@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+## 0.0.2 — 2026-07-11
+
+- Rebuilt the README around the product thesis, actual boundaries, architecture,
+  API, performance model, roadmap, and contribution paths.
+- Added CI, Dependabot, structured issue forms, and a pull-request template.
+- Added contribution, security, code-of-conduct, and technical-roadmap policies.
+- Made the displayed application version derive from `package.json`.
+- Established commit-backed SemVer releases with annotated tags.
+
 ## 0.0.1 — 2026-07-11
 
 - Added the Next.js App Router web application and public v1 route handlers.

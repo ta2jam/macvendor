@@ -7,7 +7,7 @@ export default function DataSourcesPage() {
     <section className="shell content-page">
       <p className="eyebrow">Şeffaflık</p>
       <h1>Veri kaynakları</h1>
-      <p className="lead">v0.0.1 gerçek IEEE verisi dağıtmaz. Lokal doğrulama yalnız sentetik kayıtlarla yapılır.</p>
+      <p className="lead">Mevcut demo build gerçek IEEE verisi dağıtmaz. Lokal doğrulama yalnız sentetik kayıtlarla yapılır.</p>
       <div className="source-list">
         <article>
           <div><span className="source-dot authoritative" /><h2>demo-authoritative</h2></div>

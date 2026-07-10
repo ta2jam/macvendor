@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: macvendor
+          POSTGRES_PASSWORD: macvendor
+          POSTGRES_DB: macvendor_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U macvendor -d macvendor_dev"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://macvendor:macvendor@localhost:5432/macvendor_dev
+      TEST_DATABASE_URL: postgresql://macvendor:macvendor@localhost:5432/macvendor_test
+      RATE_LIMIT_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Create test database
+        run: PGPASSWORD=macvendor createdb -h localhost -U macvendor macvendor_test
+      - name: Audit dependencies
+        run: npm audit --audit-level=low
+      - name: Verify
+        run: npm run verify

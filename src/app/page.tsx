@@ -1,4 +1,5 @@
 import { LookupForm } from "@/components/lookup-form";
+import { APP_VERSION } from "@/lib/version";
 
 export default function HomePage() {
   return (
@@ -13,8 +14,8 @@ export default function HomePage() {
               eşleşmesiyle sorgula.
             </p>
           </div>
-          <div className="stat-card" aria-label="v0.0.1 özellik özeti">
-            <span>v0.0.1</span>
+          <div className="stat-card" aria-label={`v${APP_VERSION} özellik özeti`}>
+            <span>v{APP_VERSION}</span>
             <strong>36 → 28 → 24 bit</strong>
             <p>Sabit aday kümesi, sürümlü sonuç, açık kaynak bilgisi.</p>
           </div>

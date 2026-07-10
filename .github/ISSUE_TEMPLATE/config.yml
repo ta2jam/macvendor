@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Design discussion
+    url: https://github.com/ta2jam/macvendor/discussions
+    about: Ask open-ended questions before proposing a broad change.
+  - name: Private security report
+    url: https://github.com/ta2jam/macvendor/security/advisories/new
+    about: Never disclose a suspected vulnerability in a public issue.

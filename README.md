@@ -1,22 +1,73 @@
+<div align="center">
+
 # macvendor
 
-Source-aware MAC address block assignment lookup. v0.0.1 separates authoritative assignments from owner-curated claims and returns the active data-release provenance with every lookup.
+**A source-aware MAC address block assignment lookup service.**
 
-## What v0.0.1 contains
+macvendor keeps authoritative registry assignments, owner-curated claims,
+provenance, and release state separate instead of collapsing everything into an
+unverifiable “device manufacturer” string.
 
-- Next.js App Router + TypeScript web/API application.
-- PostgreSQL immutable source/release/resolution model.
-- Strict MAC parser and 36 → 28 → 24 bit longest-prefix lookup.
-- Independent 1–48 bit curated claims.
-- Canonical URL redirects, RFC 9457 errors, ETag/cache headers and origin fallback rate limiting.
-- Exact registry assignment and active data-release endpoints.
-- Synthetic local demo data; no third-party database is redistributed.
+[![CI](https://github.com/ta2jam/macvendor/actions/workflows/ci.yml/badge.svg)](https://github.com/ta2jam/macvendor/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/github/package-json/v/ta2jam/macvendor)](CHANGELOG.md)
+[![License](https://img.shields.io/github/license/ta2jam/macvendor)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/ta2jam/macvendor?style=flat)](https://github.com/ta2jam/macvendor/stargazers)
+[![Contributors](https://img.shields.io/github/contributors/ta2jam/macvendor)](https://github.com/ta2jam/macvendor/graphs/contributors)
 
-## Local setup
+[Quick start](#quick-start) · [API](#api) · [Architecture](#architecture) ·
+[Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md) ·
+[Security](SECURITY.md)
 
-Requirements: Node.js 20.9+ and PostgreSQL 16+.
+</div>
+
+> [!WARNING]
+> The current `0.0.x` release contains **synthetic local demo records only**.
+> It does not redistribute IEEE or another third-party vendor database. A public
+> listing is not automatically licensed for redistribution. Do not represent
+> current demo results as production vendor intelligence.
+
+## What macvendor is
+
+Most MAC lookup services return one vendor string and hide how it was selected.
+macvendor models the complete lookup lifecycle:
+
+```text
+source -> immutable source release -> validation -> deterministic resolution
+       -> active release -> public API + web UI
+```
+
+A lookup can return:
+
+- an authoritative address-block assignment selected by longest-prefix match;
+- separate owner-curated claims that never overwrite the authoritative result;
+- the source release and active resolution version behind the response;
+- explicit local-administered and multicast flags without mutating input bits.
+
+An assignment identifies a registered address block. It does **not** prove the
+physical device manufacturer, model, owner, location, or current network
+identity. MAC addresses can be reassigned, spoofed, or randomized.
+
+## Current capabilities
+
+- strict parsing for bare, colon, hyphen, and dotted EUI-48 forms;
+- canonical uppercase redirects and conditional requests with ETag/304;
+- fixed authoritative lookup order: 36-bit → 28-bit → 24-bit;
+- CID kept outside full-MAC lookup semantics;
+- independent 1–48 bit owner-curated claims;
+- exact registry/prefix assignment lookup with bounded evidence;
+- immutable PostgreSQL source, release, resolution, suppression, and audit data;
+- RFC 9457 problem responses and `429 Retry-After` behavior;
+- atomic active-release state and publication-suppression overlay;
+- responsive Next.js web interface;
+- unit, PostgreSQL integration, suppression, build, and HTTP smoke coverage.
+
+## Quick start
+
+Requirements: Node.js 20.9+, npm, and PostgreSQL 16+.
 
 ```bash
+git clone https://github.com/ta2jam/macvendor.git
+cd macvendor
 createdb macvendor_dev
 createdb macvendor_test
 cp .env.example .env.local
@@ -26,37 +77,157 @@ npm run db:seed
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and query `02:AA:BB:CC:00:01`.
+Open [http://localhost:3000](http://localhost:3000) and query the synthetic demo
+address `02:AA:BB:CC:00:01`.
 
-If PostgreSQL is not installed locally, `docker compose up -d` starts PostgreSQL on port `5433`; update both database URLs in `.env.local` to use `postgresql://macvendor:macvendor@localhost:5433/...` and create the test database in that container.
+### PostgreSQL with Docker
 
-## Verification
+```bash
+docker compose up -d
+docker compose exec postgres createdb -U macvendor macvendor_test
+cp .env.example .env.local
+```
+
+Then set both database URLs in `.env.local` to port `5433`:
+
+```dotenv
+DATABASE_URL=postgresql://macvendor:macvendor@localhost:5433/macvendor_dev
+TEST_DATABASE_URL=postgresql://macvendor:macvendor@localhost:5433/macvendor_test
+```
+
+## API
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /v1/lookup/{mac}` | Authoritative assignment plus separate curated claims |
+| `GET /v1/lookup/{mac}?mode=official` | Authoritative layer only |
+| `GET /v1/assignments/{registry}/{prefix}` | Exact registry/prefix assignment |
+| `GET /v1/assignments/{registry}/{prefix}?include=evidence` | Exact assignment with bounded evidence |
+| `GET /v1/data-release` | Active release, source snapshots, rights state, and hashes |
+
+```bash
+curl -sS http://localhost:3000/v1/lookup/02AABBCC0001 | jq
+curl -sS 'http://localhost:3000/v1/lookup/02AABBCC0001?mode=official' | jq
+curl -sS 'http://localhost:3000/v1/assignments/ma-l/02AABB-24?include=evidence' | jq
+curl -sS http://localhost:3000/v1/data-release | jq
+```
+
+The complete public contract is in
+[`docs/api-contract.md`](docs/api-contract.md).
+
+## Architecture
+
+```mermaid
+flowchart LR
+    A["IEEE candidate / owner-curated source"] --> B["Isolated fetch + adapter"]
+    B --> C["Immutable source release"]
+    C --> D["Rights + validation gates"]
+    D --> E["Deterministic resolver"]
+    E --> F["Resolved assignments"]
+    E --> G["Independent resolved claims"]
+    F --> H["Atomic active-release pointer"]
+    G --> H
+    H --> I["Next.js API + UI"]
+```
+
+The application is a low-dependency modular monolith:
+
+- **Next.js + TypeScript** for the web UI and route handlers;
+- **PostgreSQL** as the source of truth;
+- **CLI migration and seed commands** from the same repository;
+- no Redis, queue, search engine, microservice split, account system, or payment
+  layer in the current scope.
+
+Authoritative lookup performs exactly three indexed candidates. Curated lookup
+has a hard upper bound of 48 prefix candidates. Candidate generation is `O(1)`
+for fixed 48-bit input; each PostgreSQL B-tree probe is `O(log N)`. Request-time
+source-table joins are excluded from the hot path.
+
+Read the binding design in [`docs/architecture.md`](docs/architecture.md), the
+physical model in [`docs/data-contract.md`](docs/data-contract.md), and the
+operational constraints in [`docs/operations.md`](docs/operations.md).
+
+## Data and licensing boundary
+
+Data availability and data rights are different facts.
+
+- IEEE is the candidate authoritative source, but production use remains blocked
+  until the intended API-output use is documented and approved.
+- KIT NETVS and community databases are reference/QA inputs, not automatically
+  production sources.
+- An amateur database is accepted only with source- and record-level provenance.
+- Exact `/48` claims are treated as device identifiers and are not public by
+  default.
+- Third-party rows with unknown origin or rights cannot enter a production
+  release.
+
+See [`docs/governance.md`](docs/governance.md) before proposing or importing a
+dataset.
+
+## Development
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run test:integration
+npm run build
+npm audit --audit-level=low
+```
+
+Run the complete local gate with:
 
 ```bash
 npm run verify
 ```
 
-This runs lint, TypeScript, unit tests, PostgreSQL integration tests and the production build.
+The integration suite resets only the database named by `TEST_DATABASE_URL` and
+refuses any name that does not end with `_test`.
 
-## API
+## Contributing
 
-```text
-GET /v1/lookup/{mac}
-GET /v1/assignments/{registry}/{prefix}
-GET /v1/data-release
-```
+Useful contributions are not limited to application code:
 
-Examples:
+- [report a reproducible bug](https://github.com/ta2jam/macvendor/issues/new?template=bug_report.yml);
+- [propose a focused feature](https://github.com/ta2jam/macvendor/issues/new?template=feature_request.yml);
+- [propose a data source](https://github.com/ta2jam/macvendor/issues/new?template=data_source.yml)
+  with license and provenance evidence;
+- improve normalization, importer, resolver, migration, cache, privacy, or
+  failure-path tests;
+- pick a [`good first issue`](https://github.com/ta2jam/macvendor/labels/good%20first%20issue)
+  or an item marked [`help wanted`](https://github.com/ta2jam/macvendor/labels/help%20wanted);
+- use [Discussions](https://github.com/ta2jam/macvendor/discussions) for open-ended
+  design questions.
 
-```bash
-curl -i http://localhost:3000/v1/lookup/02AABBCC0001
-curl -i http://localhost:3000/v1/lookup/02AABBCC0001?mode=official
-curl -i http://localhost:3000/v1/assignments/ma-l/02AABB-24?include=evidence
-curl -i http://localhost:3000/v1/data-release
-```
+If the project is useful, starring it makes the work easier to discover. Stars
+are not treated as evidence of correctness; tests and source provenance are.
 
-## Data and licensing boundary
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md), the
+[`Code of Conduct`](CODE_OF_CONDUCT.md), and the
+[`technical roadmap`](docs/ROADMAP.md) before opening a large pull request.
 
-The seed is deliberately synthetic. A public listing or downloadable file is not automatically licensed for redistribution. IEEE or any third-party dataset must pass the rights process in [`docs/governance.md`](docs/governance.md) before production ingest is enabled.
+## Version and release policy
 
-Architecture and contracts live in [`docs/architecture.md`](docs/architecture.md).
+Every released version has:
+
+1. a version change in `package.json` and `package-lock.json`;
+2. a dated entry in `CHANGELOG.md`;
+3. the full verification gate passing;
+4. an explicit `release: vX.Y.Z` commit;
+5. an annotated `vX.Y.Z` tag pointing to that commit;
+6. the commit and tag pushed together.
+
+A version is never allowed to exist only in a working tree, only as a local tag,
+or only in release notes. The detailed maintainer workflow is in
+[`CONTRIBUTING.md`](CONTRIBUTING.md#version-and-release-policy).
+
+## Security
+
+Do not report suspected vulnerabilities through public issues. Use
+[GitHub private vulnerability reporting](https://github.com/ta2jam/macvendor/security/advisories/new)
+and read [`SECURITY.md`](SECURITY.md).
+
+## License
+
+The application source is licensed under the [MIT License](LICENSE). Source-code
+licensing does not grant rights to third-party MAC assignment or vendor data.

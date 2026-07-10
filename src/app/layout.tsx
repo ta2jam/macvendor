@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { APP_VERSION } from "@/lib/version";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -35,7 +36,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               Sonuçlar adres bloğu kayıtlarını ve ayrı kullanıcı iddialarını gösterir; cihazın gerçek
               üreticisini, modelini veya sahibini kanıtlamaz.
             </p>
-            <span>v0.0.1 · local demo</span>
+            <span>v{APP_VERSION} · local demo</span>
           </div>
         </footer>
       </body>

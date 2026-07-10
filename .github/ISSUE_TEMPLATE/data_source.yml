@@ -1,0 +1,67 @@
+name: Data source proposal
+description: Propose an authoritative, curated, enrichment, or QA source with provenance.
+title: "data: "
+labels: [data-source, licensing, needs-triage]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Source name
+    validations:
+      required: true
+  - type: input
+    id: origin
+    attributes:
+      label: Canonical source URL or repository
+    validations:
+      required: true
+  - type: dropdown
+    id: class
+    attributes:
+      label: Proposed source class
+      options:
+        - authoritative
+        - owner_curated
+        - enrichment
+        - reference / QA only
+    validations:
+      required: true
+  - type: textarea
+    id: rights
+    attributes:
+      label: Rights and redistribution evidence
+      description: Identify the license, permission, ownership, restrictions, and whether API output is allowed.
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Record-level provenance
+      description: Explain how rows were created and whether any third-party list was copied or derived.
+    validations:
+      required: true
+  - type: textarea
+    id: schema
+    attributes:
+      label: Format and schema
+      description: File type, encoding, fields, prefix/exact/range geometry, update method, size, and sample rows using non-sensitive data.
+    validations:
+      required: true
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Privacy and deletion behavior
+      description: Identify /37–/48 records, personal/device data, corrections, tombstones, and takedown path.
+    validations:
+      required: true
+  - type: checkboxes
+    id: attestation
+    attributes:
+      label: Attestation
+      options:
+        - label: Public availability is not my only rights argument.
+          required: true
+        - label: I disclosed copied, imported, and derived origins.
+          required: true
+        - label: I did not include private MAC observations or personal data in this issue.
+          required: true
