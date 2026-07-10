@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: macvendor
+      POSTGRES_PASSWORD: macvendor
+      POSTGRES_DB: macvendor_dev
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U macvendor -d macvendor_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - macvendor_pgdata:/var/lib/postgresql/data
+
+volumes:
+  macvendor_pgdata:
