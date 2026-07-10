@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Updated GitHub Actions to Node 24-native major versions after the initial
+  v0.0.2 CI run reported Node 20 action-runtime deprecation warnings.
+
 ## 0.0.2 — 2026-07-11
 
 - Rebuilt the README around the product thesis, actual boundaries, architecture,
