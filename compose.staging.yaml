@@ -46,6 +46,7 @@ services:
       DATABASE_URL: ${STAGING_DATABASE_URL:?STAGING_DATABASE_URL is required}
       RATE_LIMIT_ENABLED: "true"
       TRUST_PROXY: "false"
+      DATA_CORRECTIONS_EMAIL: ${DATA_CORRECTIONS_EMAIL:-}
     depends_on:
       migrate:
         condition: service_completed_successfully

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.0.11 — 2026-07-11
+
+- Added public data-use terms covering attribution, source-rights boundaries,
+  non-device-identification semantics, raw redistribution, correctness, cache,
+  rate-limit, and correction limits.
+- Added the correction/takedown process, required evidence, target review times,
+  decision types, immutable-release behavior, and private security-channel
+  separation.
+- Added a runtime-validated `DATA_CORRECTIONS_EMAIL` link that fails closed on
+  invalid configuration and shows an explicit unavailable state when no real
+  intake channel exists; the application does not persist contact or evidence.
+- Added footer/navigation discovery and axe/cross-browser coverage for both new
+  public pages. IEEE and amateur data remain absent.
+
 ## 0.0.10 — 2026-07-11
 
 - Added a destructive-operation guard and deterministic synthetic benchmark for

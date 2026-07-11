@@ -75,6 +75,8 @@ identity. MAC addresses can be reassigned, spoofed, or randomized.
   migration-plus-artifact zero-seed rebuild drills;
 - reproducible lookup benchmarks with exact PostgreSQL plans, buffer/I/O
   counters, and separate database/origin latency distributions;
+- public data-use terms and a correction/takedown process that fails closed when
+  no accountable intake channel is configured;
 
 ## Quick start
 
@@ -184,6 +186,13 @@ Data availability and data rights are different facts.
 
 See [`docs/governance.md`](docs/governance.md) before proposing or importing a
 dataset.
+
+Public attribution and reuse boundaries are available at
+[`/legal/data-terms`](http://localhost:3000/legal/data-terms). Incorrect
+assignment, curated claim, privacy, or rights reports use
+[`/data-corrections`](http://localhost:3000/data-corrections). The latter shows
+an unavailable state until `DATA_CORRECTIONS_EMAIL` is set to a valid public
+address; it never claims that an unconfigured backend accepted a submission.
 
 ## Development
 

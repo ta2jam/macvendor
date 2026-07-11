@@ -43,6 +43,12 @@ zero-from-artifact rebuild recovery drills, sends a graceful stop, verifies exit
 zero or the standard SIGTERM-derived `143` without an OOM kill, and deletes the
 staging volume.
 
+`DATA_CORRECTIONS_EMAIL` is optional for local staging and empty by default. An
+empty value keeps `/data-corrections` visibly unavailable. Before any public
+deployment, set it to the reviewed public address backed by an access-controlled
+ticket workflow and assign the intake/escalation owner. Setting an address alone
+does not prove that the documented review targets are operational.
+
 ## Runtime boundary
 
 - Runtime is non-root UID/GID `1001`.
@@ -57,4 +63,5 @@ staging volume.
 No external staging environment is deployed by this repository. That requires a
 selected provider, account authority, DNS/TLS ownership, secret storage,
 network policy, backup destination, retention policy, and cost boundary. Until
-those are supplied, claiming an internet staging deployment would be false.
+those are supplied—and correction intake ownership is assigned—claiming an
+internet staging deployment would be false.
