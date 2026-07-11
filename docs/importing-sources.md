@@ -62,10 +62,19 @@ Limits:
 | Line | 64 KiB |
 | Text field | 16 KiB |
 | Claim JSON | 32 KiB |
+| Claim JSON nesting | 20 containers |
+| Claim JSON nodes | 4,096 values/containers |
 
 Symlinks, absolute paths, parent traversal, NUL bytes, invalid UTF-8, control
 characters, invisible/bidirectional formatting characters, hash mismatch,
 partial CSV rows and unsupported fields are rejected.
+Nested claim keys and strings are normalized to NFC; keys that collide after
+normalization are rejected rather than overwritten.
+
+The deterministic adversarial suite mutates valid artifacts and verifies that
+malformed inputs remain inside typed validation failures. It also exercises the
+byte, line, field, record, JSON-depth and JSON-node boundaries. This is a
+regression corpus, not proof that every parser input is safe.
 
 ## Idempotency
 

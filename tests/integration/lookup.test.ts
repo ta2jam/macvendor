@@ -21,6 +21,7 @@ import {
   createSuppression, expireSuppressions, listSuppressions, revokeSuppression,
 } from "../../src/operations/suppressions";
 import { writeSignedArtifact } from "../helpers/source-fixture";
+import { checkSourceGovernance } from "../../src/operations/source-health";
 
 config({ path: ".env.local", quiet: true });
 
@@ -83,6 +84,13 @@ describe("database lookup", () => {
     const release = await getDataRelease(pool);
     expect(release.activeVersion).toBe(1);
     expect(release.sources.map((source) => source.slug)).toEqual(["demo-authoritative", "demo-curated"]);
+  });
+
+  it("reports configured production source governance from PostgreSQL", async () => {
+    const report = await checkSourceGovernance(pool);
+    expect(report).toMatchObject({ healthy: true, summary: { sources: 2, failures: 0, warnings: 2 } });
+    expect(report.sources.map((source) => source.slug)).toEqual(["demo-authoritative", "demo-curated"]);
+    expect(report.sources.every((source) => source.findings[0]?.code === "FRESHNESS_LIMIT_MISSING")).toBe(true);
   });
 
   it("applies and revokes publication suppression without rebuilding", async () => {
@@ -235,6 +243,7 @@ describe("lookup route", () => {
     assertPublicContract("LookupResponse", await first.clone().json());
     expect(first.status).toBe(200);
     expect(etag).toBeTruthy();
+    expect(first.headers.get("surrogate-key")).toMatch(/^data-release resolved-release-[0-9a-f-]+$/);
 
     const secondRequest = new NextRequest("http://localhost:3000/v1/lookup/02AABBCC0001", {
       headers: { "If-None-Match": etag! },
@@ -249,6 +258,7 @@ describe("lookup route", () => {
       params: Promise.resolve({ registry: "ma-l", prefix: "02AABB-24" }),
     });
     expect(response.status).toBe(200);
+    expect(response.headers.get("surrogate-key")).toBeNull();
     assertPublicContract("AssignmentResponse", await response.json());
   });
 
@@ -256,6 +266,7 @@ describe("lookup route", () => {
     const request = new NextRequest("http://localhost:3000/v1/data-release");
     const response = await dataReleaseRoute(request);
     expect(response.status).toBe(200);
+    expect(response.headers.get("surrogate-key")).toMatch(/^data-release resolved-release-[0-9a-f-]+$/);
     assertPublicContract("DataReleaseResponse", await response.json());
   });
 });

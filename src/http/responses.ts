@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
+import { normalizeSurrogateKeys } from "@/cache/surrogate";
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
 
@@ -47,7 +48,7 @@ export function problemResponse(args: {
 export function jsonResponse(
   request: NextRequest,
   body: unknown,
-  args: { requestId: string; cacheControl: string; etagSeed: string },
+  args: { requestId: string; cacheControl: string; etagSeed: string; surrogateKeys?: string[] },
 ): Response {
   const json = JSON.stringify(body);
   const digest = createHash("sha256").update(args.etagSeed).update("\0").update(json).digest("base64url");
@@ -55,6 +56,9 @@ export function jsonResponse(
   const headers = new Headers(commonHeaders(args.requestId));
   headers.set("Cache-Control", args.cacheControl);
   headers.set("ETag", etag);
+  if (args.surrogateKeys && args.cacheControl.startsWith("public,")) {
+    headers.set("Surrogate-Key", normalizeSurrogateKeys(args.surrogateKeys).join(" "));
+  }
 
   if (request.headers.get("if-none-match") === etag) {
     headers.delete("Content-Type");

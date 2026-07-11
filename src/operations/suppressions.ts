@@ -184,7 +184,8 @@ export async function revokeSuppression(pool: Pool, options: {
         JSON.stringify({ ticketReference: options.ticketReference, revokedAt: (options.now ?? new Date()).toISOString(), publicationVersion })],
     );
     await client.query("COMMIT");
-    return { status: "revoked" as const, suppressionId: options.suppressionId, publicationVersion };
+    return { status: "revoked" as const, suppressionId: options.suppressionId,
+      resolutionRunId: active.runId, publicationVersion };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -199,7 +200,7 @@ export async function expireSuppressions(pool: Pool, options: { actorId: string;
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    await lockActiveResolution(client);
+    const active = await lockActiveResolution(client);
     const expired = await client.query<{ id: string }>(
       `UPDATE publication_suppressions SET status = 'expired'
        WHERE status = 'active' AND expires_at IS NOT NULL AND expires_at <= $1
@@ -219,7 +220,8 @@ export async function expireSuppressions(pool: Pool, options: { actorId: string;
       );
     }
     await client.query("COMMIT");
-    return { status: "expired" as const, expiredCount: expired.rows.length, publicationVersion };
+    return { status: "expired" as const, expiredCount: expired.rows.length,
+      resolutionRunId: active.runId, publicationVersion };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

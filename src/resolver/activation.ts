@@ -12,6 +12,7 @@ export interface ActivationResult {
   resolutionRunId: string;
   activeVersion: number;
   publicationVersion: number;
+  previousResolutionRunId: string | null;
 }
 
 export async function activateResolution(
@@ -40,6 +41,7 @@ export async function activateResolution(
         status: "already_active", resolutionRunId: runId,
         activeVersion: Number(pointer.rows[0].version),
         publicationVersion: Number(pointer.rows[0].publication_version),
+        previousResolutionRunId: null,
       };
     }
     if (candidate.rows[0].status !== expected) {
@@ -94,6 +96,7 @@ export async function activateResolution(
       resolutionRunId: runId,
       activeVersion: Number(updated.rows[0]!.version),
       publicationVersion: Number(updated.rows[0]!.publication_version),
+      previousResolutionRunId: pointer.rows[0]?.resolution_run_id ?? null,
     };
   } catch (error) {
     await client.query("ROLLBACK");

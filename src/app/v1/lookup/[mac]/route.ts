@@ -4,6 +4,7 @@ import { DataReleaseUnavailableError, lookupMac } from "@/db/lookup";
 import { InvalidMacError, normalizeMac } from "@/domain/mac";
 import { consumeRateLimit } from "@/http/rate-limit";
 import { jsonResponse, problemResponse, redirectResponse, requestId } from "@/http/responses";
+import { DATA_RELEASE_SURROGATE_KEY, resolutionSurrogateKey } from "@/cache/surrogate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,6 +60,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         ? "public, max-age=300, s-maxage=86400, stale-while-revalidate=604800"
         : "public, max-age=60, s-maxage=3600",
       etagSeed: `${result.data.activeVersion}:${result.data.publicationVersion}:${mode}:${mac.normalized}`,
+      surrogateKeys: [resolutionSurrogateKey(result.data.resolvedReleaseId), DATA_RELEASE_SURROGATE_KEY],
     });
   } catch (error) {
     if (error instanceof InvalidMacError) {

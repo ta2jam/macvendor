@@ -4,6 +4,7 @@ import { getPool } from "@/db/pool";
 import { InvalidPrefixError, normalizeRegistry, parseAssignmentPrefix, REGISTRY_LENGTHS } from "@/domain/mac";
 import { consumeRateLimit } from "@/http/rate-limit";
 import { jsonResponse, problemResponse, redirectResponse, requestId } from "@/http/responses";
+import { DATA_RELEASE_SURROGATE_KEY, resolutionSurrogateKey } from "@/cache/surrogate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +47,7 @@ export async function GET(
       requestId: id,
       cacheControl: include === "evidence" ? "private, no-store" : "public, max-age=300, s-maxage=86400",
       etagSeed: `${result.data.activeVersion}:${result.data.publicationVersion}:${registry.registry}:${prefix.canonical}:${include ?? "none"}`,
+      surrogateKeys: [resolutionSurrogateKey(result.data.resolvedReleaseId), DATA_RELEASE_SURROGATE_KEY],
     });
   } catch (error) {
     if (error instanceof InvalidPrefixError) {

@@ -31,16 +31,22 @@ correctness gates can delay or reject a feature.
 
 ## Next — production-data readiness
 
-- [ ] obtain and document approved production source rights;
+- [ ] obtain approved production source rights; the 2026-07-11
+  [IEEE review](./rights/ieee-registration-authority.md) found no explicit grant
+  for derived public API output, so issue #8 remains blocked;
+
+## Independent hardening while data rights are blocked
+
+- [x] provider-neutral surrogate-key headers, purge hook, and failure-injection
+  tests; a real CDN adapter still requires provider validation — issue #18;
+- [ ] external/shared rate limiting based on measured traffic — blocked issue #19;
+- [x] importer fuzz corpus and resource-limit enforcement — issue #17;
+- [x] source freshness and rights-expiry monitoring — issue #17;
+- [ ] accessibility and cross-browser UI verification;
+- [ ] benchmark lookup p50/p95/p99, query plans, CPU, memory, and I/O;
 
 ## After data readiness
 
-- [ ] CDN surrogate-key purge and failure-injection tests;
-- [ ] external/shared rate limiting based on measured traffic;
-- [ ] importer fuzz corpus and resource-limit enforcement;
-- [ ] source freshness and rights-expiry monitoring;
-- [ ] accessibility and cross-browser UI verification;
-- [ ] benchmark lookup p50/p95/p99, query plans, CPU, memory, and I/O;
 - [ ] contributor-maintained source adapters after rights review.
 
 Amateur/owner-curated database ingestion remains deferred until its provenance

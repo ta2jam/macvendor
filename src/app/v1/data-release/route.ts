@@ -3,6 +3,7 @@ import { DataReleaseUnavailableError, getDataRelease } from "@/db/lookup";
 import { getPool } from "@/db/pool";
 import { consumeRateLimit } from "@/http/rate-limit";
 import { jsonResponse, problemResponse, requestId } from "@/http/responses";
+import { DATA_RELEASE_SURROGATE_KEY, resolutionSurrogateKey } from "@/cache/surrogate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
       requestId: id,
       cacheControl: "public, max-age=60, s-maxage=300",
       etagSeed: `${result.activeVersion}:${result.publicationVersion}:${sourceVersions}`,
+      surrogateKeys: [resolutionSurrogateKey(result.resolvedReleaseId), DATA_RELEASE_SURROGATE_KEY],
     });
   } catch (error) {
     if (error instanceof DataReleaseUnavailableError) {
