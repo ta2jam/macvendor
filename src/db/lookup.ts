@@ -332,6 +332,7 @@ export async function getDataRelease(pool: Pool) {
     source_release_id: string;
     observed_at: Date;
     source_class: string;
+    record_count: number;
     distribution_scope: string;
     rights_status_at_build: string;
     current_rights_status: string;
@@ -343,7 +344,7 @@ export async function getDataRelease(pool: Pool) {
            rr.policy_version, rr.output_hash, rr.completed_at AS generated_at,
            ds.slug AS source_slug, sr.id AS source_release_id,
            COALESCE(observation.observed_at, sr.fetched_at) AS observed_at,
-           ds.source_class, ds.distribution_scope,
+           ds.source_class, sr.record_count, ds.distribution_scope,
            ri.source_config_snapshot->>'rightsStatus' AS rights_status_at_build,
            ds.rights_status AS current_rights_status, ds.rights_review_expires_at,
            ds.config_version,
@@ -376,6 +377,8 @@ export async function getDataRelease(pool: Pool) {
       sourceReleaseId: `sr_${row.source_release_id}`,
       observedAt: row.observed_at.toISOString(),
       verificationStatus: row.source_class === "authoritative" ? "authoritative" : "owner_asserted",
+      sourceClass: row.source_class,
+      recordCount: row.record_count,
       rightsScope: row.distribution_scope,
       rightsStatusAtBuild: row.rights_status_at_build,
       currentRightsStatus: row.current_rights_status,

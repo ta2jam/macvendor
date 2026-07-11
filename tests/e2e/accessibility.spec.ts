@@ -17,8 +17,8 @@ test.describe("public accessibility surface", () => {
     test(`${path} has no automated WCAG A/AA violations`, async ({ page }) => {
       await page.goto(path);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-      if (path === "/data-release") {
-        await expect(page.getByLabel("Aktif veri sürümü JSON çıktısı")).toBeVisible();
+      if (path === "/data-release" || path === "/data-sources") {
+        await expect(page.getByLabel("Aktif veri kaynakları")).toBeVisible();
       }
       await expectNoAxeViolations(page);
     });
@@ -35,6 +35,17 @@ test.describe("public accessibility surface", () => {
     await expect(skipLink).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page.locator("#main-content")).toBeFocused();
+  });
+
+  test("release and source pages render live active inputs", async ({ page }) => {
+    await page.goto("/data-sources");
+    const sources = page.getByLabel("Aktif veri kaynakları");
+    await expect(sources.getByRole("heading", { name: "demo-authoritative" })).toBeVisible();
+    await expect(sources.getByRole("heading", { name: "demo-curated" })).toBeVisible();
+    await page.goto("/data-release");
+    await expect(page.getByLabel("Toplam kayıt").getByText("2", { exact: true })).toBeVisible();
+    await page.getByText("Ham API yanıtını göster").click();
+    await expect(page.getByLabel("Aktif veri sürümü JSON çıktısı")).toBeVisible();
   });
 
   test("lookup exposes success, no-match, and validation states", async ({ page }) => {

@@ -124,12 +124,14 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["slug", "sourceReleaseId", "observedAt", "verificationStatus", "rightsScope", "rightsStatusAtBuild", "currentRightsStatus", "rightsReviewExpiresAt", "status", "configVersion", "configVersionAtBuild", "configChangedSinceBuild"],
+            "required": ["slug", "sourceReleaseId", "observedAt", "verificationStatus", "sourceClass", "recordCount", "rightsScope", "rightsStatusAtBuild", "currentRightsStatus", "rightsReviewExpiresAt", "status", "configVersion", "configVersionAtBuild", "configChangedSinceBuild"],
             "properties": {
               "slug": { "type": "string", "minLength": 1 },
               "sourceReleaseId": { "type": "string", "pattern": "^sr_[0-9a-f-]+$" },
               "observedAt": { "type": "string", "format": "date-time" },
               "verificationStatus": { "type": "string", "enum": ["authoritative", "owner_asserted"] },
+              "sourceClass": { "type": "string", "enum": ["authoritative", "enrichment", "owner_curated"] },
+              "recordCount": { "type": "integer", "minimum": 0 },
               "rightsScope": { "type": "string", "enum": ["internal_only", "api_output", "raw_redistribution"] },
               "rightsStatusAtBuild": { "type": "string", "enum": ["unreviewed", "owner_asserted", "approved", "rejected", "expired"] },
               "currentRightsStatus": { "type": "string", "enum": ["unreviewed", "owner_asserted", "approved", "rejected", "expired"] },

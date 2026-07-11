@@ -50,6 +50,10 @@ identity. MAC addresses can be reassigned, spoofed, or randomized.
 
 ## Current capabilities
 
+v0.1.0 is the first inspectable local release: the web UI reads the active
+resolution and source metadata from PostgreSQL instead of presenting a static
+demo inventory. It is not a claim of internet production readiness.
+
 - strict parsing for bare, colon, hyphen, and dotted EUI-48 forms;
 - canonical uppercase redirects and conditional requests with ETag/304;
 - fixed authoritative lookup order: 36-bit → 28-bit → 24-bit;

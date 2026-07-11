@@ -197,6 +197,8 @@ observation yoksa release fetch zamanına düşer.
       "sourceReleaseId": "sr_01...",
       "observedAt": "2026-07-11T02:00:00Z",
       "verificationStatus": "authoritative",
+      "sourceClass": "authoritative",
+      "recordCount": 39722,
       "rightsScope": "api_output",
       "rightsStatusAtBuild": "approved",
       "currentRightsStatus": "approved",
@@ -216,6 +218,9 @@ sonradan expired/rejected olan veya config'i değişen kaynak gizlenmez.
 resolution'ın kullandığı sürümdür. Eşitsizlik rebuild gerektiğini gösterir fakat
 tek başına lookup çıktısını değiştirmez. Kaynak lisans metninin yerine geçmez.
 Hassas artifact URL'leri, imza anahtarları, iç notlar ve ham kayıtlar döndürülmez.
+`sourceClass` kaynak katmanını, `recordCount` ise dahil edilen immutable source
+release içindeki normalize edilmiş kayıt sayısını gösterir; resolved assignment
+sayısı değildir.
 
 Cache: `Cache-Control: public, max-age=60, s-maxage=300`. ETag; `activeVersion`,
 `publicationVersion`, dahil edilen kaynakların güncel `configVersion`, hak

@@ -10,7 +10,7 @@ export default function HomePage() {
             <p className="eyebrow">Kaynağı belli. Sonucu açıklanabilir.</p>
             <h1>MAC adres bloğunun kayıt sahibini bul.</h1>
             <p className="hero-copy">
-              Resmî atamalar ile amatör/kürasyonlu iddiaları birbirine karıştırmadan, longest-prefix
+              Resmî atamalar ile owner-curated iddiaları birbirine karıştırmadan, longest-prefix
               eşleşmesiyle sorgula.
             </p>
           </div>

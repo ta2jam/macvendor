@@ -89,6 +89,10 @@ describe("database lookup", () => {
     const release = await getDataRelease(pool);
     expect(release.activeVersion).toBe(1);
     expect(release.sources.map((source) => source.slug)).toEqual(["demo-authoritative", "demo-curated"]);
+    expect(release.sources).toEqual(expect.arrayContaining([
+      expect.objectContaining({ slug: "demo-authoritative", sourceClass: "authoritative", recordCount: 1 }),
+      expect.objectContaining({ slug: "demo-curated", sourceClass: "owner_curated", recordCount: 1 }),
+    ]));
   });
 
   it("reports configured production source governance from PostgreSQL", async () => {

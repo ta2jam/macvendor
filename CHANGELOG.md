@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.1.0 — 2026-07-12
+
+- Graduated the local product surface from foundation preview to the first
+  inspectable release without claiming production infrastructure readiness.
+- Replaced static demo source descriptions with the deployment's live active
+  resolution inputs, including source class, record count, latest observation,
+  rights state, API scope, and build/current config status.
+- Replaced the raw-only data-release page with human-readable release metrics,
+  provenance, and source cards while retaining the exact API JSON behind a
+  disclosure control.
+- Added `sourceClass` and `recordCount` to the additive public data-release
+  contract and runtime schema validation.
+- Removed the synthetic default MAC and the inaccurate implication that amateur
+  data is active; lookups now start empty and require explicit input.
+- Added live-source browser assertions and responsive presentation. Shared rate
+  limiting and correction intake remain deployment-blocked, not silently faked.
+
 ## 0.0.18 — 2026-07-11
 
 - `/v1/data-release` now returns the latest immutable fetch observation for each

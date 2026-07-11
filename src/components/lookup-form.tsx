@@ -43,7 +43,7 @@ const verificationLabels: Record<string, string> = {
 };
 
 export function LookupForm() {
-  const [mac, setMac] = useState("02:AA:BB:CC:00:01");
+  const [mac, setMac] = useState("");
   const [result, setResult] = useState<ApiResult | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [loading, setLoading] = useState(false);
@@ -95,13 +95,7 @@ export function LookupForm() {
           <button type="submit" disabled={loading}>{loading ? "Sorgulanıyor…" : "Sorgula"}</button>
         </div>
         <p className="input-hint" id="mac-hint">
-          12 hexadecimal karakter veya ayraçlı MAC girin. Demo kayıt:{" "}
-          <button type="button" onClick={() => {
-            setMac("02:AA:BB:CC:00:01");
-            setProblem(null);
-          }}>
-            02:AA:BB:CC:00:01
-          </button>
+          12 hexadecimal karakter veya iki nokta, tire ya da nokta ayraçlı MAC girin.
         </p>
       </form>
 
