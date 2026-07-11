@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.0.13 — 2026-07-11
+
+- Added a provider-neutral `source:update:ieee` command that prepares, verifies,
+  imports, resolves, activates, purges, and health-checks the fixed MA-L/MA-M/
+  MA-S source set under one database advisory lock.
+- Added append-only fetch observations so an unchanged upstream snapshot
+  refreshes source-health evidence without duplicating immutable releases or
+  changing the active resolution version.
+- Resolver freshness now uses the latest verified observation, while failed
+  pre-activation runs preserve the active pointer and post-commit purge/health
+  failures are reported explicitly as committed.
+- Added preparation unit coverage and end-to-end PostgreSQL coverage for first
+  publication, unchanged reruns, active-version stability, and overlap rejection.
+
 ## 0.0.12 — 2026-07-11
 
 - Reopened the IEEE rights review with the adverse 2013 response, later 2014

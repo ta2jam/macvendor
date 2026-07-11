@@ -91,6 +91,19 @@ State transition:
 
 Release satırları immutable'dır. Yalnız state transition ve zaman alanları değişebilir; artifact veya kayıt içeriği değişemez.
 
+### `source_fetch_observations`
+
+- `id`, `source_release_id`.
+- `observed_at`, `source_url`, `actor_id`.
+- Boyutlandırılmış `metadata`: registry, record/byte sayıları ve adapter uyarıları.
+
+Aynı immutable release byte'larının daha sonra doğrudan ve başarıyla yeniden
+alındığını kaydeder. Unique anahtar `(source_release_id, observed_at)` çiftidir;
+satırlar append-only trigger ile update/delete'e kapalıdır. Resolver ve source
+health tazeliği release'in ilk `fetched_at` zamanı yerine varsa son observation
+zamanını kullanır. Release kimliği, import key'i veya active version sırf
+yeniden-fetch nedeniyle değişmez.
+
 ### `source_artifacts`
 
 - `id`, `source_release_id`.

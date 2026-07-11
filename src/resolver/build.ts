@@ -188,8 +188,13 @@ export async function buildResolution(pool: Pool, options: BuildResolutionOption
         ds.max_acceptable_age_seconds, ds.config_version, ds.rights_status, ds.rights_basis,
         ds.distribution_scope, ds.rights_review_reference, ds.rights_review_expires_at,
         sr.status AS release_status, sr.schema_version, sr.adapter_version,
-        sr.normalizer_version, sr.fetched_at, sr.content_hash, sr.import_key
+        sr.normalizer_version, COALESCE(observation.observed_at, sr.fetched_at) AS fetched_at,
+        sr.content_hash, sr.import_key
        FROM source_releases sr JOIN data_sources ds ON ds.id = sr.source_id
+       LEFT JOIN LATERAL (
+         SELECT observed_at FROM source_fetch_observations sfo
+         WHERE sfo.source_release_id = sr.id ORDER BY observed_at DESC LIMIT 1
+       ) observation ON true
        WHERE sr.id = ANY($1::uuid[]) ORDER BY ds.slug`,
       [requestedIds],
     );

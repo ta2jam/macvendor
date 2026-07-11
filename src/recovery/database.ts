@@ -10,6 +10,7 @@ export const BACKUP_TABLES = [
   "schema_migrations",
   "data_sources",
   "source_releases",
+  "source_fetch_observations",
   "source_artifacts",
   "source_records",
   "resolution_runs",

@@ -14,6 +14,26 @@ Her job:
 
 Scheduler timezone `UTC` kullanır; her kaynağın `fetch_policy/fetch_interval_seconds` ayarına göre çalışır ve scheduled fetch'e jitter eklenir.
 
+### IEEE güncelleme job'u
+
+```bash
+OPERATOR_ACTOR_ID=operator:ieee-scheduler npm run source:update:ieee
+```
+
+Komut sabit MA-L/MA-M/MA-S URL'lerini prepare, verify, import, resolve ve activate
+eder; commit sonrası surrogate purge ve source-health kontrolünü çalıştırır.
+Session-level advisory lock nedeniyle çakışan ikinci job `already_running`
+döndürür. Sağlayıcıya özgü scheduler bu repoya gömülü değildir; günlük UTC
+çalıştırma, jitter, secret injection ve non-zero exit alarmı deployment
+sorumluluğudur.
+
+Değişmeyen artifact yeni source release veya active version üretmez. Bunun
+yerine yeni append-only fetch observation yazar; freshness bu son gözlemden
+hesaplanır. Import, observation veya build hatası mevcut active pointer'ı
+değiştirmez; doğrulanmış ara kayıtlar audit/provenance için kalabilir. Activation
+commit'inden sonraki purge/health hatası rollback olmuş gibi sunulmaz:
+`IeeeUpdatePostCommitError.committed=true` ve hata fazı raporlanır.
+
 ## Yetki ve DB rolleri
 
 - `app_readonly`: Active pointer, resolved assignments/claims, publication suppressions ve public release metadata okur.
@@ -236,7 +256,7 @@ Disaster durumunda öncelik son doğrulanmış resolved release'i read-only serv
 
 - Aylık availability: %99,9 hedef.
 - Origin p95: 75 ms altında hedef.
-- Her `required_for_activation` kaynağın yaşı kendi `max_acceptable_age_seconds` sınırının altında; IEEE için başlangıç değeri 36 saat.
+- Her `required_for_activation` kaynağın yaşı kendi `max_acceptable_age_seconds` sınırının altında; IEEE için başlangıç değeri 48 saat.
 - Source import: 5 dakika altında.
 - Resolution: 10 dakika altında.
 

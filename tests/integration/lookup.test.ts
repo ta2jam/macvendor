@@ -22,6 +22,9 @@ import {
 } from "../../src/operations/suppressions";
 import { writeSignedArtifact } from "../helpers/source-fixture";
 import { checkSourceGovernance } from "../../src/operations/source-health";
+import { IeeeUpdatePostCommitError, updateIeeeSources } from "../../src/operations/ieee-update";
+import { IEEE_ADAPTER_KEY, IEEE_DATASETS, IEEE_RA_ORIGIN, IEEE_RIGHTS_REVIEW } from "../../src/sources/ieee";
+import type { PreparedIeeeSnapshot } from "../../src/sources/prepare-ieee";
 
 config({ path: ".env.local", quiet: true });
 
@@ -482,5 +485,119 @@ describe("resolution publication lifecycle", () => {
     } finally {
       await pool.query("UPDATE data_sources SET config_version = config_version - 1 WHERE slug = 'demo-authoritative'");
     }
+  });
+});
+
+async function writePreparedIeeeSnapshot(directory: string, preparedAt: string): Promise<PreparedIeeeSnapshot> {
+  const prefixes = { "MA-L": "001122", "MA-M": "AABBCCD", "MA-S": "DDEEFF001" } as const;
+  const datasets = [];
+  for (const dataset of IEEE_DATASETS) {
+    const csv = [
+      "Registry,Assignment,Organization Name,Organization Address",
+      `${dataset.registry},${prefixes[dataset.registry]},Integration ${dataset.registry} Vendor,Integration Address`,
+      "",
+    ].join("\n");
+    const signature = await writeSignedArtifact(directory, csv, dataset.file);
+    const manifest = {
+      schemaVersion: "macvendor-source/v1",
+      source: {
+        slug: dataset.slug, name: dataset.name, class: "authoritative", publishMode: "production",
+        adapterKey: IEEE_ADAPTER_KEY, fetchPolicy: "scheduled", fetchIntervalSeconds: 86_400,
+        maxAcceptableAgeSeconds: 172_800, requiredForActivation: true,
+        rights: { status: "approved", basis: "public_domain_claim", distributionScope: "api_output",
+          reviewReference: IEEE_RIGHTS_REVIEW, reviewExpiresAt: "2027-07-11T00:00:00.000Z" },
+      },
+      release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1",
+        adapterVersion: "1", normalizerVersion: "1", diffPolicy: { maxAddedPercent: 10, maxRemovedPercent: 2 } },
+      artifact: { path: dataset.file, format: "csv", sha256: sha256(csv), signatureStatus: "verified",
+        signature: { ...signature, origin: "operator" },
+        remote: { url: dataset.url, allowedOrigins: [IEEE_RA_ORIGIN], maxRedirects: 0 } },
+      defaults: { recordKind: "assignment", originType: "imported", rightsBasis: "public_domain_claim",
+        distributionScope: "api_output", verificationStatus: "single_observation", registry: dataset.registry },
+    };
+    const manifestPath = path.join(directory, `${dataset.slug}.manifest.json`);
+    await writeFile(manifestPath, JSON.stringify(manifest));
+    datasets.push({ registry: dataset.registry, manifestPath, contentHash: sha256(csv), records: 1,
+      bytes: Buffer.byteLength(csv), adapterWarnings: [], finalOrigin: IEEE_RA_ORIGIN, sourceUrl: dataset.url });
+  }
+  return { status: "prepared", preparedAt, output: directory, datasets };
+}
+
+describe("guarded IEEE update", () => {
+  it("publishes once, observes unchanged snapshots, and rejects overlapping runs", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "macvendor-ieee-update-"));
+    const secondPreparedAt = new Date().toISOString();
+    const firstPreparedAt = new Date(Date.parse(secondPreparedAt) - 60_000).toISOString();
+    try {
+      const prepared = await writePreparedIeeeSnapshot(directory, firstPreparedAt);
+      const common = {
+        policyVersion: "v0.0.13-test", policyCommitSha: "integration-ieee-update",
+        containerImageDigest: "sha256:integration-ieee-update", actorId: "operator:integration",
+      };
+      const first = await updateIeeeSources(pool, { ...common, prepare: async () => prepared });
+      expect(first).toMatchObject({ status: "updated", build: { status: "validated", assignmentCount: 3 },
+        activation: { status: "activated" }, cachePurge: { status: "skipped", reason: "not_configured" } });
+
+      const second = await updateIeeeSources(pool, { ...common,
+        prepare: async () => ({ ...prepared, preparedAt: secondPreparedAt }) });
+      expect(second).toMatchObject({ status: "updated", build: { status: "already_built" },
+        activation: { status: "already_active" }, cachePurge: { status: "skipped", reason: "no_change" } });
+      if (first.status !== "updated" || second.status !== "updated") throw new Error("unexpected update status");
+      expect(second.activation.activeVersion).toBe(first.activation.activeVersion);
+
+      const counts = await pool.query<{ releases: string; observations: string }>(
+        `SELECT count(DISTINCT sr.id) AS releases, count(sfo.id) AS observations
+         FROM data_sources ds JOIN source_releases sr ON sr.source_id = ds.id
+         LEFT JOIN source_fetch_observations sfo ON sfo.source_release_id = sr.id
+         WHERE ds.slug = ANY($1::text[])`,
+        [IEEE_DATASETS.map((dataset) => dataset.slug)],
+      );
+      expect(counts.rows[0]).toEqual({ releases: "3", observations: "6" });
+      await expect(pool.query("UPDATE source_fetch_observations SET actor_id = 'tampered'"))
+        .rejects.toThrow(/append-only/);
+      const health = await checkSourceGovernance(pool, { now: new Date(secondPreparedAt) });
+      expect(health.healthy).toBe(true);
+      expect(health.sources.filter((source) => source.slug.startsWith("ieee-"))
+        .every((source) => source.monitoredFetchedAt === secondPreparedAt)).toBe(true);
+
+      const lock = await pool.connect();
+      try {
+        await lock.query("SELECT pg_advisory_lock($1)", [6_104_227_006]);
+        await expect(updateIeeeSources(pool, { ...common, prepare: async () => prepared }))
+          .resolves.toEqual({ status: "already_running" });
+      } finally {
+        await lock.query("SELECT pg_advisory_unlock($1)", [6_104_227_006]);
+        lock.release();
+      }
+
+      const versionBeforeFailure = second.activation.activeVersion;
+      let postCommitError: unknown;
+      try {
+        await updateIeeeSources(pool, { ...common, policyCommitSha: "integration-ieee-postcommit",
+          prepare: async () => ({ ...prepared, preparedAt: secondPreparedAt }),
+          purge: async () => { throw new Error("injected purge failure"); } });
+      } catch (error) {
+        postCommitError = error;
+      }
+      expect(postCommitError).toBeInstanceOf(IeeeUpdatePostCommitError);
+      expect(postCommitError).toMatchObject({ phase: "cache_purge", committed: true,
+        activation: { status: "activated", activeVersion: versionBeforeFailure + 1 } });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the active pointer unchanged when preparation fails validation", async () => {
+    const before = await pool.query<{ resolution_run_id: string; version: string }>(
+      "SELECT resolution_run_id, version FROM active_resolution WHERE singleton_id = 1",
+    );
+    await expect(updateIeeeSources(pool, {
+      policyVersion: "v0.0.13-test", policyCommitSha: "integration-ieee-invalid",
+      containerImageDigest: "sha256:integration-ieee-invalid", actorId: "operator:integration",
+      prepare: async () => ({ status: "prepared", preparedAt: new Date().toISOString(), output: "fixture", datasets: [] }),
+    })).rejects.toThrow(/exactly three/);
+    await expect(pool.query<{ resolution_run_id: string; version: string }>(
+      "SELECT resolution_run_id, version FROM active_resolution WHERE singleton_id = 1",
+    )).resolves.toMatchObject({ rows: before.rows });
   });
 });

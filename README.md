@@ -191,24 +191,25 @@ Data availability and data rights are different facts.
 See [`docs/governance.md`](docs/governance.md) before proposing or importing a
 dataset.
 
-### Prepare an IEEE release
+### Update the IEEE release
 
 The private ingest key is never committed. The public trust anchor is versioned
 under `config/keys/`. After provisioning the matching private key at
 `~/.config/macvendor/ieee-ingest-ed25519-private.pem`:
 
 ```bash
-npm run source:prepare:ieee
-npm run source:import -- --manifest .local/ieee/YYYY-MM-DD/ieee-ma-l.manifest.json
-npm run source:import -- --manifest .local/ieee/YYYY-MM-DD/ieee-ma-m.manifest.json
-npm run source:import -- --manifest .local/ieee/YYYY-MM-DD/ieee-ma-s.manifest.json
-npm run resolution:build -- --source-release UUID --source-release UUID --source-release UUID
-npm run resolution:activate -- --run UUID
+OPERATOR_ACTOR_ID=operator:ieee-scheduler npm run source:update:ieee
 ```
+
+The guarded command prepares, verifies, imports, resolves, activates, and purges
+all three fixed IEEE registries. A database advisory lock rejects overlap. An
+unchanged download records a new immutable fetch observation without duplicating
+the source release or incrementing the active version.
 
 Generated raw files, signatures, and manifests stay under ignored `.local/` and
 are not redistributed through GitHub. See [`NOTICE`](NOTICE) and the importing
-runbook before rotating keys or changing URLs.
+runbook before rotating keys or changing URLs. The lower-level prepare/import/
+build/activate commands remain available for diagnosis and controlled recovery.
 
 Public attribution and reuse boundaries are available at
 [`/legal/data-terms`](http://localhost:3000/legal/data-terms). Incorrect
