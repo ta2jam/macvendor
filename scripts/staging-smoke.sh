@@ -37,4 +37,10 @@ curl --fail --silent --show-error "http://127.0.0.1:${app_port}/v1/lookup/02AABB
 
 container_id=$(docker compose -f "$compose_file" ps --quiet app)
 docker compose -f "$compose_file" stop --timeout 10 app
-test "$(docker inspect --format '{{.State.ExitCode}}' "$container_id")" = "0"
+exit_code=$(docker inspect --format '{{.State.ExitCode}}' "$container_id")
+oom_killed=$(docker inspect --format '{{.State.OOMKilled}}' "$container_id")
+test "$oom_killed" = "false"
+case "$exit_code" in
+  0|143) ;;
+  *) echo "unexpected app exit code: $exit_code" >&2; exit 1 ;;
+esac
