@@ -687,10 +687,36 @@ describe("source governance mutation", () => {
     const accepted = { ...disable, acceptActivePublicationRisk: true };
     await expect(applySourceGovernance(pool, accepted, "operator:integration"))
       .resolves.toMatchObject({ status: "updated", activeInput: true, activePublicationRisk: true });
+    const disabledHealth = await checkSourceGovernance(pool);
+    expect(disabledHealth.sources.find((source) => source.slug === "ieee-ma-l")?.findings.map((item) => item.code))
+      .toEqual(expect.arrayContaining(["ACTIVE_SOURCE_NOT_PRODUCTION", "ACTIVE_CONFIG_CHANGED"]));
     await expect(activateResolution(pool, built.resolutionRunId, { actorId: "operator:integration" }))
       .rejects.toMatchObject({ code: "SOURCE_CONFIG_CHANGED" });
     await expect(applySourceGovernance(pool, { ...disable, decisionReference: "GOV-INTEGRATION-RESTORE",
       patch: { publishMode: "production" as const, requiredForActivation: true } }, "operator:integration"))
       .resolves.toMatchObject({ status: "updated", activePublicationRisk: false });
+    const driftedRelease = await getDataRelease(pool);
+    expect(driftedRelease.sources.find((source) => source.slug === "ieee-ma-l")).toMatchObject({
+      configChangedSinceBuild: true,
+    });
+    const restoredHealth = await checkSourceGovernance(pool);
+    expect(restoredHealth.healthy).toBe(true);
+    expect(restoredHealth.sources.find((source) => source.slug === "ieee-ma-l")).toMatchObject({
+      activeConfigChanged: true,
+      findings: [expect.objectContaining({ code: "ACTIVE_CONFIG_CHANGED", severity: "warning" })],
+    });
+
+    const rebuilt = await buildResolution(pool, {
+      sourceReleaseIds: releases.rows.map((row) => row.id),
+      policyVersion: "v0.0.17-config-drift-test",
+      policyCommitSha: "governance-config-drift-rebuild",
+      containerImageDigest: "sha256:governance-config-drift-test",
+      now: new Date(),
+    });
+    await activateResolution(pool, rebuilt.resolutionRunId, { actorId: "operator:integration" });
+    expect((await checkSourceGovernance(pool)).sources.find((source) => source.slug === "ieee-ma-l"))
+      .toMatchObject({ activeConfigChanged: false, currentConfigVersion: 3, activeConfigVersion: 3 });
+    expect((await getDataRelease(pool)).sources.find((source) => source.slug === "ieee-ma-l"))
+      .toMatchObject({ configVersion: 3, configVersionAtBuild: 3, configChangedSinceBuild: false });
   });
 });

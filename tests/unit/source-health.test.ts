@@ -10,6 +10,8 @@ function row(overrides: Partial<SourceHealthRow> = {}): SourceHealthRow {
   return {
     slug: "licensed-source",
     source_class: "authoritative",
+    publish_mode: "production",
+    config_version: "1",
     required_for_activation: true,
     max_acceptable_age_seconds: 86_400,
     rights_status: "approved",
@@ -20,6 +22,7 @@ function row(overrides: Partial<SourceHealthRow> = {}): SourceHealthRow {
     active_source_release_id: "00000000-0000-4000-8000-000000000001",
     active_release_status: "valid",
     active_fetched_at: new Date("2026-07-10T12:00:00.000Z"),
+    active_config_version: "1",
     latest_valid_release_id: "00000000-0000-4000-8000-000000000001",
     latest_valid_fetched_at: new Date("2026-07-10T12:00:00.000Z"),
     ...overrides,
@@ -96,6 +99,24 @@ describe("source governance health", () => {
     expect(report.healthy).toBe(false);
     expect(report.sources[0]?.findings.map((item) => item.code)).toEqual(expect.arrayContaining([
       "REFERENCE_CANNOT_PUBLISH", "ACTIVE_RELEASE_NOT_VALID", "FUTURE_FETCH_TIME",
+    ]));
+  });
+
+  it("fails for a non-production active source and warns on config drift", () => {
+    const report = evaluateSourceGovernance([row({
+      publish_mode: "disabled",
+      config_version: "2",
+      active_config_version: "1",
+    })], { now });
+    expect(report.healthy).toBe(false);
+    expect(report.sources[0]).toMatchObject({
+      publishMode: "disabled",
+      currentConfigVersion: 2,
+      activeConfigVersion: 1,
+      activeConfigChanged: true,
+    });
+    expect(report.sources[0]?.findings.map((item) => item.code)).toEqual(expect.arrayContaining([
+      "ACTIVE_SOURCE_NOT_PRODUCTION", "ACTIVE_CONFIG_CHANGED",
     ]));
   });
 

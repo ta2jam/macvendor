@@ -65,7 +65,9 @@ identity. MAC addresses can be reassigned, spoofed, or randomized.
 - offline CSV/TSV/JSONL source-release importer with manifest, hash, rights,
   privacy, encoding, size, and idempotency gates.
 - deterministic adversarial importer coverage plus read-only source freshness
-  and rights-expiry health reporting.
+  and rights-expiry health reporting;
+- active source publish-mode failures and build/current config drift visibility,
+  with rebuild closure proven in PostgreSQL integration coverage;
 - shared-cache surrogate keys and a bounded provider-neutral post-commit purge
   hook; real CDN validation remains deployment-specific.
 - WCAG A/AA-oriented axe checks and lookup-flow tests across Chromium, Firefox,

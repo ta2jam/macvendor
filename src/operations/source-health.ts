@@ -9,6 +9,8 @@ export interface SourceHealthFinding {
     | "REFERENCE_CANNOT_PUBLISH"
     | "REQUIRED_SOURCE_NOT_ACTIVE"
     | "ACTIVE_RELEASE_NOT_VALID"
+    | "ACTIVE_SOURCE_NOT_PRODUCTION"
+    | "ACTIVE_CONFIG_CHANGED"
     | "RIGHTS_STATUS_BLOCKED"
     | "RIGHTS_SCOPE_BLOCKED"
     | "RIGHTS_REVIEW_EXPIRED"
@@ -22,6 +24,8 @@ export interface SourceHealthFinding {
 export interface SourceHealthRow {
   slug: string;
   source_class: "authoritative" | "enrichment" | "owner_curated" | "reference";
+  publish_mode: "disabled" | "qa" | "production";
+  config_version: string;
   required_for_activation: boolean;
   max_acceptable_age_seconds: number | null;
   rights_status: "unreviewed" | "owner_asserted" | "approved" | "rejected" | "expired";
@@ -32,6 +36,7 @@ export interface SourceHealthRow {
   active_source_release_id: string | null;
   active_release_status: string | null;
   active_fetched_at: Date | null;
+  active_config_version: string | null;
   latest_valid_release_id: string | null;
   latest_valid_fetched_at: Date | null;
 }
@@ -39,6 +44,7 @@ export interface SourceHealthRow {
 export interface SourceHealthResult {
   slug: string;
   sourceClass: SourceHealthRow["source_class"];
+  publishMode: SourceHealthRow["publish_mode"];
   requiredForActivation: boolean;
   activeReleaseId: string | null;
   latestValidReleaseId: string | null;
@@ -49,6 +55,9 @@ export interface SourceHealthResult {
   rightsBasis: SourceHealthRow["rights_basis"];
   distributionScope: SourceHealthRow["distribution_scope"];
   rightsReviewExpiresAt: string | null;
+  currentConfigVersion: number;
+  activeConfigVersion: number | null;
+  activeConfigChanged: boolean;
   findings: SourceHealthFinding[];
 }
 
@@ -101,6 +110,15 @@ function evaluateSource(row: SourceHealthRow, now: Date, warningWindowMs: number
   if (row.active_source_release_id && row.active_release_status !== "valid") {
     findings.push(finding("failure", "ACTIVE_RELEASE_NOT_VALID", "active resolution references a source release that is no longer valid"));
   }
+  if (row.active_source_release_id && row.publish_mode !== "production") {
+    findings.push(finding("failure", "ACTIVE_SOURCE_NOT_PRODUCTION", "active resolution references a source that is no longer a production publisher"));
+  }
+  const currentConfigVersion = Number(row.config_version);
+  const activeConfigVersion = row.active_config_version === null ? null : Number(row.active_config_version);
+  const activeConfigChanged = activeConfigVersion !== null && activeConfigVersion !== currentConfigVersion;
+  if (activeConfigChanged) {
+    findings.push(finding("warning", "ACTIVE_CONFIG_CHANGED", "active resolution was built with an older source configuration and requires a rebuild"));
+  }
   if (!monitoredReleaseId || !monitoredFetchedAt) {
     findings.push(finding(
       row.required_for_activation ? "failure" : "warning",
@@ -121,6 +139,7 @@ function evaluateSource(row: SourceHealthRow, now: Date, warningWindowMs: number
   return {
     slug: row.slug,
     sourceClass: row.source_class,
+    publishMode: row.publish_mode,
     requiredForActivation: row.required_for_activation,
     activeReleaseId: row.active_source_release_id,
     latestValidReleaseId: row.latest_valid_release_id,
@@ -131,6 +150,9 @@ function evaluateSource(row: SourceHealthRow, now: Date, warningWindowMs: number
     rightsBasis: row.rights_basis,
     distributionScope: row.distribution_scope,
     rightsReviewExpiresAt: row.rights_review_expires_at?.toISOString() ?? null,
+    currentConfigVersion,
+    activeConfigVersion,
+    activeConfigChanged,
     findings,
   };
 }
@@ -164,18 +186,21 @@ export async function checkSourceGovernance(
   options: { now?: Date; warningWindowDays?: number } = {},
 ): Promise<SourceGovernanceReport> {
   const result = await pool.query<SourceHealthRow>(
-    `SELECT ds.slug, ds.source_class, ds.required_for_activation,
+    `SELECT ds.slug, ds.source_class, ds.publish_mode, ds.config_version,
+       ds.required_for_activation,
        ds.max_acceptable_age_seconds, ds.rights_status, ds.rights_basis,
        ds.distribution_scope, ds.rights_review_reference,
        ds.rights_review_expires_at,
        active.id AS active_source_release_id,
        active.status AS active_release_status,
        COALESCE(active.observed_at, active.fetched_at) AS active_fetched_at,
+       active.config_version AS active_config_version,
        latest.id AS latest_valid_release_id,
        COALESCE(latest.observed_at, latest.fetched_at) AS latest_valid_fetched_at
      FROM data_sources ds
      LEFT JOIN LATERAL (
-       SELECT sr.id, sr.status, sr.fetched_at, observation.observed_at
+       SELECT sr.id, sr.status, sr.fetched_at, observation.observed_at,
+         ri.source_config_snapshot->>'configVersion' AS config_version
        FROM active_resolution ar
        JOIN resolution_inputs ri ON ri.resolution_run_id = ar.resolution_run_id
        JOIN source_releases sr ON sr.id = ri.source_release_id
@@ -197,7 +222,7 @@ export async function checkSourceGovernance(
        ORDER BY sr.validated_at DESC, sr.id DESC
        LIMIT 1
      ) latest ON true
-     WHERE ds.publish_mode = 'production'
+     WHERE ds.publish_mode = 'production' OR active.id IS NOT NULL
      ORDER BY ds.slug`,
   );
   return evaluateSourceGovernance(result.rows, options);
