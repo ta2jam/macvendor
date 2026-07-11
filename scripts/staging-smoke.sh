@@ -19,7 +19,6 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 docker compose -f "$compose_file" up --build --detach
-docker compose -f "$compose_file" wait migrate
 
 attempt=0
 until curl --fail --silent --show-error "http://127.0.0.1:${app_port}/readyz" >/dev/null; do
