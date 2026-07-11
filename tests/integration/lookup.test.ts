@@ -10,6 +10,8 @@ import { normalizeMac, prefixBits } from "../../src/domain/mac";
 import { GET as lookupRoute } from "../../src/app/v1/lookup/[mac]/route";
 import { sha256 } from "../../src/domain/canonical-json";
 import { importSourceRelease } from "../../src/importer/import-source";
+import { buildResolution } from "../../src/resolver/build";
+import { activateResolution } from "../../src/resolver/activation";
 
 config({ path: ".env.local", quiet: true });
 
@@ -189,6 +191,96 @@ describe("source importer", () => {
       expect(source.rowCount).toBe(0);
     } finally {
       await rm(directory, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("resolution publication lifecycle", () => {
+  it("builds idempotently, activates atomically, and rolls back to the previous run", async () => {
+    const original = await pool.query<{ resolution_run_id: string; version: string; publication_version: string }>(
+      "SELECT resolution_run_id, version, publication_version FROM active_resolution WHERE singleton_id = 1",
+    );
+    const releases = await pool.query<{ id: string }>(
+      `SELECT sr.id FROM source_releases sr
+       JOIN data_sources ds ON ds.id = sr.source_id
+       WHERE ds.slug IN ('demo-authoritative', 'demo-curated')
+       ORDER BY ds.slug`,
+    );
+    const options = {
+      sourceReleaseIds: releases.rows.map((row) => row.id),
+      policyVersion: "v0.0.4-test",
+      policyCommitSha: "integration-test-commit",
+      containerImageDigest: "sha256:integration-test-image",
+      now: new Date("2026-07-11T00:00:00.000Z"),
+    };
+
+    const concurrentBuild = await Promise.all([
+      buildResolution(pool, options),
+      buildResolution(pool, options),
+    ]);
+    expect(concurrentBuild.map((result) => result.status).sort()).toEqual(["already_built", "validated"]);
+    const built = concurrentBuild.find((result) => result.status === "validated")!;
+    const duplicate = concurrentBuild.find((result) => result.status === "already_built")!;
+    expect(built).toMatchObject({ status: "validated", assignmentCount: 1, claimCount: 1, conflicts: [] });
+    expect(duplicate).toMatchObject({
+      status: "already_built",
+      resolutionRunId: built.resolutionRunId,
+      inputManifestHash: built.inputManifestHash,
+      outputHash: built.outputHash,
+    });
+
+    const concurrentActivation = await Promise.all([
+      activateResolution(pool, built.resolutionRunId, { actorId: "integration-test-a" }),
+      activateResolution(pool, built.resolutionRunId, { actorId: "integration-test-b" }),
+    ]);
+    expect(concurrentActivation.map((result) => result.status).sort()).toEqual(["activated", "already_active"]);
+    const activated = concurrentActivation.find((result) => result.status === "activated")!;
+    expect(activated).toMatchObject({
+      status: "activated",
+      activeVersion: Number(original.rows[0]!.version) + 1,
+      publicationVersion: Number(original.rows[0]!.publication_version) + 1,
+    });
+
+    const lookup = await lookupMac(pool, normalizeMac("02AABBCC0001"), "all");
+    expect(lookup.assignment?.organizationName).toBe("Example Networks Lab");
+    expect(lookup.curatedMatches[0]).toMatchObject({
+      organizationName: "Example Devices Community",
+      verificationStatus: "single_observation",
+      conflictStatus: "conflicts",
+    });
+
+    const rolledBack = await activateResolution(pool, original.rows[0]!.resolution_run_id, {
+      actorId: "integration-test",
+      rollback: true,
+    });
+    expect(rolledBack).toMatchObject({
+      status: "rolled_back",
+      resolutionRunId: original.rows[0]!.resolution_run_id,
+      activeVersion: activated.activeVersion + 1,
+      publicationVersion: activated.publicationVersion + 1,
+    });
+  });
+
+  it("blocks activation if a source configuration changed after the build", async () => {
+    const releases = await pool.query<{ id: string }>(
+      `SELECT sr.id FROM source_releases sr
+       JOIN data_sources ds ON ds.id = sr.source_id
+       WHERE ds.slug IN ('demo-authoritative', 'demo-curated')
+       ORDER BY ds.slug`,
+    );
+    const built = await buildResolution(pool, {
+      sourceReleaseIds: releases.rows.map((row) => row.id),
+      policyVersion: "v0.0.4-config-test",
+      policyCommitSha: "integration-config-change",
+      containerImageDigest: "sha256:integration-test-image",
+      now: new Date("2026-07-11T00:00:00.000Z"),
+    });
+    await pool.query("UPDATE data_sources SET config_version = config_version + 1 WHERE slug = 'demo-authoritative'");
+    try {
+      await expect(activateResolution(pool, built.resolutionRunId, { actorId: "integration-test" }))
+        .rejects.toMatchObject({ code: "SOURCE_CONFIG_CHANGED" });
+    } finally {
+      await pool.query("UPDATE data_sources SET config_version = config_version - 1 WHERE slug = 'demo-authoritative'");
     }
   });
 });
