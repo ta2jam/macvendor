@@ -1,6 +1,6 @@
 {
   "name": "macvendor",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "type": "module",
   "private": false,
   "description": "Source-aware MAC address block assignment lookup service.",
@@ -19,6 +19,9 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "source:import": "tsx scripts/import-source.ts",
+    "resolution:build": "tsx scripts/build-resolution.ts",
+    "resolution:activate": "tsx scripts/activate-resolution.ts",
+    "resolution:rollback": "tsx scripts/rollback-resolution.ts",
     "db:test:prepare": "tsx scripts/prepare-test-db.ts",
     "test:integration": "npm run db:test:prepare && vitest run tests/integration",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run test:integration && npm run build"

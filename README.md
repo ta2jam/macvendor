@@ -58,6 +58,7 @@ identity. MAC addresses can be reassigned, spoofed, or randomized.
 - immutable PostgreSQL source, release, resolution, suppression, and audit data;
 - RFC 9457 problem responses and `429 Retry-After` behavior;
 - atomic active-release state and publication-suppression overlay;
+- deterministic, idempotent resolution builds with guarded activation and rollback;
 - responsive Next.js web interface;
 - unit, PostgreSQL integration, suppression, build, and HTTP smoke coverage.
 - offline CSV/TSV/JSONL source-release importer with manifest, hash, rights,
@@ -157,7 +158,8 @@ Data availability and data rights are different facts.
   until the intended API-output use is documented and approved.
 - KIT NETVS and community databases are reference/QA inputs, not automatically
   production sources.
-- An amateur database is accepted only with source- and record-level provenance.
+- Amateur database integration is deferred. No amateur records are admitted in
+  the current release.
 - Exact `/48` claims are treated as device identifiers and are not public by
   default.
 - Third-party rows with unknown origin or rights cannot enter a production
@@ -195,6 +197,17 @@ npm run source:import -- --manifest examples/sources/synthetic-import/manifest.j
 See [`docs/importing-sources.md`](docs/importing-sources.md). The importer reads
 only a manifest-relative local file; network fetching remains deliberately
 unimplemented until its SSRF and origin-allowlist boundary is complete.
+
+Build and publish an explicit set of approved source releases with:
+
+```bash
+npm run resolution:build -- --source-release UUID --source-release UUID
+npm run resolution:activate -- --run UUID
+npm run resolution:rollback -- --run UUID
+```
+
+See [`docs/resolution-pipeline.md`](docs/resolution-pipeline.md) for rights,
+freshness, reproducibility, conflict, concurrency, and rollback behavior.
 
 ## Contributing
 

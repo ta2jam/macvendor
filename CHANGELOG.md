@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.0.4 — 2026-07-11
+
+- Added deterministic resolution builds from explicit immutable source releases.
+- Added canonical input-manifest and semantic-output hashes plus idempotent build
+  reuse.
+- Added strict rights, freshness, required-source, source-class, and source
+  configuration gates.
+- Added same-prefix authoritative conflict rejection while keeping curated
+  claims independent.
+- Added transaction-locked activation and rollback CLIs with monotonic active
+  and publication versions and audit events.
+- Added reproducibility, conflict, source-layer, concurrent build/activation,
+  configuration-change, and rollback tests.
+- Explicitly deferred amateur database ingestion.
+
 ## 0.0.3 — 2026-07-11
 
 - Updated GitHub Actions to Node 24-native major versions after the initial
