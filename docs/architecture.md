@@ -103,16 +103,17 @@ V1'de gerçekten oluşturulacak tablolar:
 
 1. `data_sources`
 2. `source_releases`
-3. `source_artifacts`
-4. `source_records`
-5. `resolution_runs`
-6. `resolution_inputs`
-7. `resolved_assignments`
-8. `resolved_claims`
-9. `resolution_evidence`
-10. `active_resolution`
-11. `publication_suppressions`
-12. `audit_events`
+3. `source_fetch_observations`
+4. `source_artifacts`
+5. `source_records`
+6. `resolution_runs`
+7. `resolution_inputs`
+8. `resolved_assignments`
+9. `resolved_claims`
+10. `resolution_evidence`
+11. `active_resolution`
+12. `publication_suppressions`
+13. `audit_events`
 
 `organizations`, `organization_aliases`, kullanıcı hesabı, ödeme, API key ve vendor search tabloları V1'e dahil değildir. Vendor adı şu aşamada kaynak iddiasıdır; otomatik fuzzy birleştirme yapılmaz.
 

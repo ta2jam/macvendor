@@ -26,6 +26,17 @@ IEEE does not publish detached signatures, so `signature.origin` is `operator`;
 this proves post-download custody, while the pinned HTTPS origin and raw hashes
 preserve upstream provenance.
 
+Normal IEEE operation uses the guarded end-to-end command instead of manually
+chaining the phases:
+
+```bash
+OPERATOR_ACTOR_ID=operator:ieee-scheduler npm run source:update:ieee
+```
+
+It accepts the same `--output`, `--private-key`, and `--public-key` overrides as
+the preparation command. The command has no scheduler dependency; deployment is
+responsible for invoking it in UTC with jitter and alerting on non-zero exit.
+
 ## Remote manifest fields
 
 ```json

@@ -91,5 +91,11 @@ schema version, adapter version and normalizer version. Re-importing the same
 input returns the existing source release. Changing adapter or normalization
 logic produces a new release even when artifact bytes are unchanged.
 
+A successful remote re-fetch of unchanged bytes appends a
+`source_fetch_observations` row instead of mutating the immutable release.
+Freshness checks use the latest observation; release identity and historical
+`fetched_at` remain stable. Observation rows are append-only and included in
+logical backup/restore verification.
+
 The checked-in example is synthetic and `qa_only`. It is not a template for
 claiming unknown third-party data as owner-created.

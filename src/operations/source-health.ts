@@ -170,21 +170,29 @@ export async function checkSourceGovernance(
        ds.rights_review_expires_at,
        active.id AS active_source_release_id,
        active.status AS active_release_status,
-       active.fetched_at AS active_fetched_at,
+       COALESCE(active.observed_at, active.fetched_at) AS active_fetched_at,
        latest.id AS latest_valid_release_id,
-       latest.fetched_at AS latest_valid_fetched_at
+       COALESCE(latest.observed_at, latest.fetched_at) AS latest_valid_fetched_at
      FROM data_sources ds
      LEFT JOIN LATERAL (
-       SELECT sr.id, sr.status, sr.fetched_at
+       SELECT sr.id, sr.status, sr.fetched_at, observation.observed_at
        FROM active_resolution ar
        JOIN resolution_inputs ri ON ri.resolution_run_id = ar.resolution_run_id
        JOIN source_releases sr ON sr.id = ri.source_release_id
+       LEFT JOIN LATERAL (
+         SELECT observed_at FROM source_fetch_observations sfo
+         WHERE sfo.source_release_id = sr.id ORDER BY observed_at DESC LIMIT 1
+       ) observation ON true
        WHERE ar.singleton_id = 1 AND sr.source_id = ds.id
        LIMIT 1
      ) active ON true
      LEFT JOIN LATERAL (
-       SELECT sr.id, sr.fetched_at
+       SELECT sr.id, sr.fetched_at, observation.observed_at
        FROM source_releases sr
+       LEFT JOIN LATERAL (
+         SELECT observed_at FROM source_fetch_observations sfo
+         WHERE sfo.source_release_id = sr.id ORDER BY observed_at DESC LIMIT 1
+       ) observation ON true
        WHERE sr.source_id = ds.id AND sr.status = 'valid'
        ORDER BY sr.validated_at DESC, sr.id DESC
        LIMIT 1
