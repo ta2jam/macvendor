@@ -13,7 +13,7 @@ services:
       timeout: 3s
       retries: 20
     volumes:
-      - staging_postgres:/var/lib/postgresql/data
+      - staging_postgres:/var/lib/postgresql
     restart: unless-stopped
 
   migrate:

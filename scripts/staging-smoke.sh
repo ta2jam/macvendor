@@ -8,7 +8,13 @@ compose_file=${COMPOSE_FILE:-compose.staging.yaml}
 app_port=${APP_PORT:-3000}
 
 cleanup() {
-  docker compose -f "$compose_file" down --volumes --remove-orphans
+  status=$?
+  trap - EXIT INT TERM
+  if [ "$status" -ne 0 ]; then
+    docker compose -f "$compose_file" logs app migrate postgres || true
+  fi
+  docker compose -f "$compose_file" down --volumes --remove-orphans || true
+  exit "$status"
 }
 trap cleanup EXIT INT TERM
 
