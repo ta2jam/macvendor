@@ -17,6 +17,7 @@ services:
     restart: unless-stopped
 
   migrate:
+    image: macvendor-staging-tooling
     build:
       context: .
       target: tooling
@@ -26,6 +27,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    restart: "no"
+
+  recovery:
+    image: macvendor-staging-tooling
+    profiles: ["recovery"]
+    command: ["npm", "run", "recovery:smoke"]
+    environment:
+      RECOVERY_SOURCE_DATABASE_URL: ${STAGING_DATABASE_URL:?STAGING_DATABASE_URL is required}
+      RECOVERY_ADMIN_DATABASE_URL: postgresql://macvendor:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/postgres
     restart: "no"
 
   app:

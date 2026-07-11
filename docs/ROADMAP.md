@@ -3,7 +3,7 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.0.6 source acquisition foundation
+## Current — 0.0.7 recovery foundation
 
 - [x] strict EUI-48 normalization;
 - [x] authoritative and curated layers kept separate;
@@ -25,11 +25,13 @@ correctness gates can delay or reject a feature.
 - [x] isolated allowlisted HTTPS fetch and DNS/IP SSRF controls;
 - [x] Ed25519 artifact authenticity verification;
 - [x] full-snapshot completeness, duplicate, and release-diff gates.
+- [x] snapshot-consistent logical backup with checksum manifest;
+- [x] guarded disposable-database restore and integrity verification;
+- [x] zero-from-artifact migration/import/resolution rebuild drill.
 
 ## Next — production-data readiness
 
 - [ ] obtain and document approved production source rights;
-- [ ] complete backup/restore and zero-from-artifact rebuild drills.
 
 ## After data readiness
 

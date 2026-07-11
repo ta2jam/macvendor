@@ -8,5 +8,6 @@ test-results
 .env.*
 *.log
 *.tsbuildinfo
+*.dump
 docs
 tests

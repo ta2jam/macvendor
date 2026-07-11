@@ -1,6 +1,6 @@
 {
   "name": "macvendor",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "type": "module",
   "private": false,
   "description": "Source-aware MAC address block assignment lookup service.",
@@ -28,6 +28,10 @@
     "suppression:list": "tsx scripts/publication-suppression.ts list",
     "suppression:expire": "tsx scripts/publication-suppression.ts expire",
     "staging:smoke": "sh scripts/staging-smoke.sh",
+    "recovery:backup": "tsx scripts/backup-database.ts",
+    "recovery:restore": "tsx scripts/restore-database.ts",
+    "recovery:rebuild": "tsx scripts/rebuild-database.ts",
+    "recovery:smoke": "tsx scripts/recovery-smoke.ts",
     "db:test:prepare": "tsx scripts/prepare-test-db.ts",
     "test:integration": "npm run db:test:prepare && vitest run tests/integration",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run test:integration && npm run build"

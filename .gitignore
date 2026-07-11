@@ -11,3 +11,5 @@ coverage/
 *.tsbuildinfo
 .DS_Store
 test-results/
+backups/
+*.dump
