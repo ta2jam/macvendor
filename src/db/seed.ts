@@ -17,7 +17,7 @@ async function insertSource(client: PoolClient, values: {
       id, slug, name, source_class, publish_mode, adapter_key, fetch_policy,
       required_for_activation, rights_status, rights_basis, distribution_scope,
       rights_review_reference
-    ) VALUES ($1, $2, $3, $4, 'production', 'demo-v1', 'manual', true,
+    ) VALUES ($1, $2, $3, $4, 'production', 'demo-v1', 'manual', false,
       'owner_asserted', 'owner_created', 'api_output', 'local-demo-only')`,
     [id, values.slug, values.name, values.sourceClass],
   );

@@ -16,6 +16,9 @@ export interface SourceManifest {
     class: SourceClass;
     publishMode: PublishMode;
     adapterKey: string;
+    fetchPolicy?: "scheduled" | "manual";
+    fetchIntervalSeconds?: number;
+    maxAcceptableAgeSeconds?: number;
     requiredForActivation: boolean;
     homepageUrl?: string;
     termsUrl?: string;
@@ -48,6 +51,7 @@ export interface SourceManifest {
       path: string;
       publicKeyPath: string;
       publicKeySha256: string;
+      origin?: "upstream" | "operator";
       url?: string;
     };
     remote?: {

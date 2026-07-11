@@ -21,10 +21,11 @@ unverifiable “device manufacturer” string.
 </div>
 
 > [!WARNING]
-> The current `0.0.x` release contains **synthetic local demo records only**.
-> It does not redistribute IEEE or another third-party vendor database. A public
-> listing is not automatically licensed for redistribution. Do not represent
-> current demo results as production vendor intelligence.
+> The repository and GitHub release do not bundle an IEEE snapshot. v0.0.12 can
+> retrieve MA-L, MA-M, and MA-S directly from IEEE under the documented owner
+> risk acceptance, hash/sign/import them, and activate a derived lookup release.
+> Do not represent assignment-owner results as device identity or IEEE
+> endorsement.
 
 ## What macvendor is
 
@@ -77,6 +78,9 @@ identity. MAC addresses can be reassigned, spoofed, or randomized.
   counters, and separate database/origin latency distributions;
 - public data-use terms and a correction/takedown process that fails closed when
   no accountable intake channel is configured;
+- fixed-origin IEEE MA-L/MA-M/MA-S preparation with raw SHA-256 provenance,
+  operator Ed25519 custody signatures, schema normalization, duplicate omission,
+  immutable import, and deterministic activation;
 
 ## Quick start
 
@@ -171,9 +175,9 @@ operational constraints in [`docs/operations.md`](docs/operations.md).
 
 Data availability and data rights are different facts.
 
-- IEEE is the candidate authoritative source, but production use remains blocked
-  until the intended API-output use is documented and approved. The current
-  evidence and exact unblock requirements are recorded in
+- IEEE MA-L, MA-M, and MA-S derived API output is approved under an explicit
+  owner risk acceptance and mandatory controls. The evidence, adverse 2013
+  statement, later 2014 clarification, residual ambiguity, and scope are in
   [`docs/rights/ieee-registration-authority.md`](docs/rights/ieee-registration-authority.md).
 - KIT NETVS and community databases are reference/QA inputs, not automatically
   production sources.
@@ -186,6 +190,25 @@ Data availability and data rights are different facts.
 
 See [`docs/governance.md`](docs/governance.md) before proposing or importing a
 dataset.
+
+### Prepare an IEEE release
+
+The private ingest key is never committed. The public trust anchor is versioned
+under `config/keys/`. After provisioning the matching private key at
+`~/.config/macvendor/ieee-ingest-ed25519-private.pem`:
+
+```bash
+npm run source:prepare:ieee
+npm run source:import -- --manifest .local/ieee/YYYY-MM-DD/ieee-ma-l.manifest.json
+npm run source:import -- --manifest .local/ieee/YYYY-MM-DD/ieee-ma-m.manifest.json
+npm run source:import -- --manifest .local/ieee/YYYY-MM-DD/ieee-ma-s.manifest.json
+npm run resolution:build -- --source-release UUID --source-release UUID --source-release UUID
+npm run resolution:activate -- --run UUID
+```
+
+Generated raw files, signatures, and manifests stay under ignored `.local/` and
+are not redistributed through GitHub. See [`NOTICE`](NOTICE) and the importing
+runbook before rotating keys or changing URLs.
 
 Public attribution and reuse boundaries are available at
 [`/legal/data-terms`](http://localhost:3000/legal/data-terms). Incorrect

@@ -12,6 +12,7 @@ import type {
   SourceManifest,
   VerificationStatus,
 } from "./types";
+import { IEEE_ADAPTER_KEY } from "@/sources/ieee";
 
 const SOURCE_CLASSES = ["authoritative", "enrichment", "owner_curated", "reference"] as const;
 const PUBLISH_MODES = ["production", "qa_only", "disabled"] as const;
@@ -120,7 +121,8 @@ export function parseManifest(value: unknown): SourceManifest {
   }
 
   const source = object(root.source, "source");
-  keys(source, ["slug", "name", "class", "publishMode", "adapterKey", "requiredForActivation", "homepageUrl", "termsUrl", "rights"], "source");
+  keys(source, ["slug", "name", "class", "publishMode", "adapterKey", "fetchPolicy",
+    "fetchIntervalSeconds", "maxAcceptableAgeSeconds", "requiredForActivation", "homepageUrl", "termsUrl", "rights"], "source");
   const slug = string(source.slug, "source.slug", 80);
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
     throw new ImportValidationError("INVALID_SOURCE_SLUG", "source.slug must be lowercase kebab-case");
@@ -128,8 +130,8 @@ export function parseManifest(value: unknown): SourceManifest {
   const rights = object(source.rights, "source.rights");
   keys(rights, ["status", "basis", "distributionScope", "reviewReference", "reviewExpiresAt"], "source.rights");
   const adapterKey = string(source.adapterKey, "source.adapterKey", 120);
-  if (adapterKey !== "strict-delimited-v1") {
-    throw new ImportValidationError("UNSUPPORTED_ADAPTER", "only the reviewed strict-delimited-v1 adapter is available");
+  if (!["strict-delimited-v1", IEEE_ADAPTER_KEY].includes(adapterKey)) {
+    throw new ImportValidationError("UNSUPPORTED_ADAPTER", "manifest requests an unreviewed adapter");
   }
 
   const release = object(root.release, "release");
@@ -149,7 +151,7 @@ export function parseManifest(value: unknown): SourceManifest {
   const artifactHash = hash(artifact.sha256, "artifact.sha256");
   const signatureStatus = oneOf(artifact.signatureStatus, ["verified", "unverified", "not_applicable"] as const, "artifact.signatureStatus");
   const signature = artifact.signature === undefined ? undefined : object(artifact.signature, "artifact.signature");
-  if (signature) keys(signature, ["algorithm", "path", "publicKeyPath", "publicKeySha256", "url"], "artifact.signature");
+  if (signature) keys(signature, ["algorithm", "path", "publicKeyPath", "publicKeySha256", "origin", "url"], "artifact.signature");
   const remote = artifact.remote === undefined ? undefined : object(artifact.remote, "artifact.remote");
   if (remote) keys(remote, ["url", "allowedOrigins", "maxRedirects"], "artifact.remote");
   const remoteUrl = remote ? httpsUrl(remote.url, "artifact.remote.url") : undefined;
@@ -179,6 +181,12 @@ export function parseManifest(value: unknown): SourceManifest {
       class: oneOf<SourceClass>(source.class, SOURCE_CLASSES, "source.class"),
       publishMode: oneOf<PublishMode>(source.publishMode, PUBLISH_MODES, "source.publishMode"),
       adapterKey,
+      fetchPolicy: source.fetchPolicy === undefined ? "manual"
+        : oneOf(source.fetchPolicy, ["scheduled", "manual"] as const, "source.fetchPolicy"),
+      fetchIntervalSeconds: source.fetchIntervalSeconds === undefined ? undefined
+        : integer(source.fetchIntervalSeconds, "source.fetchIntervalSeconds", 60, 31_536_000),
+      maxAcceptableAgeSeconds: source.maxAcceptableAgeSeconds === undefined ? undefined
+        : integer(source.maxAcceptableAgeSeconds, "source.maxAcceptableAgeSeconds", 60, 31_536_000),
       requiredForActivation: boolean(source.requiredForActivation, "source.requiredForActivation"),
       homepageUrl: optionalHttpsUrl(source.homepageUrl, "source.homepageUrl"),
       termsUrl: optionalHttpsUrl(source.termsUrl, "source.termsUrl"),
@@ -211,6 +219,7 @@ export function parseManifest(value: unknown): SourceManifest {
         path: safeRelativePath(signature.path, "artifact.signature.path"),
         publicKeyPath: safeRelativePath(signature.publicKeyPath, "artifact.signature.publicKeyPath"),
         publicKeySha256: hash(signature.publicKeySha256, "artifact.signature.publicKeySha256"),
+        origin: signature.origin === undefined ? "upstream" : oneOf(signature.origin, ["upstream", "operator"] as const, "artifact.signature.origin"),
         url: optionalHttpsUrl(signature.url, "artifact.signature.url"),
       } : undefined,
       remote: remote ? {
@@ -236,7 +245,8 @@ export function parseManifest(value: unknown): SourceManifest {
   if (manifest.artifact.signatureStatus !== "verified" && manifest.artifact.signature) {
     throw new ImportValidationError("SIGNATURE_CONFIG_UNEXPECTED", "artifact.signature is valid only with signatureStatus=verified");
   }
-  if (manifest.artifact.remote && manifest.artifact.signatureStatus === "verified" && !manifest.artifact.signature?.url) {
+  if (manifest.artifact.remote && manifest.artifact.signatureStatus === "verified"
+    && manifest.artifact.signature?.origin !== "operator" && !manifest.artifact.signature?.url) {
     throw new ImportValidationError("SIGNATURE_URL_REQUIRED", "remote verified artifacts require artifact.signature.url");
   }
   if (manifest.source.publishMode === "production" && manifest.artifact.signatureStatus !== "verified") {

@@ -3,7 +3,7 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.0.11 durable foundation
+## Current — 0.0.12 durable foundation
 
 - [x] strict EUI-48 normalization;
 - [x] authoritative and curated layers kept separate;
@@ -37,9 +37,11 @@ correctness gates can delay or reject a feature.
 
 ## Next — production-data readiness
 
-- [ ] obtain approved production source rights; the 2026-07-11
-  [IEEE review](./rights/ieee-registration-authority.md) found no explicit grant
-  for derived public API output, so issue #8 remains blocked;
+- [x] approve scoped IEEE MA-L/MA-M/MA-S derived API output under the documented
+  2013/2014 evidence chain, explicit owner risk acceptance, annual re-review,
+  direct-origin requirement, and no-raw-redistribution boundary — issue #8;
+- [x] prepare, sign, import, resolve, and locally activate a real 53,283-row IEEE
+  release while omitting two ambiguous duplicate MA-L prefixes;
 
 ## Independent hardening while data rights are blocked
 

@@ -69,7 +69,7 @@ export async function fetchSourceArtifact(
   }
 
   let signatureBytes: Buffer | undefined;
-  if (manifest.artifact.signatureStatus === "verified") {
+  if (manifest.artifact.signatureStatus === "verified" && manifest.artifact.signature?.origin !== "operator") {
     const signatureUrl = manifest.artifact.signature?.url;
     if (!signatureUrl) throw new ImportValidationError("SIGNATURE_URL_REQUIRED", "verified remote artifact has no signature URL");
     signatureBytes = (await downloadHttps(signatureUrl, {

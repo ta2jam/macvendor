@@ -8,6 +8,7 @@ import { ImportValidationError } from "../../src/importer/errors";
 import { parseManifest } from "../../src/importer/manifest";
 import type { SourceManifest } from "../../src/importer/types";
 import { writeSignedArtifact } from "../helpers/source-fixture";
+import { IEEE_ADAPTER_KEY, IEEE_RA_ORIGIN, IEEE_RIGHTS_REVIEW } from "../../src/sources/ieee";
 
 const temporaryDirectories: string[] = [];
 
@@ -64,9 +65,30 @@ function manifest(overrides: Partial<SourceManifest> = {}): SourceManifest {
   };
 }
 
+function ieeeManifest(): SourceManifest {
+  const candidate = manifest();
+  candidate.source = {
+    slug: "ieee-ma-l", name: "IEEE Registration Authority MA-L", class: "authoritative",
+    publishMode: "production", adapterKey: IEEE_ADAPTER_KEY, fetchPolicy: "scheduled",
+    fetchIntervalSeconds: 86_400, maxAcceptableAgeSeconds: 172_800, requiredForActivation: true,
+    rights: { status: "approved", basis: "public_domain_claim", distributionScope: "api_output",
+      reviewReference: IEEE_RIGHTS_REVIEW },
+  };
+  candidate.artifact.remote = {
+    url: `${IEEE_RA_ORIGIN}/oui/oui.csv`, allowedOrigins: [IEEE_RA_ORIGIN], maxRedirects: 0,
+  };
+  candidate.artifact.signature!.origin = "operator";
+  candidate.defaults.rightsBasis = "public_domain_claim";
+  return candidate;
+}
+
 describe("source manifest", () => {
   it("accepts a strict production manifest with documented rights", () => {
     expect(parseManifest(manifest()).source.slug).toBe("synthetic-authoritative");
+  });
+
+  it("accepts the fixed IEEE dataset with a local operator signature", () => {
+    expect(parseManifest(ieeeManifest()).source.slug).toBe("ieee-ma-l");
   });
 
   it("rejects unknown fields", () => {
@@ -112,6 +134,36 @@ describe("source manifest", () => {
 });
 
 describe("artifact parser", () => {
+  it("adapts reviewed IEEE rows and suppresses private assignee text", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "macvendor-ieee-importer-"));
+    temporaryDirectories.push(directory);
+    const csv = [
+      "Registry,Assignment,Organization Name,Organization Address",
+      `MA-L,001122,"Example, Inc.\t",\u200BExample Address`,
+      "MA-L,AABBCC,Private,Private",
+      "MA-L,DDEEFF,Conflicting One,Address One",
+      "MA-L,DDEEFF,Conflicting Two,Address Two",
+      "",
+    ].join("\n");
+    const signature = await writeSignedArtifact(directory, csv);
+    const manifestPath = path.join(directory, "manifest.json");
+    await writeFile(manifestPath, "{}");
+    const candidate = ieeeManifest();
+    candidate.artifact.sha256 = sha256(csv);
+    candidate.artifact.signature = { ...signature, origin: "operator" };
+
+    const parsed = await parseArtifact(candidate, manifestPath);
+    expect(parsed.records).toHaveLength(2);
+    expect(parsed.records[0]).toMatchObject({ registry: "MA-L", prefixBits: 0x001122n,
+      prefixLength: 24, organizationName: "Example, Inc.", organizationAddress: "Example Address",
+      isPrivate: false });
+    expect(parsed.records[1]).toMatchObject({ registry: "MA-L", prefixBits: 0xaabbccn,
+      organizationName: null, organizationAddress: null, isPrivate: true });
+    expect(parsed.adapterWarnings).toEqual([{
+      code: "IEEE_DUPLICATE_ASSIGNMENT_OMITTED", assignment: "DDEEFF", sourceRows: [3, 4],
+    }]);
+  });
+
   it("parses quoted CSV fields and normalizes prefix records", async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "macvendor-importer-"));
     temporaryDirectories.push(directory);

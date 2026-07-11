@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.0.12 — 2026-07-11
+
+- Reopened the IEEE rights review with the adverse 2013 response, later 2014
+  no-copyright/no-distribution-restriction clarification preserved by Debian,
+  current direct CSV downloads, and explicit repository-owner risk acceptance.
+- Added a fixed-origin MA-L/MA-M/MA-S adapter and preparation command with DNS/IP
+  egress controls, raw SHA-256 hashes, operator Ed25519 custody signatures,
+  exact schema/registry/prefix gates, and a versioned public trust anchor.
+- Deterministically normalizes unsafe whitespace while retaining signed raw
+  artifacts; ambiguous MA-L prefixes `0001C8` and `080030` are omitted rather
+  than assigned a silent winner and remain in validation warnings.
+- Imported and locally activated 53,283 real IEEE assignments (39,722 MA-L,
+  6,478 MA-M, 7,083 MA-S) with successful longest-prefix lookup verification.
+- Added the NOTICE, operator runbook, annual rights re-review, no-raw-dataset,
+  no-endorsement, and no-device-identification boundaries. Amateur data remains
+  deferred.
+
 ## 0.0.11 — 2026-07-11
 
 - Added public data-use terms covering attribution, source-rights boundaries,
