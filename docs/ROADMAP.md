@@ -13,11 +13,12 @@ correctness gates can delay or reject a feature.
 - [x] synthetic local seed;
 - [x] unit, PostgreSQL integration, build, and HTTP smoke coverage;
 - [x] CI, issue templates, contribution, security, and release policy.
+- [x] offline manifest-driven CSV/TSV/JSONL source-release importer;
 
 ## Next — production-data readiness
 
 - [ ] obtain and document approved production source rights;
-- [ ] implement the isolated HTTPS fetcher and adapter runner;
+- [ ] implement the isolated HTTPS fetcher and adapter runner around the offline importer;
 - [ ] verify signatures, artifact hashes, snapshot completeness, and diff gates;
 - [ ] implement deterministic resolver build manifests and reproducibility tests;
 - [ ] publish OpenAPI and machine-readable JSON Schemas;

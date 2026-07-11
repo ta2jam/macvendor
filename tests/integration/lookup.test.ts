@@ -1,10 +1,15 @@
 import { config } from "dotenv";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
 import { getAssignment, getDataRelease, lookupMac } from "../../src/db/lookup";
 import { createPool } from "../../src/db/pool";
 import { normalizeMac, prefixBits } from "../../src/domain/mac";
 import { GET as lookupRoute } from "../../src/app/v1/lookup/[mac]/route";
+import { sha256 } from "../../src/domain/canonical-json";
+import { importSourceRelease } from "../../src/importer/import-source";
 
 config({ path: ".env.local", quiet: true });
 
@@ -120,5 +125,70 @@ describe("lookup route", () => {
     });
     const second = await lookupRoute(secondRequest, { params: Promise.resolve({ mac: "02AABBCC0001" }) });
     expect(second.status).toBe(304);
+  });
+});
+
+describe("source importer", () => {
+  it("imports a fully validated release atomically and idempotently", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "macvendor-import-integration-"));
+    try {
+      const csv = "prefix,prefixLength,organizationName\n02CCDD,24,Synthetic Import Vendor\n";
+      await writeFile(path.join(directory, "records.csv"), csv);
+      const manifest = {
+        schemaVersion: "macvendor-source/v1",
+        source: {
+          slug: "synthetic-import-source", name: "Synthetic Import Source",
+          class: "authoritative", publishMode: "production", adapterKey: "strict-delimited-v1",
+          requiredForActivation: false,
+          rights: { status: "approved", basis: "licensed", distributionScope: "api_output", reviewReference: "TEST-RIGHTS-IMPORT" },
+        },
+        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "1" },
+        artifact: { path: "records.csv", format: "csv", sha256: sha256(csv), signatureStatus: "verified" },
+        defaults: { recordKind: "assignment", originType: "imported", rightsBasis: "licensed", distributionScope: "api_output", verificationStatus: "single_observation", registry: "MA-L" },
+      };
+      const manifestPath = path.join(directory, "manifest.json");
+      await writeFile(manifestPath, JSON.stringify(manifest));
+
+      const first = await importSourceRelease(pool, manifestPath);
+      const second = await importSourceRelease(pool, manifestPath);
+      expect(first.status).toBe("imported");
+      expect(second).toMatchObject({ status: "already_imported", sourceReleaseId: first.sourceReleaseId });
+      const counts = await pool.query<{ releases: string; records: string }>(
+        `SELECT count(DISTINCT sr.id) AS releases, count(r.id) AS records
+         FROM source_releases sr JOIN data_sources ds ON ds.id = sr.source_id
+         JOIN source_records r ON r.source_release_id = sr.id
+         WHERE ds.slug = 'synthetic-import-source'`,
+      );
+      expect(counts.rows[0]).toEqual({ releases: "1", records: "1" });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("does not create partial database state for an invalid artifact", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "macvendor-import-invalid-"));
+    try {
+      const csv = "prefix,prefixLength,organizationName\n02CCDDE,28,Wrong Registry Length\n";
+      await writeFile(path.join(directory, "records.csv"), csv);
+      const manifest = {
+        schemaVersion: "macvendor-source/v1",
+        source: {
+          slug: "invalid-import-source", name: "Invalid Import Source",
+          class: "authoritative", publishMode: "production", adapterKey: "strict-delimited-v1",
+          requiredForActivation: false,
+          rights: { status: "approved", basis: "licensed", distributionScope: "api_output", reviewReference: "TEST-RIGHTS-INVALID" },
+        },
+        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "1" },
+        artifact: { path: "records.csv", format: "csv", sha256: sha256(csv), signatureStatus: "verified" },
+        defaults: { recordKind: "assignment", originType: "imported", rightsBasis: "licensed", distributionScope: "api_output", verificationStatus: "single_observation", registry: "MA-L" },
+      };
+      const manifestPath = path.join(directory, "manifest.json");
+      await writeFile(manifestPath, JSON.stringify(manifest));
+      await expect(importSourceRelease(pool, manifestPath)).rejects.toMatchObject({ code: "REGISTRY_PREFIX_MISMATCH" });
+      const source = await pool.query("SELECT 1 FROM data_sources WHERE slug = 'invalid-import-source'");
+      expect(source.rowCount).toBe(0);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });
