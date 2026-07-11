@@ -3,7 +3,7 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.0.9 durable foundation
+## Current — 0.0.10 durable foundation
 
 - [x] strict EUI-48 normalization;
 - [x] authoritative and curated layers kept separate;
@@ -47,7 +47,10 @@ correctness gates can delay or reject a feature.
 - [x] importer fuzz corpus and resource-limit enforcement — issue #17;
 - [x] source freshness and rights-expiry monitoring — issue #17;
 - [x] accessibility and cross-browser UI verification — issue #21;
-- [ ] benchmark lookup p50/p95/p99, query plans, CPU, memory, and I/O;
+- [x] reproducible lookup p50/p95/p99, throughput, exact query plans,
+  PostgreSQL buffer/I/O, Node CPU, and peak RSS baseline; deployment SLO and
+  capacity remain intentionally unset until target infrastructure and traffic
+  concurrency are known — issue #23;
 
 ## After data readiness
 

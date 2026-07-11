@@ -1,7 +1,7 @@
 # macvendor.io — sürdürülebilir V1 mimarisi
 
 Tarih: 11 Temmuz 2026
-Durum: Bağlayıcı temel tasarım; çekirdek dikey dilim v0.0.1'de uygulanmıştır
+Durum: Bağlayıcı temel tasarım; çekirdek ve ölçüm temeli v0.0.10'da uygulanmıştır
 
 ## Ürün sınırı
 
@@ -164,7 +164,12 @@ Exact `/48` kayıtlar ve 37–47 bit iddialar hassas kabul edilir. Kişi, konum,
 - Servis RTO: 4 saat.
 - Üç aylık restore testi; altı aylık sıfırdan rebuild tatbikatı.
 
-Trafik tahmini verilmediği için ilk performans kabul testi 15 dakika boyunca 100 RPS'tir. Bu kapasite vaadi değildir; gerçek forecast geldiğinde eşik değiştirilir. Rate limit ve artifact/payload sınırları `operations.md` içindedir.
+Trafik tahmini, hedef altyapı ve concurrency profili verilmediği için henüz
+production gecikme SLO'su veya kapasite eşiği yoktur. Sentetik yerel baseline,
+ölçüm yöntemi ve sınırları [`performance-benchmark.md`](./performance-benchmark.md)
+ve [`performance-baseline.md`](./performance-baseline.md) içindedir. Rate limit
+ancak deployment trafiği ölçüldükten sonra belirlenir; artifact/payload sınırları
+`operations.md` içindedir.
 
 ## V1 dışı
 

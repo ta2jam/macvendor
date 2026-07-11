@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.0.10 — 2026-07-11
+
+- Added a destructive-operation guard and deterministic synthetic benchmark for
+  1K, 10K, 100K, and 250K resolved assignments plus equally scaled curated
+  claims; no IEEE or amateur records are used.
+- Recorded separate direct-database and origin-HTTP p50/p95/p99, sequential
+  throughput, Node CPU/peak RSS, PostgreSQL database I/O, storage, and exact
+  `EXPLAIN (ANALYZE, BUFFERS, WAL, FORMAT JSON)` evidence.
+- Fixed the lookup hot path after the benchmark exposed a linear resolved-table
+  scan: official lookup now performs three exact index candidates and curated
+  lookup performs at most 48 exact index candidates.
+- Kept machine-specific latency out of required CI thresholds; deployment SLO,
+  concurrency capacity, shared rate limiting, PostgreSQL process CPU, and energy
+  remain unset until target infrastructure and traffic are measured.
+
 ## 0.0.9 — 2026-07-11
 
 - Added a Playwright and axe release gate across Chromium, Firefox, WebKit, and
