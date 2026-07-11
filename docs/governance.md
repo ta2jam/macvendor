@@ -203,6 +203,38 @@ IEEE adı endorsement izlenimi yaratacak biçimde kullanılmaz.
 
 Mevcut source/release satırları mutate edilmez. Her karar audit event ve ticket reference üretir.
 
+## Source configuration kararları
+
+Mevcut bir source'un publish mode, freshness, fetch, signature, diff-policy veya
+rights ayarı doğrudan SQL ile değiştirilmez. Değişiklik, 64 KiB ile sınırlı ve
+unknown-field reddeden `macvendor-governance/v1` karar belgesiyle yapılır.
+
+Karar belgesi source slug, opaque decision reference, tam patch ve
+`acceptActivePublicationRisk` boolean'ı taşır. Source class ile adapter key bu
+iş akışında immutable'dır. Rights patch'i parçalı olamaz; status, basis, scope,
+review reference ve expiry birlikte verilir.
+
+```bash
+# Varsayılan salt-okunur preview
+npm run source:governance -- \
+  --decision examples/governance/ieee-ma-l-noop.json
+
+# Açık mutation yetkisi
+OPERATOR_ACTOR_ID=operator:governance npm run source:governance -- \
+  --decision path/to/reviewed-decision.json --apply
+```
+
+Apply, source satırını kilitler; değişen alanları hesaplar, `config_version`
+değerini artırır ve before/after hash, karar referansı, actor ve active-input
+durumunu tek transaction audit event'ine yazar. Aynı karar ikinci kez no-op'tur.
+
+Aktif source'u disabled/QA-only yapan veya haklarını public API için geçersiz
+kılan karar varsayılan olarak reddedilir. `acceptActivePublicationRisk=true`
+yalnız gerçekten active risk varsa kabul edilir. Bu kabul mevcut public çıktıyı
+silmez: suppression, yeni resolution veya rollback kararı ayrıca uygulanmalıdır.
+Karar commit'inden sonra yalnız data-release metadata cache'i purge edilir;
+purge hatası DB commit'i geri alınmış gibi raporlanmaz.
+
 ## Kaynak özgünlüğü ve review
 
 - Production owner-curated artifact signed Git commit/tag veya onaylı detached signature ile bağlanır.

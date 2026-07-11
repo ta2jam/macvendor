@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 0.0.16 — 2026-07-11
+
+- Added a strict, bounded `macvendor-governance/v1` decision document and a
+  preview-first CLI for changing existing source configuration without ad-hoc
+  SQL.
+- Governance apply now locks, versions, hashes, and audits configuration changes
+  atomically; identical reruns are no-ops and pending builds are invalidated by
+  the existing config-version activation gate.
+- Active-source rights/publication weakening requires explicit risk acceptance,
+  while the audit records that acceptance and the CLI reports cache-purge errors
+  as post-commit failures.
+- Fixed nullable source diff policies being written as JSON `null` instead of SQL
+  `NULL`, which previously rejected valid QA/reference source creation.
+- Added malformed-decision, preview, idempotence, audit, active-risk, and
+  pending-build regression coverage. No source data or rights approval was added.
+
 ## 0.0.15 — 2026-07-11
 
 - Replaced duplicated adapter-key branches with one typed, compile-time reviewed

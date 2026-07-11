@@ -191,6 +191,8 @@ Data availability and data rights are different facts.
 See [`docs/governance.md`](docs/governance.md) before proposing or importing a
 dataset. Adapter contributions must also follow the compile-time registry and
 fixture contract in [`docs/source-adapters.md`](docs/source-adapters.md).
+Existing source configuration changes use the preview-first, audited decision
+workflow in [`docs/governance.md`](docs/governance.md); direct SQL is unsupported.
 
 ### Update the IEEE release
 
