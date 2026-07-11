@@ -1,6 +1,6 @@
 {
   "name": "macvendor",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "type": "module",
   "private": false,
   "description": "Source-aware MAC address block assignment lookup service.",
@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node .next/standalone/server.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run tests/unit",
@@ -22,6 +22,11 @@
     "resolution:build": "tsx scripts/build-resolution.ts",
     "resolution:activate": "tsx scripts/activate-resolution.ts",
     "resolution:rollback": "tsx scripts/rollback-resolution.ts",
+    "suppression:create": "tsx scripts/publication-suppression.ts create",
+    "suppression:revoke": "tsx scripts/publication-suppression.ts revoke",
+    "suppression:list": "tsx scripts/publication-suppression.ts list",
+    "suppression:expire": "tsx scripts/publication-suppression.ts expire",
+    "staging:smoke": "sh scripts/staging-smoke.sh",
     "db:test:prepare": "tsx scripts/prepare-test-db.ts",
     "test:integration": "npm run db:test:prepare && vitest run tests/integration",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run test:integration && npm run build"
@@ -39,6 +44,8 @@
     "@types/pg": "8.15.6",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.1",
     "eslint": "9.39.2",
     "eslint-config-next": "16.2.10",
     "tsx": "4.21.0",

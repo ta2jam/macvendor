@@ -6,6 +6,7 @@ import {
   normalizeMac,
   normalizeRegistry,
   parseAssignmentPrefix,
+  parsePrefix,
   prefixBits,
 } from "../../src/domain/mac";
 
@@ -68,5 +69,17 @@ describe("assignment path parsing", () => {
 
   it("rejects a registry and length mismatch", () => {
     expect(() => parseAssignmentPrefix("02AABB-24", 28)).toThrow(InvalidPrefixError);
+  });
+});
+
+describe("generic prefix parsing", () => {
+  it("accepts canonical nibble and non-nibble prefixes", () => {
+    expect(parsePrefix("02AABB-24")).toEqual({ bits: 0x02aabbn, prefixLength: 24, canonical: "02AABB-24" });
+    expect(parsePrefix("A-3")).toEqual({ bits: 0b101n, prefixLength: 3, canonical: "A-3" });
+  });
+
+  it("rejects non-zero unused bits and width mismatches", () => {
+    expect(() => parsePrefix("B-3")).toThrow(InvalidPrefixError);
+    expect(() => parsePrefix("02AABB-28")).toThrow(InvalidPrefixError);
   });
 });

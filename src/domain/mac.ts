@@ -106,3 +106,20 @@ export function parseAssignmentPrefix(input: string, expectedLength: number): { 
   const bits = displayValue >> BigInt(unusedLowBits);
   return { bits, canonical: `${formatPrefix(bits, prefixLength)}-${prefixLength}` };
 }
+
+export function parsePrefix(input: string): { bits: bigint; prefixLength: number; canonical: string } {
+  const match = /^([0-9a-fA-F]+)-(\d{1,2})$/.exec(input);
+  if (!match) throw new InvalidPrefixError();
+  const [, hex, lengthText] = match;
+  const prefixLength = Number(lengthText);
+  if (prefixLength < 1 || prefixLength > 48 || hex.length !== Math.ceil(prefixLength / 4)) {
+    throw new InvalidPrefixError();
+  }
+  const unusedLowBits = hex.length * 4 - prefixLength;
+  const displayValue = BigInt(`0x${hex}`);
+  if (unusedLowBits > 0 && (displayValue & ((1n << BigInt(unusedLowBits)) - 1n)) !== 0n) {
+    throw new InvalidPrefixError("Unused low bits in the final hexadecimal digit must be zero.");
+  }
+  const bits = displayValue >> BigInt(unusedLowBits);
+  return { bits, prefixLength, canonical: `${formatPrefix(bits, prefixLength)}-${prefixLength}` };
+}

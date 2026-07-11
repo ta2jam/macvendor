@@ -212,6 +212,8 @@ interface AssignmentRow {
   reason_code: string | null;
   source_record_hash: string | null;
   observed_at: Date | null;
+  evidence_source_slug: string | null;
+  evidence_source_release_id: string | null;
 }
 
 export async function getAssignment(
@@ -258,11 +260,15 @@ export async function getAssignment(
              CASE WHEN $4::boolean THEN ev.role END AS evidence_role,
              CASE WHEN $4::boolean THEN ev.reason_code END AS reason_code,
              CASE WHEN $4::boolean THEN sr.raw_record_hash END AS source_record_hash,
-             CASE WHEN $4::boolean THEN sr.observed_at END AS observed_at
+             CASE WHEN $4::boolean THEN sr.observed_at END AS observed_at,
+             CASE WHEN $4::boolean THEN eds.slug END AS evidence_source_slug,
+             CASE WHEN $4::boolean THEN esr.id END AS evidence_source_release_id
       FROM active a
       JOIN assignment ass ON true
       LEFT JOIN resolution_evidence ev ON $4::boolean AND ev.resolved_assignment_id = ass.id
       LEFT JOIN source_records sr ON sr.id = ev.source_record_id
+      LEFT JOIN source_releases esr ON esr.id = sr.source_release_id
+      LEFT JOIN data_sources eds ON eds.id = esr.source_id
       ORDER BY ev.role NULLS LAST, ev.id
       LIMIT 101
     `,
@@ -290,8 +296,8 @@ export async function getAssignment(
     evidence: includeEvidence
       ? result.rows.slice(0, 100).flatMap((row) => row.evidence_id ? [{
           evidenceId: `ev_${row.evidence_id}`,
-          sourceSlug: row.core_source_slug,
-          sourceReleaseId: `sr_${row.core_source_release_id}`,
+          sourceSlug: row.evidence_source_slug!,
+          sourceReleaseId: `sr_${row.evidence_source_release_id}`,
           role: row.evidence_role,
           reasonCode: row.reason_code,
           observedAt: row.observed_at?.toISOString() ?? null,

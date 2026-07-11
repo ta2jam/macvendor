@@ -1,0 +1,62 @@
+name: macvendor-staging
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: macvendor
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: macvendor
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U macvendor -d macvendor"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - staging_postgres:/var/lib/postgresql
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      target: tooling
+    command: ["sh", "-c", "npm run db:migrate && npm run db:seed"]
+    environment:
+      DATABASE_URL: ${STAGING_DATABASE_URL:?STAGING_DATABASE_URL is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      target: runtime
+    environment:
+      DATABASE_URL: ${STAGING_DATABASE_URL:?STAGING_DATABASE_URL is required}
+      RATE_LIMIT_ENABLED: "true"
+      TRUST_PROXY: "false"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    stop_grace_period: 10s
+    restart: unless-stopped
+
+volumes:
+  staging_postgres:

@@ -49,3 +49,20 @@ jobs:
         run: npm audit --audit-level=low
       - name: Verify
         run: npm run verify
+
+  container-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build, migrate, seed, probe, and stop staging artifact
+        env:
+          APP_PORT: "3100"
+        run: |
+          POSTGRES_PASSWORD="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          export POSTGRES_PASSWORD
+          STAGING_DATABASE_URL="postgresql://macvendor:${POSTGRES_PASSWORD}@postgres:5432/macvendor"
+          export STAGING_DATABASE_URL
+          npm run staging:smoke

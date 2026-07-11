@@ -37,7 +37,8 @@ Tarih: 11 Temmuz 2026
 Bu beş konu tasarımla uydurulamaz; gerçek karar veya kanıt gerekir:
 
 1. IEEE ve production'a girecek her üçüncü taraf kaynak için yazılı hak incelemesi.
-2. İlk amatör veritabanının manifesti, örnek satırları ve satır-köken sınıflandırması.
+2. Amatör veritabanı işi kullanıcı yeniden başlatana kadar ertelendi; bu sırada
+   gerçek satır, manifest veya örnek veri sisteme alınmayacak.
 3. Production CDN/object storage sağlayıcısı; purge ve object-lock ayrıntıları buna göre uygulanacak.
 4. Gerçek trafik tahmini ve kötüye kullanım profili; başlangıç rate/load eşikleri buna göre ölçülecek.
 5. `DATA_CORRECTIONS_EMAIL`, veri sorumlusu ve nöbet/escalation sahipleri.

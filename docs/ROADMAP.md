@@ -3,7 +3,7 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.0.4 resolution foundation
+## Current — 0.0.5 contract and operations foundation
 
 - [x] strict EUI-48 normalization;
 - [x] authoritative and curated layers kept separate;
@@ -18,14 +18,16 @@ correctness gates can delay or reject a feature.
 - [x] authoritative conflict rejection and independent curated claims;
 - [x] idempotent, concurrency-locked builds;
 - [x] guarded atomic activation and rollback commands.
+- [x] OpenAPI 3.1 and JSON Schema response contracts;
+- [x] runtime response-drift tests;
+- [x] audited create, revoke, list, and expire suppression commands;
+- [x] provider-neutral non-root staging image and container smoke workflow.
 
 ## Next — production-data readiness
 
 - [ ] obtain and document approved production source rights;
 - [ ] implement the isolated HTTPS fetcher and adapter runner around the offline importer;
 - [ ] verify signatures, artifact hashes, snapshot completeness, and diff gates;
-- [ ] publish OpenAPI and machine-readable JSON Schemas;
-- [ ] add correction/takedown intake and publication-guard CLI;
 - [ ] complete backup/restore and zero-from-artifact rebuild drills.
 
 ## After data readiness

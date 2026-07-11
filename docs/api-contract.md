@@ -78,7 +78,7 @@ Prefix alanı `(prefix, prefixLength)` birlikte yorumlanır. Nibble dışı cura
       "originType": "owner_observation",
       "conflictStatus": "no_official_match",
       "source": {
-        "slug": "my-amateur-db",
+        "slug": "demo-curated",
         "sourceReleaseId": "sr_02..."
       }
     }
