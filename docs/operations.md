@@ -60,10 +60,20 @@ sorumluluğudur.
 
 Değişmeyen artifact yeni source release veya active version üretmez. Bunun
 yerine yeni append-only fetch observation yazar; freshness bu son gözlemden
-hesaplanır. Import, observation veya build hatası mevcut active pointer'ı
+hesaplanır. Yeni observation `/v1/data-release` metadata'sını değiştirdiği için
+yalnız `data-release` surrogate key purge edilir ve response ETag'i döner; aynı
+release/timestamp tekrarında observation eklenmez ve purge no-op olur. Import,
+observation veya build hatası mevcut active pointer'ı
 değiştirmez; doğrulanmış ara kayıtlar audit/provenance için kalabilir. Activation
 commit'inden sonraki purge/health hatası rollback olmuş gibi sunulmaz:
 `IeeeUpdatePostCommitError.committed=true` ve hata fazı raporlanır.
+Aktif input'a yazılan observation cache purge, observation transaction'ından
+hemen sonra ve build'den önce çalışır; böylece sonraki build hatası public
+freshness metadata'sını eski cache içinde bırakmaz. Henüz aktif olmayan yeni
+release observation'ı public cevabı değiştirmediği için purge edilmez.
+Observation purge hatasında `activation=null` olur.
+Activation değişirse ikinci purge eski resolution ve data-release anahtarlarını
+publication commit'inden sonra temizler.
 
 ## Yetki ve DB rolleri
 

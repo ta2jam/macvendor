@@ -179,6 +179,9 @@ Resmî bir IEEE atamasını registry, exact prefix ve uzunlukla getirir. Registr
 ## 5. `GET /v1/data-release`
 
 Aktif veri sürümünü, dahil edilen kaynak sürümlerini ve tazelik durumunu döndürür.
+`observedAt`, immutable source release'in ilk import zamanı değil, o aynı
+artifact için başarıyla doğrulanmış en yeni fetch observation zamanıdır;
+observation yoksa release fetch zamanına düşer.
 
 ```json
 {
@@ -214,7 +217,10 @@ resolution'ın kullandığı sürümdür. Eşitsizlik rebuild gerektiğini göst
 tek başına lookup çıktısını değiştirmez. Kaynak lisans metninin yerine geçmez.
 Hassas artifact URL'leri, imza anahtarları, iç notlar ve ham kayıtlar döndürülmez.
 
-Cache: `Cache-Control: public, max-age=60, s-maxage=300`. ETag; `activeVersion`, `publicationVersion` ve dahil edilen kaynakların güncel `configVersion` değerlerinden üretilir. Hak/config değişikliği bu endpoint'in surrogate key'ini purge eder.
+Cache: `Cache-Control: public, max-age=60, s-maxage=300`. ETag; `activeVersion`,
+`publicationVersion`, dahil edilen kaynakların güncel `configVersion`, hak
+durumu ve `observedAt` değerlerinden üretilir. Hak/config veya doğrulanmış yeni
+fetch observation değişikliği bu endpoint'in surrogate key'ini purge eder.
 
 ## 6. Hata modeli
 

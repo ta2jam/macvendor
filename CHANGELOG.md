@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.0.18 — 2026-07-11
+
+- `/v1/data-release` now returns the latest immutable fetch observation for each
+  active source release instead of permanently exposing its first fetch time.
+- IEEE unchanged-snapshot updates report how many observation rows were added
+  and how many affect active inputs. Only active observation changes purge
+  `data-release` immediately after commit; new inactive releases defer to the
+  activation purge and exact timestamp reruns remain no-change operations.
+- Data-release ETags now include observation time, preventing conditional and
+  shared caches from retaining stale public freshness metadata.
+- Added PostgreSQL regressions covering first observation, unchanged refresh,
+  exact rerun idempotence, targeted purge keys, pre-build purge failure,
+  response timestamps, and ETag rotation. Corrected the source-health
+  TypeScript QA publish-mode literal.
+
 ## 0.0.17 — 2026-07-11
 
 - Source health now keeps active inputs visible after their current publish mode

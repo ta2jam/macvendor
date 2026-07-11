@@ -532,20 +532,51 @@ describe("guarded IEEE update", () => {
     const firstPreparedAt = new Date(Date.parse(secondPreparedAt) - 60_000).toISOString();
     try {
       const prepared = await writePreparedIeeeSnapshot(directory, firstPreparedAt);
+      const purgeCalls: string[][] = [];
+      const purge = async (keys: string[]) => {
+        purgeCalls.push(keys);
+        return { status: "purged" as const, surrogateKeys: [...keys].sort() };
+      };
       const common = {
         policyVersion: "v0.0.13-test", policyCommitSha: "integration-ieee-update",
         containerImageDigest: "sha256:integration-ieee-update", actorId: "operator:integration",
+        purge,
       };
       const first = await updateIeeeSources(pool, { ...common, prepare: async () => prepared });
       expect(first).toMatchObject({ status: "updated", build: { status: "validated", assignmentCount: 3 },
-        activation: { status: "activated" }, cachePurge: { status: "skipped", reason: "not_configured" } });
+        activation: { status: "activated" }, observations: { recorded: 3, activeRecorded: 0, observedAt: firstPreparedAt },
+        cachePurge: { observation: { status: "skipped", reason: "no_active_change" },
+          activation: { status: "purged" } } });
+      const firstReleaseResponse = await dataReleaseRoute(new NextRequest("http://localhost:3000/v1/data-release"));
+      const firstEtag = firstReleaseResponse.headers.get("etag");
+      const firstReleaseBody = await firstReleaseResponse.json();
+      expect(firstReleaseBody.sources.filter((source: { slug: string }) => source.slug.startsWith("ieee-"))
+        .every((source: { observedAt: string }) => source.observedAt === firstPreparedAt)).toBe(true);
 
       const second = await updateIeeeSources(pool, { ...common,
         prepare: async () => ({ ...prepared, preparedAt: secondPreparedAt }) });
       expect(second).toMatchObject({ status: "updated", build: { status: "already_built" },
-        activation: { status: "already_active" }, cachePurge: { status: "skipped", reason: "no_change" } });
+        activation: { status: "already_active" },
+        observations: { recorded: 3, activeRecorded: 3, observedAt: secondPreparedAt },
+        cachePurge: { observation: { status: "purged", surrogateKeys: ["data-release"] },
+          activation: { status: "skipped", reason: "no_change" } } });
       if (first.status !== "updated" || second.status !== "updated") throw new Error("unexpected update status");
       expect(second.activation.activeVersion).toBe(first.activation.activeVersion);
+      expect(purgeCalls[1]).toEqual(["data-release"]);
+      const secondReleaseResponse = await dataReleaseRoute(new NextRequest("http://localhost:3000/v1/data-release"));
+      expect(secondReleaseResponse.headers.get("etag")).not.toBe(firstEtag);
+      const secondReleaseBody = await secondReleaseResponse.json();
+      expect(secondReleaseBody.sources.filter((source: { slug: string }) => source.slug.startsWith("ieee-"))
+        .every((source: { observedAt: string }) => source.observedAt === secondPreparedAt)).toBe(true);
+
+      const exactRerun = await updateIeeeSources(pool, { ...common,
+        prepare: async () => ({ ...prepared, preparedAt: secondPreparedAt }) });
+      expect(exactRerun).toMatchObject({ observations: { recorded: 0, activeRecorded: 0 },
+        activation: { status: "already_active" }, cachePurge: {
+          observation: { status: "skipped", reason: "no_change" },
+          activation: { status: "skipped", reason: "no_change" },
+        } });
+      expect(purgeCalls).toHaveLength(2);
 
       const counts = await pool.query<{ releases: string; observations: string }>(
         `SELECT count(DISTINCT sr.id) AS releases, count(sfo.id) AS observations
@@ -571,6 +602,17 @@ describe("guarded IEEE update", () => {
         await lock.query("SELECT pg_advisory_unlock($1)", [6_104_227_006]);
         lock.release();
       }
+
+      const observationFailureAt = new Date(Date.parse(secondPreparedAt) + 60_000).toISOString();
+      let observationPurgeError: unknown;
+      try {
+        await updateIeeeSources(pool, { ...common, prepare: async () => ({ ...prepared, preparedAt: observationFailureAt }),
+          purge: async () => { throw new Error("injected observation purge failure"); } });
+      } catch (error) {
+        observationPurgeError = error;
+      }
+      expect(observationPurgeError).toBeInstanceOf(IeeeUpdatePostCommitError);
+      expect(observationPurgeError).toMatchObject({ phase: "cache_purge", committed: true, activation: null });
 
       const versionBeforeFailure = second.activation.activeVersion;
       let postCommitError: unknown;

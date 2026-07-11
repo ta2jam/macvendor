@@ -341,7 +341,8 @@ export async function getDataRelease(pool: Pool) {
   }>(`
     SELECT ar.resolution_run_id, ar.version AS active_version, ar.publication_version,
            rr.policy_version, rr.output_hash, rr.completed_at AS generated_at,
-           ds.slug AS source_slug, sr.id AS source_release_id, sr.fetched_at AS observed_at,
+           ds.slug AS source_slug, sr.id AS source_release_id,
+           COALESCE(observation.observed_at, sr.fetched_at) AS observed_at,
            ds.source_class, ds.distribution_scope,
            ri.source_config_snapshot->>'rightsStatus' AS rights_status_at_build,
            ds.rights_status AS current_rights_status, ds.rights_review_expires_at,
@@ -352,6 +353,11 @@ export async function getDataRelease(pool: Pool) {
     JOIN resolution_inputs ri ON ri.resolution_run_id = ar.resolution_run_id
     JOIN source_releases sr ON sr.id = ri.source_release_id
     JOIN data_sources ds ON ds.id = sr.source_id
+    LEFT JOIN LATERAL (
+      SELECT observed_at FROM source_fetch_observations sfo
+      WHERE sfo.source_release_id = sr.id
+      ORDER BY observed_at DESC LIMIT 1
+    ) observation ON true
     WHERE ar.singleton_id = 1
     ORDER BY ds.slug
   `);
