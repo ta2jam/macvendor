@@ -66,3 +66,53 @@ jobs:
           STAGING_DATABASE_URL="postgresql://macvendor:${POSTGRES_PASSWORD}@postgres:5432/macvendor"
           export STAGING_DATABASE_URL
           npm run staging:smoke
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: macvendor
+          POSTGRES_PASSWORD: macvendor
+          POSTGRES_DB: macvendor_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U macvendor -d macvendor_dev"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://macvendor:macvendor@localhost:5432/macvendor_test
+      TEST_DATABASE_URL: postgresql://macvendor:macvendor@localhost:5432/macvendor_test
+      RATE_LIMIT_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Create and seed browser test database
+        run: |
+          PGPASSWORD=macvendor createdb -h localhost -U macvendor macvendor_test
+          npm run db:test:prepare
+      - name: Build production application
+        run: npm run build
+      - name: Install browser engines
+        run: npm run browser:install
+      - name: Run accessibility and cross-browser tests
+        run: npm run test:browser
+      - name: Upload browser failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failure-artifacts
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

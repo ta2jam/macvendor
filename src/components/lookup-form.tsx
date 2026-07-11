@@ -29,6 +29,7 @@ interface ApiResult {
 }
 
 interface Problem {
+  code?: string;
   title: string;
   detail: string;
   requestId?: string;
@@ -72,25 +73,43 @@ export function LookupForm() {
 
   return (
     <div className="lookup-card">
-      <form onSubmit={submit}>
+      <form onSubmit={submit} aria-describedby="mac-hint">
         <label htmlFor="mac">MAC adresi</label>
         <div className="input-row">
           <input
             id="mac"
             name="mac"
             value={mac}
-            onChange={(event) => setMac(event.target.value)}
+            onChange={(event) => {
+              setMac(event.target.value);
+              if (problem) setProblem(null);
+            }}
             placeholder="Örn. 02:AA:BB:CC:00:01"
             autoComplete="off"
             spellCheck={false}
             maxLength={32}
+            required
+            aria-describedby="mac-hint"
+            aria-invalid={problem?.code === "INVALID_MAC" ? true : undefined}
           />
           <button type="submit" disabled={loading}>{loading ? "Sorgulanıyor…" : "Sorgula"}</button>
         </div>
-        <p className="input-hint">Demo kayıt: <button type="button" onClick={() => setMac("02:AA:BB:CC:00:01")}>02:AA:BB:CC:00:01</button></p>
+        <p className="input-hint" id="mac-hint">
+          12 hexadecimal karakter veya ayraçlı MAC girin. Demo kayıt:{" "}
+          <button type="button" onClick={() => {
+            setMac("02:AA:BB:CC:00:01");
+            setProblem(null);
+          }}>
+            02:AA:BB:CC:00:01
+          </button>
+        </p>
       </form>
 
-      <div className="result-region" aria-live="polite">
+      <p className="sr-only" role="status" aria-live="polite">
+        {loading ? "MAC adresi sorgulanıyor." : result ? "Sorgu sonucu hazır." : ""}
+      </p>
+      <div className="result-region" role="region" aria-label="MAC sorgu durumu" aria-busy={loading}>
+        {loading && <p className="loading-line lookup-loading" aria-hidden="true">Sorgulanıyor…</p>}
         {problem && (
           <div className="problem-card" role="alert">
             <strong>{problem.title}</strong>

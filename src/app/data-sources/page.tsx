@@ -10,12 +10,12 @@ export default function DataSourcesPage() {
       <p className="lead">Mevcut demo build gerçek IEEE verisi dağıtmaz. Lokal doğrulama yalnız sentetik kayıtlarla yapılır.</p>
       <div className="source-list">
         <article>
-          <div><span className="source-dot authoritative" /><h2>demo-authoritative</h2></div>
+          <div><span className="source-dot authoritative" aria-hidden="true" /><h2>demo-authoritative</h2></div>
           <p>Sentetik `/24` assignment. Yalnız geliştirme ve test amacıyla oluşturuldu.</p>
           <dl><div><dt>Sınıf</dt><dd>authoritative</dd></div><div><dt>Hak</dt><dd>owner_created</dd></div></dl>
         </article>
         <article>
-          <div><span className="source-dot curated" /><h2>demo-curated</h2></div>
+          <div><span className="source-dot curated" aria-hidden="true" /><h2>demo-curated</h2></div>
           <p>Sentetik `/32` owner-curated iddia. Resmî sonucu değiştirmez.</p>
           <dl><div><dt>Sınıf</dt><dd>owner_curated</dd></div><div><dt>Hak</dt><dd>owner_created</dd></div></dl>
         </article>

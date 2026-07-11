@@ -16,7 +16,7 @@ export function ReleaseView() {
       .catch((reason: Error) => setError(reason.message));
   }, []);
 
-  if (error) return <div className="problem-card"><strong>Veri sürümü alınamadı</strong><p>{error}</p></div>;
-  if (!data) return <p className="loading-line">Aktif veri sürümü okunuyor…</p>;
-  return <pre className="json-view">{JSON.stringify(data, null, 2)}</pre>;
+  if (error) return <div className="problem-card" role="alert"><strong>Veri sürümü alınamadı</strong><p>{error}</p></div>;
+  if (!data) return <p className="loading-line" role="status">Aktif veri sürümü okunuyor…</p>;
+  return <pre className="json-view" tabIndex={0} aria-label="Aktif veri sürümü JSON çıktısı">{JSON.stringify(data, null, 2)}</pre>;
 }

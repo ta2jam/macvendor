@@ -70,6 +70,8 @@ Run before opening the pull request:
 
 ```bash
 npm run verify
+npm run browser:install
+DATABASE_URL="$TEST_DATABASE_URL" npm run test:browser
 npm audit --audit-level=low
 ```
 
