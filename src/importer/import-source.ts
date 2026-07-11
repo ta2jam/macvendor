@@ -78,7 +78,8 @@ async function ensureSource(client: PoolClient, manifest: SourceManifest): Promi
       config.fetchPolicy, config.fetchIntervalSeconds, config.maxAcceptableAgeSeconds,
       config.requiredForActivation, config.homepageUrl, config.termsUrl, config.rightsStatus,
       config.rightsBasis, config.distributionScope, config.rightsReviewReference, config.rightsReviewExpiresAt,
-      JSON.stringify(config.fetchOrigins), config.signatureKeySha256, JSON.stringify(config.diffPolicy)],
+      JSON.stringify(config.fetchOrigins), config.signatureKeySha256,
+      config.diffPolicy === null ? null : JSON.stringify(config.diffPolicy)],
   );
   return id;
 }

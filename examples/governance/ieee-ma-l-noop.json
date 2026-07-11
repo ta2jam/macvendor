@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "macvendor-governance/v1",
+  "sourceSlug": "ieee-ma-l",
+  "decisionReference": "EXAMPLE-NOOP-ONLY",
+  "acceptActivePublicationRisk": false,
+  "patch": {
+    "name": "IEEE Registration Authority MA-L"
+  }
+}

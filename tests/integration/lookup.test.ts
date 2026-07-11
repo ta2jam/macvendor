@@ -26,6 +26,7 @@ import { IeeeUpdatePostCommitError, updateIeeeSources } from "../../src/operatio
 import { IEEE_ADAPTER_KEY, IEEE_DATASETS, IEEE_RA_ORIGIN, IEEE_RIGHTS_REVIEW } from "../../src/sources/ieee";
 import type { PreparedIeeeSnapshot } from "../../src/sources/prepare-ieee";
 import { migrate } from "../../src/db/migrate";
+import { applySourceGovernance, previewSourceGovernance } from "../../src/operations/source-governance";
 
 config({ path: ".env.local", quiet: true });
 
@@ -645,5 +646,51 @@ describe("migration history integrity", () => {
     await migrate(pool);
     const after = await pool.query<{ count: string }>("SELECT count(*) FROM schema_migrations");
     expect(after.rows).toEqual(before.rows);
+  });
+});
+
+describe("source governance mutation", () => {
+  it("previews, audits, versions, and idempotently applies an inactive-source change", async () => {
+    await importSourceRelease(pool, path.resolve("examples/sources/synthetic-import/manifest.json"));
+    const decision = { schemaVersion: "macvendor-governance/v1" as const,
+      sourceSlug: "synthetic-import-example", decisionReference: "GOV-INTEGRATION-1",
+      acceptActivePublicationRisk: false, patch: { name: "Synthetic Import Governed" } };
+    await expect(previewSourceGovernance(pool, decision)).resolves.toMatchObject({
+      status: "preview", activeInput: false, activePublicationRisk: false, changedFields: ["name"],
+    });
+    const updated = await applySourceGovernance(pool, decision, "operator:integration");
+    expect(updated).toMatchObject({ status: "updated", configVersion: 2, changedFields: ["name"] });
+    await expect(applySourceGovernance(pool, decision, "operator:integration"))
+      .resolves.toMatchObject({ status: "no_change", configVersion: 2 });
+    const audit = await pool.query<{ metadata: { decisionReference: string; changedFields: string[] } }>(
+      "SELECT metadata FROM audit_events WHERE event_type='source.governance_updated' AND target_id=(SELECT id::text FROM data_sources WHERE slug=$1)",
+      [decision.sourceSlug],
+    );
+    expect(audit.rows).toHaveLength(1);
+    expect(audit.rows[0]!.metadata).toMatchObject({ decisionReference: "GOV-INTEGRATION-1", changedFields: ["name"] });
+  });
+
+  it("requires explicit acceptance before weakening an active source and invalidates pending builds", async () => {
+    const releases = await pool.query<{ id: string }>(
+      `SELECT sr.id FROM active_resolution ar JOIN resolution_inputs ri ON ri.resolution_run_id=ar.resolution_run_id
+       JOIN source_releases sr ON sr.id=ri.source_release_id JOIN data_sources ds ON ds.id=sr.source_id
+       WHERE ar.singleton_id=1 ORDER BY ds.slug`,
+    );
+    const built = await buildResolution(pool, { sourceReleaseIds: releases.rows.map((row) => row.id),
+      policyVersion: "v0.0.16-governance-test", policyCommitSha: "governance-pending-build",
+      containerImageDigest: "sha256:governance-test", now: new Date() });
+    const disable = { schemaVersion: "macvendor-governance/v1" as const, sourceSlug: "ieee-ma-l",
+      decisionReference: "GOV-INTEGRATION-RISK", acceptActivePublicationRisk: false,
+      patch: { publishMode: "disabled" as const, requiredForActivation: false } };
+    await expect(applySourceGovernance(pool, disable, "operator:integration"))
+      .rejects.toMatchObject({ code: "ACTIVE_PUBLICATION_RISK" });
+    const accepted = { ...disable, acceptActivePublicationRisk: true };
+    await expect(applySourceGovernance(pool, accepted, "operator:integration"))
+      .resolves.toMatchObject({ status: "updated", activeInput: true, activePublicationRisk: true });
+    await expect(activateResolution(pool, built.resolutionRunId, { actorId: "operator:integration" }))
+      .rejects.toMatchObject({ code: "SOURCE_CONFIG_CHANGED" });
+    await expect(applySourceGovernance(pool, { ...disable, decisionReference: "GOV-INTEGRATION-RESTORE",
+      patch: { publishMode: "production" as const, requiredForActivation: true } }, "operator:integration"))
+      .resolves.toMatchObject({ status: "updated", activePublicationRisk: false });
   });
 });

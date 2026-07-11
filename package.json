@@ -1,6 +1,6 @@
 {
   "name": "macvendor",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "type": "module",
   "private": false,
   "description": "Source-aware MAC address block assignment lookup service.",
@@ -28,6 +28,7 @@
     "source:prepare:ieee": "tsx scripts/prepare-ieee-source.ts",
     "source:update:ieee": "tsx scripts/update-ieee-source.ts",
     "source:health": "tsx scripts/source-health.ts",
+    "source:governance": "tsx scripts/source-governance.ts",
     "resolution:build": "tsx scripts/build-resolution.ts",
     "resolution:activate": "tsx scripts/activate-resolution.ts",
     "resolution:rollback": "tsx scripts/rollback-resolution.ts",

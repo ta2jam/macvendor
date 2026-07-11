@@ -33,6 +33,18 @@ npm run db:migrate
 değildir. Dosyayı değiştirmek veya history satırını silmek yasaktır; yeni bir
 ileri migration hazırlanır ya da yanlış deployment artifact'i geri çekilir.
 
+### Source governance mutation
+
+`source:governance` varsayılan olarak preview'dur; `--apply` ve
+`OPERATOR_ACTOR_ID` olmadan DB yazmaz. Apply global governance advisory lock ve
+source row lock altında config update, monoton `config_version` ve immutable
+audit event'i birlikte commit eder. Aktif publication'ı zayıflatan patch explicit
+risk acceptance olmadan durur. Commit sonrası `data-release` surrogate key purge
+edilir; hata committed sonucu içeren non-zero çıktı üretir.
+
+Karar belgesi review artifact'i olarak ticket sisteminde saklanır. Repo örneği
+yalnız no-op preview içindir; bir rights approval kanıtı değildir.
+
 ### IEEE güncelleme job'u
 
 ```bash
