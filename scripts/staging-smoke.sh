@@ -34,6 +34,7 @@ curl --fail --silent --show-error "http://127.0.0.1:${app_port}/healthz" >/dev/n
 curl --fail --silent --show-error "http://127.0.0.1:${app_port}/openapi.json" >/dev/null
 curl --fail --silent --show-error "http://127.0.0.1:${app_port}/schemas/public-api-v1.schema.json" >/dev/null
 curl --fail --silent --show-error "http://127.0.0.1:${app_port}/v1/lookup/02AABBCC0001" >/dev/null
+docker compose -f "$compose_file" --profile recovery run --rm --no-deps recovery
 
 container_id=$(docker compose -f "$compose_file" ps --quiet app)
 docker compose -f "$compose_file" stop --timeout 10 app

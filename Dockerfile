@@ -6,6 +6,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 FROM dependencies AS tooling
+RUN apk add --no-cache postgresql-client
 COPY . .
 
 FROM dependencies AS builder

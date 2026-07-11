@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 0.0.7 — 2026-07-11
+
+- Added repeatable-read exported-snapshot PostgreSQL custom backups so dump bytes
+  and integrity counts describe the same database instant.
+- Added versioned backup manifests with dump SHA-256, size, migrations, bounded
+  table counts, active pointer/versions, audit-trigger state, and measured time.
+- Added restrictive output permissions and credential-free PostgreSQL tool
+  arguments.
+- Added guarded restore into a new disposable database only, pre-restore archive
+  validation, single-transaction restore, exact integrity comparison, and
+  optional post-check removal.
+- Added zero-from-artifact rebuild without logical dump or demo seed: migrations,
+  signed synthetic source imports, deterministic resolution, activation, lookup,
+  and integrity checks.
+- Added target-name, existing-database, dump tamper, active-pointer, migration,
+  constraint, and append-only audit guards.
+- Added the measured recovery drill to the PostgreSQL 18 staging container smoke
+  workflow while documenting that provider PITR, encryption, scheduling, and RPO
+  guarantees remain external.
+
 ## 0.0.6 — 2026-07-11
 
 - Added a database-free HTTPS fetch phase with explicit origin/port allowlists,

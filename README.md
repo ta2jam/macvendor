@@ -65,6 +65,8 @@ identity. MAC addresses can be reassigned, spoofed, or randomized.
   privacy, encoding, size, and idempotency gates.
 - allowlisted HTTPS fetch with DNS/IP SSRF defense, redirect revalidation,
   Ed25519 verification, snapshot completeness, and release-diff gates;
+- snapshot-consistent logical backup, guarded restore verification, and
+  migration-plus-artifact zero-seed rebuild drills;
 
 ## Quick start
 
@@ -221,6 +223,9 @@ opaque ticket references, not requester contact data.
 The provider-neutral non-root staging image, Compose stack, probes, and smoke
 drill are documented in [`docs/staging.md`](docs/staging.md). No external staging
 deployment is claimed without a selected provider and deployment authority.
+
+Recovery commands and their PITR/encryption/provider limits are documented in
+[`docs/recovery.md`](docs/recovery.md).
 
 ## Contributing
 

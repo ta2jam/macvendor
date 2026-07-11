@@ -199,6 +199,11 @@ Correction başvurusunun iletişim ve kanıt içeriği V1 PostgreSQL şemasında
 - Quarterly restore drill.
 - Altı ayda bir artifact'ten sıfırdan rebuild drill.
 
+Logical backup, disposable restore ve sentetik artifact'tan sıfır kurulum
+komutları [`recovery.md`](recovery.md) içinde uygulanmıştır ve container CI'da
+çalışır. PITR/WAL arşivleme, şifreli/versioned uzak hedef, scheduler ve RPO alarmı
+sağlayıcı seçilmeden tamamlanmış sayılmaz.
+
 Disaster durumunda öncelik son doğrulanmış resolved release'i read-only servis etmektir; importer kapalı kalabilir.
 
 ## Gözlemlenebilirlik ve sahiplik

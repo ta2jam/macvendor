@@ -38,7 +38,8 @@ npm run staging:smoke
 ```
 
 The drill builds the multi-stage image, starts PostgreSQL, migrates, seeds,
-checks health/readiness/OpenAPI/lookup, sends a graceful stop, verifies exit code
+checks health/readiness/OpenAPI/lookup, runs logical backup/restore and
+zero-from-artifact rebuild recovery drills, sends a graceful stop, verifies exit code
 zero or the standard SIGTERM-derived `143` without an OOM kill, and deletes the
 staging volume.
 
