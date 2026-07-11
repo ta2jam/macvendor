@@ -337,6 +337,7 @@ export async function getDataRelease(pool: Pool) {
     current_rights_status: string;
     rights_review_expires_at: Date | null;
     config_version: string;
+    config_version_at_build: string;
   }>(`
     SELECT ar.resolution_run_id, ar.version AS active_version, ar.publication_version,
            rr.policy_version, rr.output_hash, rr.completed_at AS generated_at,
@@ -344,7 +345,8 @@ export async function getDataRelease(pool: Pool) {
            ds.source_class, ds.distribution_scope,
            ri.source_config_snapshot->>'rightsStatus' AS rights_status_at_build,
            ds.rights_status AS current_rights_status, ds.rights_review_expires_at,
-           ds.config_version
+           ds.config_version,
+           ri.source_config_snapshot->>'configVersion' AS config_version_at_build
     FROM active_resolution ar
     JOIN resolution_runs rr ON rr.id = ar.resolution_run_id AND rr.status = 'active'
     JOIN resolution_inputs ri ON ri.resolution_run_id = ar.resolution_run_id
@@ -374,6 +376,8 @@ export async function getDataRelease(pool: Pool) {
       rightsReviewExpiresAt: row.rights_review_expires_at?.toISOString() ?? null,
       status: "included",
       configVersion: Number(row.config_version),
+      configVersionAtBuild: Number(row.config_version_at_build),
+      configChangedSinceBuild: Number(row.config_version) !== Number(row.config_version_at_build),
     })),
   };
 }

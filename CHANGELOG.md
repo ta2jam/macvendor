@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.0.17 — 2026-07-11
+
+- Source health now keeps active inputs visible after their current publish mode
+  changes and fails when an active source is no longer a production publisher;
+  disabling a source can no longer hide it from the report.
+- Active source-config snapshot drift is reported as a warning with current and
+  build-time config versions, while existing rights and publish-mode failures
+  remain fail-closed.
+- `/v1/data-release` now exposes `configVersionAtBuild` and
+  `configChangedSinceBuild` alongside the compatible current `configVersion`.
+- Added unit and PostgreSQL regressions for disable, restore, drift visibility,
+  public contract validation, and rebuild/activation closure.
+
 ## 0.0.16 — 2026-07-11
 
 - Added a strict, bounded `macvendor-governance/v1` decision document and a

@@ -301,7 +301,7 @@ Bunlar ölçüm hedefidir; ölçülmeden garanti değildir.
 - Source fetch/validation/rejection.
 - Kayıt/claim/conflict/suppression sayıları.
 - Active pointer version ve release age.
-- Hak review expiry ve aktif build'in source-config hash uyumu.
+- Hak review expiry ve aktif build'in source-config version uyumu.
 - Curated verification/origin dağılımı.
 - Correction queue age.
 
@@ -314,13 +314,16 @@ npm run source:health -- --warning-days 45
 ```
 
 The command emits JSON. Active-resolution inputs are monitored instead of being
-masked by a newer but unpublished release. It exits `1` for expired/blocked
-rights, non-API scope, missing or inactive required releases, stale active
-releases, invalid active inputs, or future-dated fetch timestamps;
-an approaching rights expiry or missing freshness threshold is a warning and
-does not change the exit code. The database query uses the latest-valid-release
-index and the evaluator is `O(S)` for `S` configured production sources; report
-memory is also `O(S)`.
+masked by a newer but unpublished release or disappearing after a publish-mode
+change. It exits `1` for expired/blocked rights, non-API scope, missing or
+inactive required releases, stale active releases, invalid active inputs,
+active non-production sources, or future-dated fetch timestamps. Build/current
+config-version drift, approaching rights expiry, and a missing freshness
+threshold are warnings and do not change the exit code. A successful rebuild
+and activation snapshots the current config versions and clears drift. The
+database query uses the latest-valid-release index and the evaluator is `O(S)`
+for `S` configured production or currently active sources; report memory is
+also `O(S)`.
 
 ### Alarm sahipliği
 

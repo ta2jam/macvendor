@@ -199,13 +199,20 @@ Aktif veri sürümünü, dahil edilen kaynak sürümlerini ve tazelik durumunu d
       "currentRightsStatus": "approved",
       "rightsReviewExpiresAt": null,
       "status": "included",
-      "configVersion": 1
+      "configVersion": 2,
+      "configVersionAtBuild": 1,
+      "configChangedSinceBuild": true
     }
   ]
 }
 ```
 
-Bu uç, build anındaki hak snapshot'ı ile güncel hak durumunu ayırır; böylece sonradan expired/rejected olan kaynak gizlenmez. Kaynak lisans metninin yerine geçmez. Hassas artifact URL'leri, imza anahtarları, iç notlar ve ham kayıtlar döndürülmez.
+Bu uç, build anındaki hak/config snapshot'ı ile güncel durumu ayırır; böylece
+sonradan expired/rejected olan veya config'i değişen kaynak gizlenmez.
+`configVersion` güncel source config sürümüdür; `configVersionAtBuild` aktif
+resolution'ın kullandığı sürümdür. Eşitsizlik rebuild gerektiğini gösterir fakat
+tek başına lookup çıktısını değiştirmez. Kaynak lisans metninin yerine geçmez.
+Hassas artifact URL'leri, imza anahtarları, iç notlar ve ham kayıtlar döndürülmez.
 
 Cache: `Cache-Control: public, max-age=60, s-maxage=300`. ETag; `activeVersion`, `publicationVersion` ve dahil edilen kaynakların güncel `configVersion` değerlerinden üretilir. Hak/config değişikliği bu endpoint'in surrogate key'ini purge eder.
 

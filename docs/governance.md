@@ -234,6 +234,10 @@ yalnız gerçekten active risk varsa kabul edilir. Bu kabul mevcut public çıkt
 silmez: suppression, yeni resolution veya rollback kararı ayrıca uygulanmalıdır.
 Karar commit'inden sonra yalnız data-release metadata cache'i purge edilir;
 purge hatası DB commit'i geri alınmış gibi raporlanmaz.
+`source:health`, active input'u güncel publish mode production olmasa bile
+rapora dahil eder ve bunu failure olarak gösterir. Production'a geri dönüş
+config drift'i tek başına kapatmaz; yeni resolution build edilip aktive edilene
+kadar warning ve `/v1/data-release.configChangedSinceBuild=true` görünür kalır.
 
 ## Kaynak özgünlüğü ve review
 
