@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   try {
     const result = await getDataRelease(getPool());
     const sourceVersions = result.sources
-      .map((source) => `${source.slug}:${source.configVersion}:${source.currentRightsStatus}`).join("|");
+      .map((source) => `${source.slug}:${source.configVersion}:${source.currentRightsStatus}:${source.observedAt}`).join("|");
     return jsonResponse(request, result, {
       requestId: id,
       cacheControl: "public, max-age=60, s-maxage=300",

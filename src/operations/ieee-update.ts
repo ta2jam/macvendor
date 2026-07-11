@@ -16,15 +16,22 @@ async function recordObservations(
   imports: Array<{ sourceReleaseId: string; contentHash: string; recordCount: number }>,
   actorId: string,
   observedAt: Date,
-): Promise<void> {
+): Promise<{ recorded: number; activeRecorded: number }> {
+  let recorded = 0;
+  let activeRecorded = 0;
   await client.query("BEGIN");
   try {
     for (const [index, dataset] of prepared.datasets.entries()) {
       const imported = imports[index]!;
       if (dataset.contentHash !== imported.contentHash) throw new Error("prepared and imported IEEE hashes differ");
       if (dataset.records !== imported.recordCount) throw new Error("prepared and imported IEEE record counts differ");
-      const source = await client.query<{ id: string }>(
-        "SELECT id FROM source_releases WHERE id = $1 AND content_hash = $2",
+      const source = await client.query<{ id: string; active: boolean }>(
+        `SELECT sr.id, EXISTS (
+           SELECT 1 FROM active_resolution ar
+           JOIN resolution_inputs ri ON ri.resolution_run_id = ar.resolution_run_id
+           WHERE ar.singleton_id = 1 AND ri.source_release_id = sr.id
+         ) AS active
+         FROM source_releases sr WHERE sr.id = $1 AND sr.content_hash = $2`,
         [imported.sourceReleaseId, imported.contentHash],
       );
       if (!source.rows[0]) throw new Error("imported IEEE release is unavailable for observation");
@@ -45,6 +52,8 @@ async function recordObservations(
       )).rows[0]?.id;
       if (!observationId) throw new Error("IEEE observation could not be recorded");
       if (inserted.rows[0]) {
+        recorded += 1;
+        if (source.rows[0]!.active) activeRecorded += 1;
         await client.query(
           `INSERT INTO audit_events (event_type, actor_id, target_type, target_id, metadata)
            VALUES ('source_release.observed', $1, 'source_release', $2, $3)`,
@@ -54,6 +63,7 @@ async function recordObservations(
       }
     }
     await client.query("COMMIT");
+    return { recorded, activeRecorded };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -76,7 +86,7 @@ export class IeeeUpdatePostCommitError extends Error {
   constructor(
     public readonly phase: "cache_purge" | "source_health",
     message: string,
-    public readonly activation: ActivationResult,
+    public readonly activation: ActivationResult | null,
     cause: unknown,
   ) {
     super(message, { cause });
@@ -114,7 +124,20 @@ export async function updateIeeeSources(pool: Pool, options: UpdateIeeeOptions) 
     const observedAt = validatePreparedSnapshot(prepared);
     const imports = [];
     for (const dataset of prepared.datasets) imports.push(await importSourceRelease(pool, dataset.manifestPath));
-    await recordObservations(lock, prepared, imports, options.actorId, observedAt);
+    const observations = await recordObservations(lock, prepared, imports, options.actorId, observedAt);
+    const purge = options.purge ?? purgeSurrogateKeys;
+    let observationCachePurge;
+    try {
+      observationCachePurge = observations.recorded === 0
+        ? { status: "skipped" as const, reason: "no_change" as const }
+        : observations.activeRecorded === 0
+          ? { status: "skipped" as const, reason: "no_active_change" as const }
+        : await purge([DATA_RELEASE_SURROGATE_KEY]);
+    } catch (error) {
+      throw new IeeeUpdatePostCommitError(
+        "cache_purge", "IEEE observations were committed, but metadata cache purge failed", null, error,
+      );
+    }
     const build = await buildResolution(pool, {
       sourceReleaseIds: imports.map((item) => item.sourceReleaseId),
       policyVersion: options.policyVersion,
@@ -126,7 +149,6 @@ export async function updateIeeeSources(pool: Pool, options: UpdateIeeeOptions) 
     const activation = await activateResolution(pool, build.resolutionRunId, { actorId: options.actorId });
     let cachePurge;
     try {
-      const purge = options.purge ?? purgeSurrogateKeys;
       cachePurge = activation.status === "already_active"
         ? { status: "skipped" as const, reason: "no_change" as const }
         : await purge([
@@ -147,7 +169,9 @@ export async function updateIeeeSources(pool: Pool, options: UpdateIeeeOptions) 
         "source_health", "IEEE resolution was committed, but the source health check failed", activation, error,
       );
     }
-    return { status: "updated" as const, prepared, imports, build, activation, cachePurge, health: health.summary };
+    return { status: "updated" as const, prepared, imports, build, activation,
+      observations: { ...observations, observedAt: observedAt.toISOString() },
+      cachePurge: { observation: observationCachePurge, activation: cachePurge }, health: health.summary };
   } finally {
     await lock.query("SELECT pg_advisory_unlock($1)", [IEEE_UPDATE_LOCK]).catch(() => undefined);
     lock.release();

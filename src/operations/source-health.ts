@@ -24,7 +24,7 @@ export interface SourceHealthFinding {
 export interface SourceHealthRow {
   slug: string;
   source_class: "authoritative" | "enrichment" | "owner_curated" | "reference";
-  publish_mode: "disabled" | "qa" | "production";
+  publish_mode: "disabled" | "qa_only" | "production";
   config_version: string;
   required_for_activation: boolean;
   max_acceptable_age_seconds: number | null;

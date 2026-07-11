@@ -1,6 +1,6 @@
 {
   "name": "macvendor",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "type": "module",
   "private": false,
   "description": "Source-aware MAC address block assignment lookup service.",
