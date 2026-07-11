@@ -6,6 +6,17 @@ import { loadManifest } from "./manifest";
 import { parseArtifact } from "./artifact";
 import type { ParsedSourceRecord, SourceManifest } from "./types";
 
+interface DiffReport {
+  baselineReleaseId: string | null;
+  previousCount: number;
+  currentCount: number;
+  addedCount: number;
+  removedCount: number;
+  addedPercent: number;
+  removedPercent: number;
+  status: "initial" | "passed" | "not_applicable";
+}
+
 function sourceConfig(manifest: SourceManifest) {
   return {
     slug: manifest.source.slug,
@@ -21,6 +32,9 @@ function sourceConfig(manifest: SourceManifest) {
     distributionScope: manifest.source.rights.distributionScope,
     rightsReviewReference: manifest.source.rights.reviewReference ?? null,
     rightsReviewExpiresAt: manifest.source.rights.reviewExpiresAt ?? null,
+    fetchOrigins: manifest.artifact.remote?.allowedOrigins ?? [],
+    signatureKeySha256: manifest.artifact.signature?.publicKeySha256 ?? null,
+    diffPolicy: manifest.release.diffPolicy ?? null,
   };
 }
 
@@ -33,7 +47,9 @@ async function ensureSource(client: PoolClient, manifest: SourceManifest): Promi
       'homepageUrl', homepage_url, 'termsUrl', terms_url, 'rightsStatus', rights_status,
       'rightsBasis', rights_basis, 'distributionScope', distribution_scope,
       'rightsReviewReference', rights_review_reference,
-      'rightsReviewExpiresAt', CASE WHEN rights_review_expires_at IS NULL THEN NULL ELSE to_char(rights_review_expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END
+      'rightsReviewExpiresAt', CASE WHEN rights_review_expires_at IS NULL THEN NULL ELSE to_char(rights_review_expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
+      'fetchOrigins', fetch_origins, 'signatureKeySha256', signature_key_sha256,
+      'diffPolicy', diff_policy
     ) AS config FROM data_sources WHERE slug = $1`,
     [manifest.source.slug],
   );
@@ -48,11 +64,13 @@ async function ensureSource(client: PoolClient, manifest: SourceManifest): Promi
     `INSERT INTO data_sources (
       id, slug, name, source_class, publish_mode, adapter_key, fetch_policy,
       required_for_activation, homepage_url, terms_url, rights_status, rights_basis,
-      distribution_scope, rights_review_reference, rights_review_expires_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, 'manual', $7, $8, $9, $10, $11, $12, $13, $14)`,
+      distribution_scope, rights_review_reference, rights_review_expires_at,
+      fetch_origins, signature_key_sha256, diff_policy
+    ) VALUES ($1, $2, $3, $4, $5, $6, 'manual', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
     [id, config.slug, config.name, config.sourceClass, config.publishMode, config.adapterKey,
       config.requiredForActivation, config.homepageUrl, config.termsUrl, config.rightsStatus,
-      config.rightsBasis, config.distributionScope, config.rightsReviewReference, config.rightsReviewExpiresAt],
+      config.rightsBasis, config.distributionScope, config.rightsReviewReference, config.rightsReviewExpiresAt,
+      JSON.stringify(config.fetchOrigins), config.signatureKeySha256, JSON.stringify(config.diffPolicy)],
   );
   return id;
 }
@@ -90,6 +108,59 @@ async function insertRecordChunk(client: PoolClient, sourceReleaseId: string, re
     )`,
     [sourceReleaseId, JSON.stringify(payload)],
   );
+}
+
+async function validateReleaseDiff(
+  client: PoolClient,
+  sourceId: string,
+  records: ParsedSourceRecord[],
+  manifest: SourceManifest,
+): Promise<DiffReport> {
+  const current = new Set(records.map((record) => record.rawRecordHash));
+  if (manifest.release.snapshotKind === "delta") {
+    return {
+      baselineReleaseId: null, previousCount: 0, currentCount: current.size,
+      addedCount: 0, removedCount: 0, addedPercent: 0, removedPercent: 0, status: "not_applicable",
+    };
+  }
+  const previousRelease = await client.query<{ id: string }>(
+    `SELECT id FROM source_releases WHERE source_id = $1 AND status = 'valid'
+     ORDER BY validated_at DESC, id DESC LIMIT 1`,
+    [sourceId],
+  );
+  if (!previousRelease.rows[0]) {
+    return {
+      baselineReleaseId: null, previousCount: 0, currentCount: current.size,
+      addedCount: current.size, removedCount: 0, addedPercent: 0, removedPercent: 0, status: "initial",
+    };
+  }
+  const previousRows = await client.query<{ raw_record_hash: string }>(
+    "SELECT raw_record_hash FROM source_records WHERE source_release_id = $1 AND record_status IN ('eligible', 'qa_only')",
+    [previousRelease.rows[0].id],
+  );
+  const previous = new Set(previousRows.rows.map((row) => row.raw_record_hash));
+  const addedCount = [...current].filter((hash) => !previous.has(hash)).length;
+  const removedCount = [...previous].filter((hash) => !current.has(hash)).length;
+  const addedPercent = previous.size ? (addedCount / previous.size) * 100 : 0;
+  const removedPercent = previous.size ? (removedCount / previous.size) * 100 : 0;
+  const report: DiffReport = {
+    baselineReleaseId: previousRelease.rows[0].id,
+    previousCount: previous.size,
+    currentCount: current.size,
+    addedCount,
+    removedCount,
+    addedPercent: Number(addedPercent.toFixed(6)),
+    removedPercent: Number(removedPercent.toFixed(6)),
+    status: "passed",
+  };
+  const policy = manifest.release.diffPolicy;
+  if (policy && (addedPercent > policy.maxAddedPercent || removedPercent > policy.maxRemovedPercent)) {
+    throw new ImportValidationError(
+      "RELEASE_DIFF_EXCEEDED",
+      `release diff exceeds policy: added=${report.addedPercent}% removed=${report.removedPercent}%`,
+    );
+  }
+  return report;
 }
 
 export interface ImportResult {
@@ -133,6 +204,8 @@ export async function importSourceRelease(pool: Pool, manifestPath: string): Pro
       };
     }
 
+    const diff = await validateReleaseDiff(client, sourceId, artifact.records, manifest);
+
     const sourceReleaseId = randomUUID();
     const now = new Date();
     await client.query(
@@ -144,15 +217,19 @@ export async function importSourceRelease(pool: Pool, manifestPath: string): Pro
       [sourceReleaseId, sourceId, manifest.release.snapshotKind, manifest.release.snapshotComplete,
         manifest.release.schemaVersion, manifest.release.adapterVersion, manifest.release.normalizerVersion,
         now, artifact.contentHash, importKey, artifact.records.length,
-        JSON.stringify({ manifestHash, limits: { artifactBytes: artifact.byteSize }, validation: "passed" })],
+        JSON.stringify({ manifestHash, limits: { artifactBytes: artifact.byteSize },
+          signature: { status: manifest.artifact.signatureStatus, publicKeySha256: artifact.signatureKeyHash },
+          diff, validation: "passed" })],
     );
     await client.query(
       `INSERT INTO source_artifacts (
-        source_release_id, dataset_key, source_repo_path, sha256, byte_size, mime_type,
+        source_release_id, dataset_key, source_url, source_repo_path, sha256, byte_size, mime_type,
         storage_key, source_signature_status
-      ) VALUES ($1, 'primary', $2, $3, $4, $5, $6, $7)`,
-      [sourceReleaseId, manifest.artifact.path, artifact.contentHash, artifact.byteSize,
-        artifact.mimeType, `local/${artifact.contentHash.slice(7)}`, manifest.artifact.signatureStatus],
+      ) VALUES ($1, 'primary', $2, $3, $4, $5, $6, $7, $8)`,
+      [sourceReleaseId, manifest.artifact.remote?.url ?? null,
+        manifest.artifact.remote ? null : manifest.artifact.path,
+        artifact.contentHash, artifact.byteSize, artifact.mimeType,
+        `local/${artifact.contentHash.slice(7)}`, manifest.artifact.signatureStatus],
     );
     for (let offset = 0; offset < artifact.records.length; offset += 1_000) {
       await insertRecordChunk(client, sourceReleaseId, artifact.records.slice(offset, offset + 1_000));

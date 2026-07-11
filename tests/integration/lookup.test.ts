@@ -20,6 +20,7 @@ import { assertPublicContract } from "../helpers/contracts";
 import {
   createSuppression, expireSuppressions, listSuppressions, revokeSuppression,
 } from "../../src/operations/suppressions";
+import { writeSignedArtifact } from "../helpers/source-fixture";
 
 config({ path: ".env.local", quiet: true });
 
@@ -280,7 +281,7 @@ describe("source importer", () => {
     const directory = await mkdtemp(path.join(tmpdir(), "macvendor-import-integration-"));
     try {
       const csv = "prefix,prefixLength,organizationName\n02CCDD,24,Synthetic Import Vendor\n";
-      await writeFile(path.join(directory, "records.csv"), csv);
+      const signature = await writeSignedArtifact(directory, csv);
       const manifest = {
         schemaVersion: "macvendor-source/v1",
         source: {
@@ -289,8 +290,8 @@ describe("source importer", () => {
           requiredForActivation: false,
           rights: { status: "approved", basis: "licensed", distributionScope: "api_output", reviewReference: "TEST-RIGHTS-IMPORT" },
         },
-        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "1" },
-        artifact: { path: "records.csv", format: "csv", sha256: sha256(csv), signatureStatus: "verified" },
+        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "1", diffPolicy: { maxAddedPercent: 25, maxRemovedPercent: 5 } },
+        artifact: { path: "records.csv", format: "csv", sha256: sha256(csv), signatureStatus: "verified", signature },
         defaults: { recordKind: "assignment", originType: "imported", rightsBasis: "licensed", distributionScope: "api_output", verificationStatus: "single_observation", registry: "MA-L" },
       };
       const manifestPath = path.join(directory, "manifest.json");
@@ -316,7 +317,7 @@ describe("source importer", () => {
     const directory = await mkdtemp(path.join(tmpdir(), "macvendor-import-invalid-"));
     try {
       const csv = "prefix,prefixLength,organizationName\n02CCDDE,28,Wrong Registry Length\n";
-      await writeFile(path.join(directory, "records.csv"), csv);
+      const signature = await writeSignedArtifact(directory, csv);
       const manifest = {
         schemaVersion: "macvendor-source/v1",
         source: {
@@ -325,8 +326,8 @@ describe("source importer", () => {
           requiredForActivation: false,
           rights: { status: "approved", basis: "licensed", distributionScope: "api_output", reviewReference: "TEST-RIGHTS-INVALID" },
         },
-        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "1" },
-        artifact: { path: "records.csv", format: "csv", sha256: sha256(csv), signatureStatus: "verified" },
+        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "1", diffPolicy: { maxAddedPercent: 25, maxRemovedPercent: 5 } },
+        artifact: { path: "records.csv", format: "csv", sha256: sha256(csv), signatureStatus: "verified", signature },
         defaults: { recordKind: "assignment", originType: "imported", rightsBasis: "licensed", distributionScope: "api_output", verificationStatus: "single_observation", registry: "MA-L" },
       };
       const manifestPath = path.join(directory, "manifest.json");
@@ -334,6 +335,49 @@ describe("source importer", () => {
       await expect(importSourceRelease(pool, manifestPath)).rejects.toMatchObject({ code: "REGISTRY_PREFIX_MISMATCH" });
       const source = await pool.query("SELECT 1 FROM data_sources WHERE slug = 'invalid-import-source'");
       expect(source.rowCount).toBe(0);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a full-snapshot change beyond its configured diff policy", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "macvendor-import-diff-"));
+    try {
+      const manifestPath = path.join(directory, "manifest.json");
+      const source = {
+        slug: "synthetic-diff-source", name: "Synthetic Diff Source",
+        class: "authoritative", publishMode: "production", adapterKey: "strict-delimited-v1",
+        requiredForActivation: false,
+        rights: { status: "approved", basis: "licensed", distributionScope: "api_output", reviewReference: "TEST-RIGHTS-DIFF" },
+      };
+      const defaults = {
+        recordKind: "assignment", originType: "imported", rightsBasis: "licensed",
+        distributionScope: "api_output", verificationStatus: "single_observation", registry: "MA-L",
+      };
+      const firstCsv = "prefix,prefixLength,organizationName\n02DDEE,24,Synthetic First Vendor\n";
+      const firstSignature = await writeSignedArtifact(directory, firstCsv);
+      await writeFile(manifestPath, JSON.stringify({
+        schemaVersion: "macvendor-source/v1", source,
+        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "1", diffPolicy: { maxAddedPercent: 100, maxRemovedPercent: 0 } },
+        artifact: { path: "records.csv", format: "csv", sha256: sha256(firstCsv), signatureStatus: "verified", signature: firstSignature },
+        defaults,
+      }));
+      await expect(importSourceRelease(pool, manifestPath)).resolves.toMatchObject({ status: "imported", recordCount: 1 });
+
+      const secondCsv = "prefix,prefixLength,organizationName\n02DDEF,24,Synthetic Replacement Vendor\n";
+      const secondSignature = await writeSignedArtifact(directory, secondCsv);
+      await writeFile(manifestPath, JSON.stringify({
+        schemaVersion: "macvendor-source/v1", source,
+        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "1", diffPolicy: { maxAddedPercent: 100, maxRemovedPercent: 0 } },
+        artifact: { path: "records.csv", format: "csv", sha256: sha256(secondCsv), signatureStatus: "verified", signature: secondSignature },
+        defaults,
+      }));
+      await expect(importSourceRelease(pool, manifestPath)).rejects.toMatchObject({ code: "RELEASE_DIFF_EXCEEDED" });
+      const count = await pool.query<{ releases: string }>(
+        `SELECT count(*) AS releases FROM source_releases sr JOIN data_sources ds ON ds.id = sr.source_id
+         WHERE ds.slug = 'synthetic-diff-source'`,
+      );
+      expect(count.rows[0]!.releases).toBe("1");
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

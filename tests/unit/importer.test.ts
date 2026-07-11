@@ -7,6 +7,7 @@ import { parseArtifact } from "../../src/importer/artifact";
 import { ImportValidationError } from "../../src/importer/errors";
 import { parseManifest } from "../../src/importer/manifest";
 import type { SourceManifest } from "../../src/importer/types";
+import { writeSignedArtifact } from "../helpers/source-fixture";
 
 const temporaryDirectories: string[] = [];
 
@@ -37,12 +38,19 @@ function manifest(overrides: Partial<SourceManifest> = {}): SourceManifest {
       schemaVersion: "1",
       adapterVersion: "1",
       normalizerVersion: "1",
+      diffPolicy: { maxAddedPercent: 25, maxRemovedPercent: 5 },
     },
     artifact: {
       path: "records.csv",
       format: "csv",
       sha256: `sha256:${"0".repeat(64)}`,
       signatureStatus: "verified",
+      signature: {
+        algorithm: "ed25519",
+        path: "records.csv.sig",
+        publicKeyPath: "trusted-ed25519-public.pem",
+        publicKeySha256: `sha256:${"0".repeat(64)}`,
+      },
     },
     defaults: {
       recordKind: "assignment",
@@ -65,6 +73,12 @@ describe("source manifest", () => {
     expect(() => parseManifest({ ...manifest(), surprise: true })).toThrowError(ImportValidationError);
   });
 
+  it("rejects unreviewed adapter keys", () => {
+    const candidate = manifest();
+    candidate.source.adapterKey = "arbitrary-code";
+    expect(() => parseManifest(candidate)).toThrowError(expect.objectContaining({ code: "UNSUPPORTED_ADAPTER" }));
+  });
+
   it("rejects third-party production use without an approved review", () => {
     const candidate = manifest();
     candidate.source.rights.status = "unreviewed";
@@ -79,6 +93,7 @@ describe("source manifest", () => {
 
     const unsigned = manifest();
     unsigned.artifact.signatureStatus = "unverified";
+    delete unsigned.artifact.signature;
     expect(() => parseManifest(unsigned)).toThrowError(expect.objectContaining({ code: "ARTIFACT_SIGNATURE_BLOCKED" }));
   });
 
@@ -87,6 +102,13 @@ describe("source manifest", () => {
     candidate.release.snapshotComplete = false;
     expect(() => parseManifest(candidate)).toThrowError(expect.objectContaining({ code: "INCOMPLETE_PRODUCTION_SNAPSHOT" }));
   });
+
+  it("rejects production deltas until deterministic materialization exists", () => {
+    const candidate = manifest();
+    candidate.release.snapshotKind = "delta";
+    candidate.release.snapshotComplete = false;
+    expect(() => parseManifest(candidate)).toThrowError(expect.objectContaining({ code: "PRODUCTION_DELTA_UNSUPPORTED" }));
+  });
 });
 
 describe("artifact parser", () => {
@@ -94,12 +116,12 @@ describe("artifact parser", () => {
     const directory = await mkdtemp(path.join(tmpdir(), "macvendor-importer-"));
     temporaryDirectories.push(directory);
     const csv = "prefix,prefixLength,organizationName\n02CCDD,24,\"Example, Incorporated\"\n";
-    const artifactPath = path.join(directory, "records.csv");
     const manifestPath = path.join(directory, "manifest.json");
-    await writeFile(artifactPath, csv);
+    const signature = await writeSignedArtifact(directory, csv);
     await writeFile(manifestPath, "{}");
     const candidate = manifest();
     candidate.artifact.sha256 = sha256(csv);
+    candidate.artifact.signature = signature;
 
     const parsed = await parseArtifact(candidate, manifestPath);
     expect(parsed.records).toHaveLength(1);
@@ -124,11 +146,39 @@ describe("artifact parser", () => {
     const directory = await mkdtemp(path.join(tmpdir(), "macvendor-importer-"));
     temporaryDirectories.push(directory);
     const csv = "prefix,prefixLength,organizationName,verificationStatus\n02CCDD,24,Example,corroborated\n";
+    const signature = await writeSignedArtifact(directory, csv);
+    const manifestPath = path.join(directory, "manifest.json");
+    await writeFile(manifestPath, "{}");
+    const candidate = manifest();
+    candidate.artifact.sha256 = sha256(csv);
+    candidate.artifact.signature = signature;
+    await expect(parseArtifact(candidate, manifestPath)).rejects.toMatchObject({ code: "CORROBORATION_RESERVED" });
+  });
+
+  it("rejects an invalid detached signature", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "macvendor-importer-"));
+    temporaryDirectories.push(directory);
+    const csv = "prefix,prefixLength,organizationName\n02CCDD,24,Example\n";
+    const signature = await writeSignedArtifact(directory, `${csv}tampered`);
     await writeFile(path.join(directory, "records.csv"), csv);
     const manifestPath = path.join(directory, "manifest.json");
     await writeFile(manifestPath, "{}");
     const candidate = manifest();
     candidate.artifact.sha256 = sha256(csv);
-    await expect(parseArtifact(candidate, manifestPath)).rejects.toMatchObject({ code: "CORROBORATION_RESERVED" });
+    candidate.artifact.signature = signature;
+    await expect(parseArtifact(candidate, manifestPath)).rejects.toMatchObject({ code: "ARTIFACT_SIGNATURE_INVALID" });
+  });
+
+  it("rejects duplicate normalized records", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "macvendor-importer-"));
+    temporaryDirectories.push(directory);
+    const csv = "prefix,prefixLength,organizationName\n02CCDD,24,Example\n02CCDD,24,Example\n";
+    const signature = await writeSignedArtifact(directory, csv);
+    const manifestPath = path.join(directory, "manifest.json");
+    await writeFile(manifestPath, "{}");
+    const candidate = manifest();
+    candidate.artifact.sha256 = sha256(csv);
+    candidate.artifact.signature = signature;
+    await expect(parseArtifact(candidate, manifestPath)).rejects.toMatchObject({ code: "DUPLICATE_RECORD" });
   });
 });

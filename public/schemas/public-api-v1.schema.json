@@ -124,7 +124,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["slug", "sourceReleaseId", "observedAt", "verificationStatus", "rightsScope", "rightsStatusAtBuild", "currentRightsStatus", "rightsReviewExpiresAt", "status"],
+            "required": ["slug", "sourceReleaseId", "observedAt", "verificationStatus", "rightsScope", "rightsStatusAtBuild", "currentRightsStatus", "rightsReviewExpiresAt", "status", "configVersion"],
             "properties": {
               "slug": { "type": "string", "minLength": 1 },
               "sourceReleaseId": { "type": "string", "pattern": "^sr_[0-9a-f-]+$" },
@@ -134,7 +134,8 @@
               "rightsStatusAtBuild": { "type": "string", "enum": ["unreviewed", "owner_asserted", "approved", "rejected", "expired"] },
               "currentRightsStatus": { "type": "string", "enum": ["unreviewed", "owner_asserted", "approved", "rejected", "expired"] },
               "rightsReviewExpiresAt": { "type": ["string", "null"], "format": "date-time" },
-              "status": { "const": "included" }
+              "status": { "const": "included" },
+              "configVersion": { "type": "integer", "minimum": 1 }
             }
           }
         }

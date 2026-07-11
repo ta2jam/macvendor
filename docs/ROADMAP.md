@@ -3,7 +3,7 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.0.5 contract and operations foundation
+## Current — 0.0.6 source acquisition foundation
 
 - [x] strict EUI-48 normalization;
 - [x] authoritative and curated layers kept separate;
@@ -22,12 +22,13 @@ correctness gates can delay or reject a feature.
 - [x] runtime response-drift tests;
 - [x] audited create, revoke, list, and expire suppression commands;
 - [x] provider-neutral non-root staging image and container smoke workflow.
+- [x] isolated allowlisted HTTPS fetch and DNS/IP SSRF controls;
+- [x] Ed25519 artifact authenticity verification;
+- [x] full-snapshot completeness, duplicate, and release-diff gates.
 
 ## Next — production-data readiness
 
 - [ ] obtain and document approved production source rights;
-- [ ] implement the isolated HTTPS fetcher and adapter runner around the offline importer;
-- [ ] verify signatures, artifact hashes, snapshot completeness, and diff gates;
 - [ ] complete backup/restore and zero-from-artifact rebuild drills.
 
 ## After data readiness

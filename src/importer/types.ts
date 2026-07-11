@@ -33,12 +33,28 @@ export interface SourceManifest {
     schemaVersion: string;
     adapterVersion: string;
     normalizerVersion: string;
+    diffPolicy?: {
+      maxAddedPercent: number;
+      maxRemovedPercent: number;
+    };
   };
   artifact: {
     path: string;
     format: "csv" | "tsv" | "jsonl";
     sha256: string;
     signatureStatus: "verified" | "unverified" | "not_applicable";
+    signature?: {
+      algorithm: "ed25519";
+      path: string;
+      publicKeyPath: string;
+      publicKeySha256: string;
+      url?: string;
+    };
+    remote?: {
+      url: string;
+      allowedOrigins: string[];
+      maxRedirects: number;
+    };
   };
   defaults: {
     recordKind: RecordKind;

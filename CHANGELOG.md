@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.0.6 — 2026-07-11
+
+- Added a database-free HTTPS fetch phase with explicit origin/port allowlists,
+  redirect revalidation, DNS result bounds, private/reserved IP rejection, and
+  DNS-to-TLS connection pinning.
+- Added wall-time, byte, content-encoding, status, URL credential/query, and TLS
+  verification gates with atomic artifact handoff.
+- Added Ed25519 detached-signature verification against a hash-pinned local trust
+  anchor; production releases can no longer assert signature status without
+  cryptographic verification.
+- Added reviewed adapter-key enforcement, duplicate record/assignment rejection,
+  mandatory production full-snapshot diff policies, and atomic change-threshold
+  enforcement.
+- Blocked production deltas until deterministic base-snapshot materialization is
+  implemented.
+- Added synthetic local HTTPS, TLS, SSRF, redirect, size, signature, duplicate,
+  and PostgreSQL diff-gate tests.
+
 ## 0.0.5 — 2026-07-11
 
 - Published OpenAPI 3.1 and JSON Schema documents for all public v1 endpoints,

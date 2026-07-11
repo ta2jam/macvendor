@@ -53,6 +53,9 @@ V1'de aşağıdaki tablolar gerçekten oluşturulur. “Gelecekte gerekebilir”
 - `rights_basis`: `owner_created | licensed | permission_granted | public_domain_claim | unknown`.
 - `distribution_scope`: `internal_only | api_output | raw_redistribution`.
 - `rights_review_reference`, `rights_review_expires_at`.
+- `fetch_origins`: gözden geçirilmiş HTTPS origin/port allowlist JSON array'i.
+- `signature_key_sha256`: güvenilen artifact imza anahtarının SHA-256 parmak izi.
+- `diff_policy`: full-snapshot ekleme/çıkarma eşikleri.
 - `config_version` monoton artan bigint.
 - `created_at`, `updated_at`.
 
