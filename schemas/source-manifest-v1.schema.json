@@ -17,6 +17,9 @@
         "class": { "enum": ["authoritative", "enrichment", "owner_curated", "reference"] },
         "publishMode": { "enum": ["production", "qa_only", "disabled"] },
         "adapterKey": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "fetchPolicy": { "enum": ["scheduled", "manual"] },
+        "fetchIntervalSeconds": { "type": "integer", "minimum": 60, "maximum": 31536000 },
+        "maxAcceptableAgeSeconds": { "type": "integer", "minimum": 60, "maximum": 31536000 },
         "requiredForActivation": { "type": "boolean" },
         "homepageUrl": { "type": "string", "maxLength": 2048 },
         "termsUrl": { "type": "string", "maxLength": 2048 },
@@ -73,6 +76,7 @@
             "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
             "publicKeyPath": { "type": "string", "minLength": 1, "maxLength": 1024 },
             "publicKeySha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "origin": { "enum": ["upstream", "operator"] },
             "url": { "type": "string", "format": "uri", "pattern": "^https://" }
           }
         },

@@ -1,0 +1,18 @@
+IEEE REGISTRATION AUTHORITY PUBLIC LISTINGS
+
+macvendor can retrieve MA-L, MA-M, and MA-S public-listing data directly from:
+https://standards.ieee.org/products-programs/regauth/
+
+IEEE stated in a 2014 clarification preserved by Debian that it does not assert
+copyright in the OUI Public Listing or attempt to restrict distribution of the
+listing. IEEE strongly encourages direct retrieval and regular updates to
+preserve data integrity. The evidence and residual-risk decision are recorded in
+docs/rights/ieee-registration-authority.md.
+
+IEEE data is not bundled in this source repository or GitHub release. Each
+deployment records its own retrieval time, source URLs, SHA-256 hashes, and
+validation report. macvendor is not affiliated with, sponsored by, or endorsed
+by IEEE. IEEE and related marks belong to their respective owners.
+
+The application source is MIT-licensed. That source-code license does not grant
+additional rights in any fetched dataset.

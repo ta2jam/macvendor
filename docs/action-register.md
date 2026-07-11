@@ -36,7 +36,9 @@ Tarih: 11 Temmuz 2026
 
 Bu beş konu tasarımla uydurulamaz; gerçek karar veya kanıt gerekir:
 
-1. IEEE ve production'a girecek her üçüncü taraf kaynak için yazılı hak incelemesi.
+1. IEEE için 2026-07-11 owner risk acceptance kaydedildi; 2027-07-11'de veya
+   çelişkili yeni şart çıktığında yeniden review zorunlu. IEEE dışındaki her
+   production üçüncü taraf kaynak için ayrıca yazılı hak incelemesi gerekir.
 2. Amatör veritabanı işi kullanıcı yeniden başlatana kadar ertelendi; bu sırada
    gerçek satır, manifest veya örnek veri sisteme alınmayacak.
 3. Production CDN/object storage sağlayıcısı; purge ve object-lock ayrıntıları buna göre uygulanacak.

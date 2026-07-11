@@ -2,61 +2,82 @@
 
 Review date: 2026-07-11
 
-Status: **blocked — no production use approved**
+Next mandatory review: 2027-07-11
+Status: **approved with recorded residual risk for derived public API output**
 
-This is an engineering gate, not legal advice. It records the evidence required
-by macvendor before IEEE Registration Authority data can enter a production
-release.
+This is an engineering and owner risk-acceptance record, not legal advice or an
+IEEE endorsement.
 
 ## Intended use
 
-macvendor would periodically fetch MA-L, MA-M, and MA-S public-listing files,
-normalize assignments, cache the derived data, and return organization and
-prefix fields through a public API. Raw database download is not planned for V1.
+macvendor periodically retrieves the IEEE Registration Authority MA-L, MA-M,
+and MA-S public CSV listings directly from `standards-oui.ieee.org`, stores an
+immutable hash-pinned operator-signed snapshot, normalizes assignment rows, and
+returns selected prefix and organization fields through the public lookup API.
+Raw or bulk IEEE dataset redistribution is not approved by this decision.
 
-## Evidence reviewed
+## Evidence chain
 
-- IEEE SA identifies itself as the registry owner and provides full public-listing
-  downloads for MA-L, MA-M, MA-S, IAB, and CID:
-  <https://standards.ieee.org/products-programs/regauth/>.
-- The linked MA-L, MA-M, and MA-S CSV files contain only a field header and data
-  rows. No license, permission grant, attribution rule, or API-output scope was
-  present in the downloaded artifacts on the review date.
-- The IEEE MA-L product page describes assignment use and public display, but it
-  does not grant third parties permission to copy, transform, cache, or expose
-  the public listing through another API:
-  <https://standards.ieee.org/products-programs/regauth/oui/>.
-- The KIT NETVS lookup is a reference implementation/consumer, not the owner of
-  IEEE assignment rights. Its availability cannot license IEEE data for
-  macvendor: <https://netvs.scc.kit.edu/tools/oui_lookup>.
+1. The current IEEE Registration Authority page explicitly offers complete CSV
+   downloads for MA-L, MA-M, MA-S, IAB, and CID public listings:
+   <https://standards.ieee.org/products-programs/regauth/>.
+2. A 2013 IEEE response preserved by Debian stated that IEEE did not issue
+   licenses for third-party distribution of the public listing. This is adverse
+   evidence and is retained rather than omitted:
+   <https://lists.debian.org/debian-legal/2013/08/msg00003.html>.
+3. Debian's current machine-readable copyright record preserves a later 2014
+   IEEE clarification: IEEE does not assert copyright in the OUI Public Listing
+   and does not attempt to restrict its distribution. Debian applies that record
+   to `iab.*`, `mam.*`, `oui36.*`, and `oui.*`:
+   <https://metadata.ftp-master.debian.org/changelogs/main/i/ieee-data/unstable_copyright>.
+4. Debian continues to distribute the data in `main`; its current package is
+   built from direct IEEE listings: <https://packages.debian.org/sid/ieee-data>.
+5. The Free Software Directory records the same 2014 clarification as a public
+   domain claim: <https://directory.fsf.org/wiki/Ieee-data>.
 
-“Public listing” and “downloadable” establish access, not redistribution or
-commercial/public API rights. No open-data or Creative Commons license was found
-on the registry page or in the three candidate CSV artifacts.
+The 2014 statement is preserved through Debian's reviewed package metadata, not
+on a currently discoverable IEEE-hosted license page. The general IEEE website
+footer still says “all rights reserved.” These facts create residual ambiguity;
+they do not erase the later dataset-specific clarification.
 
-## Decision
+## Decision 2026-07-11
 
-The candidate remains `reference`/QA-only. Do not create an IEEE production
-manifest, import an IEEE artifact as production, publish derived IEEE rows, or
-describe IEEE data as open/public-domain. GitHub mirrors and KIT are not
-alternative rights sources.
+The repository owner explicitly accepted the residual legal risk on 2026-07-11.
+For macvendor's engineering gates, MA-L, MA-M, and MA-S are therefore classified
+as:
 
-Issue [#8](https://github.com/ta2jam/macvendor/issues/8) remains open and
-blocked. Code, attribution, or a disclaimer cannot replace permission.
+- `rights_status=approved`;
+- `rights_basis=public_domain_claim`;
+- `distribution_scope=api_output`;
+- `rights_review_reference=docs/rights/ieee-registration-authority.md#decision-2026-07-11`.
 
-## Evidence required to unblock
+This approval covers derived lookup responses only. It does not approve a raw
+download endpoint, third-party mirrors, IAB/CID ingestion, IEEE logo use, or a
+claim that IEEE sponsors or certifies macvendor.
 
-Obtain a written IEEE license or permission that explicitly covers:
+## Mandatory controls
 
-1. automated periodic retrieval of the MA-L, MA-M, and MA-S listings;
-2. local storage, normalization, combination, and cache/CDN copies;
-3. public API output, including commercial use if macvendor may monetize;
-4. permitted fields and whether raw or bulk output is prohibited;
-5. mandatory attribution, trademark, link-back, and disclaimer text;
-6. update-frequency, request-rate, termination, revocation, and deletion duties;
-7. geographic, sublicensing, downstream-user, and retention limits.
+- Retrieve only the three fixed official HTTPS CSV URLs; do not use KIT,
+  GitHub mirrors, Debian package payloads, or commercial lookup services as the
+  production source.
+- Pin every raw artifact with SHA-256 and sign it with the operator Ed25519
+  ingest key before import. The private key remains outside the repository.
+- Preserve source URL, fetch time, byte count, raw hash, adapter version,
+  normalization version, and validation warnings in the immutable release.
+- Reject schema, registry, prefix-width, signature, hash, origin, rights, and
+  full-snapshot diff changes.
+- Omit every ambiguous duplicate prefix rather than selecting a silent winner.
+  The 2026-07-11 MA-L snapshot omits `0001C8` and `080030` and records the source
+  row numbers in `adapterWarnings`.
+- Normalize control and invisible characters deterministically while retaining
+  the raw signed artifact.
+- Display assignment-owner semantics and the no-device-identification
+  disclaimer. Keep IEEE and curated claims separate.
+- Refresh from IEEE regularly, expose data age, and re-run this rights review by
+  2027-07-11 or immediately if IEEE publishes conflicting terms.
+- On revocation or credible dispute, block new builds and use the audited
+  suppression/rollback process.
 
-The approval record must name the reviewer, evidence reference, allowed
-distribution scope, effective date, expiry/review date, and revocation response.
-Until then, synthetic data is the only authoritative-looking data allowed in
-local demonstrations.
+Issue [#8](https://github.com/ta2jam/macvendor/issues/8) may close only after the
+adapter, real import, deterministic resolution, lookup tests, and release gates
+pass.

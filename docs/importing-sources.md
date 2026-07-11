@@ -47,6 +47,14 @@ materialization exists. Production full snapshots are compared with the most
 recent valid release and abort atomically when the configured added/removed
 percentages are exceeded.
 
+The reviewed `ieee-registration-authority-csv-v1` adapter is deliberately not a
+generic CSV adapter. It accepts only the fixed MA-L, MA-M, and MA-S source slugs,
+registries, prefix widths, and official URLs in `src/sources/ieee.ts`. The
+operator signs each directly fetched raw CSV before import. Control/invisible
+characters are normalized deterministically, while duplicate assignment
+prefixes are omitted and recorded in `adapterWarnings`. The raw signed bytes
+remain the provenance artifact.
+
 ## Accepted artifact formats
 
 - UTF-8 CSV with one strict header row;

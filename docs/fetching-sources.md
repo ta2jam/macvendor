@@ -13,6 +13,19 @@ signature and artifact into their manifest-relative paths. `source:import`
 remains an offline local-file parser and database writer. Deployment must run the
 second phase without network egress.
 
+IEEE preparation is a narrower reviewed workflow:
+
+```bash
+npm run source:prepare:ieee
+```
+
+It downloads only the three fixed official CSV URLs, pins raw hashes, signs the
+raw bytes with the operator ingest key, writes manifests under ignored `.local/`,
+and runs complete adapter/signature/schema validation before reporting success.
+IEEE does not publish detached signatures, so `signature.origin` is `operator`;
+this proves post-download custody, while the pinned HTTPS origin and raw hashes
+preserve upstream provenance.
+
 ## Remote manifest fields
 
 ```json

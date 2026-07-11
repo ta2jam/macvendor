@@ -74,7 +74,7 @@ Başlangıç yaklaşımı:
 
 | Kaynak | Başlangıç rolü |
 |---|---|
-| IEEE Registration Authority public listing | Yazılı hak incelemesinden sonra `authoritative/production` adayı |
+| IEEE Registration Authority MA-L/MA-M/MA-S | 2026-07-11 kanıt zinciri ve açık owner risk acceptance ile `authoritative/production`; direct-origin, imza, yıllık review ve yalnız `api_output` |
 | KIT NETVS OUI lookup/verisi | `reference/qa_only`; availability veya kamuya açık oluşu yeniden dağıtım izni sayılmaz |
 | Ringmast4r OUI Master ve benzeri derlemeler | Lisans ve satır kökeni çözülene kadar `reference/qa_only` |
 | Eski Gist snapshot'ı | Güncellik ve haklar yetersizse `disabled` |

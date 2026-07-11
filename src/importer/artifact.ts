@@ -6,6 +6,8 @@ import { formatPrefix } from "@/domain/mac";
 import { ImportValidationError } from "./errors";
 import type { ParsedSourceRecord, RecordKind, Registry, SourceManifest } from "./types";
 import { verifyArtifactSignature } from "./signature";
+import { adaptIeeeRows, type IeeeAdapterWarning } from "./adapters/ieee";
+import { IEEE_ADAPTER_KEY } from "@/sources/ieee";
 
 export const IMPORT_LIMITS = Object.freeze({
   artifactBytes: 20 * 1024 * 1024,
@@ -238,6 +240,7 @@ export interface ParsedArtifact {
   records: ParsedSourceRecord[];
   mimeType: string;
   signatureKeyHash: string | null;
+  adapterWarnings: IeeeAdapterWarning[];
 }
 
 export async function parseArtifact(manifest: SourceManifest, manifestPath: string): Promise<ParsedArtifact> {
@@ -288,6 +291,12 @@ export async function parseArtifact(manifest: SourceManifest, manifestPath: stri
       throw new ImportValidationError("INVALID_DELIMITED_FILE", "CSV/TSV artifact could not be parsed with a single strict header row");
     }
   }
+  let adapterWarnings: IeeeAdapterWarning[] = [];
+  if (manifest.source.adapterKey === IEEE_ADAPTER_KEY) {
+    const adapted = adaptIeeeRows(rawRecords, manifest);
+    rawRecords = adapted.rows;
+    adapterWarnings = adapted.warnings;
+  }
   if (rawRecords.length === 0) throw new ImportValidationError("EMPTY_ARTIFACT", "artifact contains no records");
   if (rawRecords.length > IMPORT_LIMITS.records) throw new ImportValidationError("TOO_MANY_RECORDS", "artifact exceeds 250,000 records");
   const records = rawRecords.map((record, index) => normalizeRecord(record, index + 1, manifest));
@@ -313,5 +322,6 @@ export async function parseArtifact(manifest: SourceManifest, manifestPath: stri
     records,
     mimeType: manifest.artifact.format === "jsonl" ? "application/x-ndjson" : "text/plain",
     signatureKeyHash,
+    adapterWarnings,
   };
 }

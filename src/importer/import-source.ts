@@ -24,6 +24,9 @@ function sourceConfig(manifest: SourceManifest) {
     sourceClass: manifest.source.class,
     publishMode: manifest.source.publishMode,
     adapterKey: manifest.source.adapterKey,
+    fetchPolicy: manifest.source.fetchPolicy ?? "manual",
+    fetchIntervalSeconds: manifest.source.fetchIntervalSeconds ?? null,
+    maxAcceptableAgeSeconds: manifest.source.maxAcceptableAgeSeconds ?? null,
     requiredForActivation: manifest.source.requiredForActivation,
     homepageUrl: manifest.source.homepageUrl ?? null,
     termsUrl: manifest.source.termsUrl ?? null,
@@ -43,7 +46,10 @@ async function ensureSource(client: PoolClient, manifest: SourceManifest): Promi
   const existing = await client.query<{ id: string; config: Record<string, unknown> }>(
     `SELECT id, jsonb_build_object(
       'slug', slug, 'name', name, 'sourceClass', source_class, 'publishMode', publish_mode,
-      'adapterKey', adapter_key, 'requiredForActivation', required_for_activation,
+      'adapterKey', adapter_key, 'fetchPolicy', fetch_policy,
+      'fetchIntervalSeconds', fetch_interval_seconds,
+      'maxAcceptableAgeSeconds', max_acceptable_age_seconds,
+      'requiredForActivation', required_for_activation,
       'homepageUrl', homepage_url, 'termsUrl', terms_url, 'rightsStatus', rights_status,
       'rightsBasis', rights_basis, 'distributionScope', distribution_scope,
       'rightsReviewReference', rights_review_reference,
@@ -63,11 +69,13 @@ async function ensureSource(client: PoolClient, manifest: SourceManifest): Promi
   await client.query(
     `INSERT INTO data_sources (
       id, slug, name, source_class, publish_mode, adapter_key, fetch_policy,
+      fetch_interval_seconds, max_acceptable_age_seconds,
       required_for_activation, homepage_url, terms_url, rights_status, rights_basis,
       distribution_scope, rights_review_reference, rights_review_expires_at,
       fetch_origins, signature_key_sha256, diff_policy
-    ) VALUES ($1, $2, $3, $4, $5, $6, 'manual', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
     [id, config.slug, config.name, config.sourceClass, config.publishMode, config.adapterKey,
+      config.fetchPolicy, config.fetchIntervalSeconds, config.maxAcceptableAgeSeconds,
       config.requiredForActivation, config.homepageUrl, config.termsUrl, config.rightsStatus,
       config.rightsBasis, config.distributionScope, config.rightsReviewReference, config.rightsReviewExpiresAt,
       JSON.stringify(config.fetchOrigins), config.signatureKeySha256, JSON.stringify(config.diffPolicy)],
@@ -219,7 +227,7 @@ export async function importSourceRelease(pool: Pool, manifestPath: string): Pro
         now, artifact.contentHash, importKey, artifact.records.length,
         JSON.stringify({ manifestHash, limits: { artifactBytes: artifact.byteSize },
           signature: { status: manifest.artifact.signatureStatus, publicKeySha256: artifact.signatureKeyHash },
-          diff, validation: "passed" })],
+          adapterWarnings: artifact.adapterWarnings, diff, validation: "passed" })],
     );
     await client.query(
       `INSERT INTO source_artifacts (

@@ -17,8 +17,9 @@ export default function DataTermsPage() {
       </p>
 
       <div className="callout warning">
-        Mevcut 0.0.x sürümü yalnız sentetik, sahibi tarafından oluşturulmuş demo kayıtları içerir.
-        IEEE veya başka bir üçüncü taraf vendor veritabanı dağıtılmaz.
+        Repository ve GitHub release IEEE snapshot&apos;ı paketlemez. Bir deployment doğrudan IEEE&apos;den
+        aldığı MA-L, MA-M ve MA-S verisinden türetilmiş lookup sonuçları yayınlayabilir; bu IEEE
+        endorsement&apos;ı veya cihaz üreticisi doğrulaması değildir.
       </div>
 
       <div className="policy-grid">
