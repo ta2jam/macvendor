@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.0.14 — 2026-07-11
+
+- Added a committed SHA-256 ledger covering the exact migration SQL set and a
+  database-free verification command in the required release gate.
+- Migration history now stores a checksum for every applied filename, rejects
+  edited or missing applied migrations before executing new SQL, and upgrades
+  legacy filename-only history from the verified ledger transactionally.
+- Added machine-readable migration integrity failures plus unit and PostgreSQL
+  regression coverage for file tampering, incomplete ledgers, applied drift,
+  unknown database history, legacy backfill, and idempotent reruns.
+
 ## 0.0.13 — 2026-07-11
 
 - Added a provider-neutral `source:update:ieee` command that prepares, verifies,

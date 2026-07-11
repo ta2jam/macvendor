@@ -14,6 +14,25 @@ Her job:
 
 Scheduler timezone `UTC` kullanır; her kaynağın `fetch_policy/fetch_interval_seconds` ayarına göre çalışır ve scheduled fetch'e jitter eklenir.
 
+### Migration bütünlüğü
+
+`migrations/checksums.json` deploy edilen SQL dosya kümesinin birebir SHA-256
+ledger'ıdır. Migrator DB bağlantısından önce dosya/ledger eşleşmesini, advisory
+lock altında da `schema_migrations(name, checksum)` geçmişini doğrular. Uygulanmış
+bir dosya değişmişse, DB geçmişindeki dosya deploy setinden eksikse veya ledger
+eksikse yeni SQL çalıştırılmaz. Eski yalnız-filename geçmişi ancak doğrulanmış
+ledger hash'leriyle aynı transaction içinde backfill edilir ve checksum kolonu
+yeniden `NOT NULL` yapılır.
+
+```bash
+npm run db:migrations:verify
+npm run db:migrate
+```
+
+`APPLIED_MIGRATION_DRIFT` ve `APPLIED_MIGRATION_MISSING` otomatik onarım nedeni
+değildir. Dosyayı değiştirmek veya history satırını silmek yasaktır; yeni bir
+ileri migration hazırlanır ya da yanlış deployment artifact'i geri çekilir.
+
 ### IEEE güncelleme job'u
 
 ```bash

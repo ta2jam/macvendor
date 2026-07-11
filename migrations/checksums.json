@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "macvendor-migrations/v1",
+  "files": {
+    "0001_initial.sql": "sha256:02a902bd595a0a2e70a78e81b60556018c0bb7d3880dba987c6440ac92b2e1cb",
+    "0002_active_suppression_uniqueness.sql": "sha256:d31a599fad876001832aa6f9e77c3b1dc6f07887536711016ae23f4892db51a7",
+    "0003_source_acquisition_config.sql": "sha256:6f1759d5d8d3869738dd06638f4680801c3e7da3bfdb40a31c0157a1c5f07758",
+    "0004_source_health_lookup.sql": "sha256:f58dc660b8c1a23dd37b66fce845d697eb57bd5bc1277c1e686e622e8f757b3a",
+    "0005_retire_demo_activation_requirement.sql": "sha256:4de25f1c48ba30b1ae3ab97c3da3730a5c164a0828a0011704ecd6b31f03fe67",
+    "0006_schedule_ieee_sources.sql": "sha256:30ec9e8bf0f5f62ae9a3b91862f22ec88685fe55cdf880aad53e9d02f8058c3e",
+    "0007_source_fetch_observations.sql": "sha256:63860e9c52320cd40175157a4c0439284570c9c4ef27bcf5731de41edd74ca62"
+  }
+}
