@@ -3,7 +3,7 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.0.7 recovery foundation
+## Current — 0.0.9 durable foundation
 
 - [x] strict EUI-48 normalization;
 - [x] authoritative and curated layers kept separate;
@@ -28,6 +28,10 @@ correctness gates can delay or reject a feature.
 - [x] snapshot-consistent logical backup with checksum manifest;
 - [x] guarded disposable-database restore and integrity verification;
 - [x] zero-from-artifact migration/import/resolution rebuild drill.
+- [x] WCAG A/AA-oriented axe gate across Chromium, Firefox, WebKit, and a
+  320 px mobile viewport;
+- [x] skip link, visible focus, async status/error semantics, mobile navigation,
+  and measured text contrast fixes;
 
 ## Next — production-data readiness
 
@@ -42,7 +46,7 @@ correctness gates can delay or reject a feature.
 - [ ] external/shared rate limiting based on measured traffic — blocked issue #19;
 - [x] importer fuzz corpus and resource-limit enforcement — issue #17;
 - [x] source freshness and rights-expiry monitoring — issue #17;
-- [ ] accessibility and cross-browser UI verification;
+- [x] accessibility and cross-browser UI verification — issue #21;
 - [ ] benchmark lookup p50/p95/p99, query plans, CPU, memory, and I/O;
 
 ## After data readiness

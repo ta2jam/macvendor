@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.0.9 — 2026-07-11
+
+- Added a Playwright and axe release gate across Chromium, Firefox, WebKit, and
+  a 320 px Chromium mobile viewport for all public pages and lookup states.
+- Added skip-link focus, persistent mobile navigation, visible focus rings,
+  labelled/busy/status/error regions, focusable JSON output, and bounded touch
+  targets.
+- Darkened muted text after measured 3.95–4.45:1 failures; the tested surfaces
+  now exceed the 4.5:1 normal-text threshold.
+- Fixed local standalone startup so `npm start` copies public/static assets
+  before launching; the previous script served HTML without CSS or client JS.
+- Added failure-only browser screenshots, traces, video, and HTML report
+  retention to CI; `browser`, `verify`, and `container-smoke` are required main
+  branch checks.
+- Documented that automated checks are not formal WCAG conformance and retained
+  real Safari Tab traversal, assistive-technology, forced-color, and 200% zoom
+  checks as explicit manual work.
+
 ## 0.0.8 — 2026-07-11
 
 - Recorded the IEEE Registration Authority evidence review and kept production

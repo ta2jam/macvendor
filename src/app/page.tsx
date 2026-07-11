@@ -31,17 +31,17 @@ export default function HomePage() {
         </div>
         <div className="principle-grid">
           <article>
-            <span>01</span>
+            <span aria-hidden="true">01</span>
             <h3>Atama, cihaz kimliği değildir</h3>
             <p>Sonuç registry sahibini gösterir. MAC değiştirilebilir veya rastgeleleştirilebilir.</p>
           </article>
           <article>
-            <span>02</span>
+            <span aria-hidden="true">02</span>
             <h3>Kaynaklar ayrı kalır</h3>
             <p>Authoritative kayıt, owner-curated iddia tarafından sessizce ezilemez.</p>
           </article>
           <article>
-            <span>03</span>
+            <span aria-hidden="true">03</span>
             <h3>Her sonuç sürümlüdür</h3>
             <p>Aktif release ve politika sürümü API yanıtında görünür.</p>
           </article>

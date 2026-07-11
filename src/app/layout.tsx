@@ -15,6 +15,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="tr">
       <body>
+        <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
         <header className="site-header">
           <div className="shell header-inner">
             <Link className="brand" href="/" aria-label="macvendor.io ana sayfa">
@@ -29,7 +30,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </nav>
           </div>
         </header>
-        <main>{children}</main>
+        <main id="main-content" tabIndex={-1}>{children}</main>
         <footer>
           <div className="shell footer-grid">
             <p>

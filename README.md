@@ -67,6 +67,8 @@ identity. MAC addresses can be reassigned, spoofed, or randomized.
   and rights-expiry health reporting.
 - shared-cache surrogate keys and a bounded provider-neutral post-commit purge
   hook; real CDN validation remains deployment-specific.
+- WCAG A/AA-oriented axe checks and lookup-flow tests across Chromium, Firefox,
+  WebKit, and a 320 px mobile viewport;
 - allowlisted HTTPS fetch with DNS/IP SSRF defense, redirect revalidation,
   Ed25519 verification, snapshot completeness, and release-diff gates;
 - snapshot-consistent logical backup, guarded restore verification, and
@@ -188,6 +190,8 @@ npm run typecheck
 npm run test
 npm run test:integration
 npm run build
+npm run browser:install
+npm run test:browser
 npm audit --audit-level=low
 ```
 
@@ -196,6 +200,10 @@ Run the complete local gate with:
 ```bash
 npm run verify
 ```
+
+Browser setup, CI behavior, and the manual checks that automation cannot prove
+are documented in
+[`docs/accessibility-testing.md`](docs/accessibility-testing.md).
 
 The integration suite resets only the database named by `TEST_DATABASE_URL` and
 refuses any name that does not end with `_test`.

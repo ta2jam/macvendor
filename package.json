@@ -1,6 +1,6 @@
 {
   "name": "macvendor",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "type": "module",
   "private": false,
   "description": "Source-aware MAC address block assignment lookup service.",
@@ -11,11 +11,13 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "node .next/standalone/server.js",
+    "start": "node scripts/start-standalone.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run tests/unit",
     "test:watch": "vitest tests/unit",
+    "browser:install": "playwright install --with-deps chromium firefox webkit",
+    "test:browser": "playwright test",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "source:import": "tsx scripts/import-source.ts",
@@ -46,6 +48,8 @@
     "react-dom": "19.2.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "^1.61.1",
     "@types/node": "24.10.1",
     "@types/pg": "8.15.6",
     "@types/react": "19.2.14",
