@@ -43,7 +43,16 @@
         "snapshotComplete": { "type": "boolean" },
         "schemaVersion": { "type": "string", "minLength": 1, "maxLength": 80 },
         "adapterVersion": { "type": "string", "minLength": 1, "maxLength": 80 },
-        "normalizerVersion": { "type": "string", "minLength": 1, "maxLength": 80 }
+        "normalizerVersion": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "diffPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxAddedPercent", "maxRemovedPercent"],
+          "properties": {
+            "maxAddedPercent": { "type": "number", "minimum": 0, "maximum": 1000 },
+            "maxRemovedPercent": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        }
       }
     },
     "artifact": {
@@ -54,7 +63,35 @@
         "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
         "format": { "enum": ["csv", "tsv", "jsonl"] },
         "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-        "signatureStatus": { "enum": ["verified", "unverified", "not_applicable"] }
+        "signatureStatus": { "enum": ["verified", "unverified", "not_applicable"] },
+        "signature": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["algorithm", "path", "publicKeyPath", "publicKeySha256"],
+          "properties": {
+            "algorithm": { "const": "ed25519" },
+            "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+            "publicKeyPath": { "type": "string", "minLength": 1, "maxLength": 1024 },
+            "publicKeySha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "url": { "type": "string", "format": "uri", "pattern": "^https://" }
+          }
+        },
+        "remote": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["url", "allowedOrigins", "maxRedirects"],
+          "properties": {
+            "url": { "type": "string", "format": "uri", "pattern": "^https://" },
+            "allowedOrigins": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 8,
+              "uniqueItems": true,
+              "items": { "type": "string", "format": "uri", "pattern": "^https://" }
+            },
+            "maxRedirects": { "type": "integer", "minimum": 0, "maximum": 3 }
+          }
+        }
       }
     },
     "defaults": {

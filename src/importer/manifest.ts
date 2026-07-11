@@ -51,6 +51,19 @@ function boolean(value: unknown, path: string): boolean {
   return value;
 }
 
+function number(value: unknown, path: string, minimum: number, maximum: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum) {
+    throw new ImportValidationError("INVALID_MANIFEST", `${path} must be a number from ${minimum} to ${maximum}`);
+  }
+  return value;
+}
+
+function integer(value: unknown, path: string, minimum: number, maximum: number): number {
+  const candidate = number(value, path, minimum, maximum);
+  if (!Number.isInteger(candidate)) throw new ImportValidationError("INVALID_MANIFEST", `${path} must be an integer`);
+  return candidate;
+}
+
 function oneOf<T extends string>(value: unknown, values: readonly T[], path: string): T {
   if (typeof value !== "string" || !values.includes(value as T)) {
     throw new ImportValidationError("INVALID_MANIFEST", `${path} must be one of ${values.join(", ")}`);
@@ -71,9 +84,30 @@ function optionalHttpsUrl(value: unknown, path: string): string | undefined {
   if (!candidate) return undefined;
   try {
     const url = new URL(candidate);
-    if (url.protocol !== "https:" || url.username || url.password) throw new Error();
+    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) throw new Error();
   } catch {
-    throw new ImportValidationError("INVALID_MANIFEST", `${path} must be an HTTPS URL without credentials`);
+    throw new ImportValidationError("INVALID_MANIFEST", `${path} must be an HTTPS URL without credentials, query, or fragment`);
+  }
+  return candidate;
+}
+
+function httpsUrl(value: unknown, path: string): string {
+  return optionalHttpsUrl(value, path)
+    ?? (() => { throw new ImportValidationError("INVALID_MANIFEST", `${path} is required`); })();
+}
+
+function safeRelativePath(value: unknown, field: string): string {
+  const candidate = string(value, field, 1024);
+  if (candidate.startsWith("/") || candidate.startsWith("\\") || candidate.split(/[\\/]/).includes("..")) {
+    throw new ImportValidationError("UNSAFE_ARTIFACT_PATH", `${field} must be a relative path without parent traversal`);
+  }
+  return candidate;
+}
+
+function hash(value: unknown, field: string): string {
+  const candidate = string(value, field, 71);
+  if (!/^sha256:[0-9a-f]{64}$/.test(candidate)) {
+    throw new ImportValidationError("INVALID_ARTIFACT_HASH", `${field} must use lowercase sha256:<64 hex>`);
   }
   return candidate;
 }
@@ -93,25 +127,46 @@ export function parseManifest(value: unknown): SourceManifest {
   }
   const rights = object(source.rights, "source.rights");
   keys(rights, ["status", "basis", "distributionScope", "reviewReference", "reviewExpiresAt"], "source.rights");
+  const adapterKey = string(source.adapterKey, "source.adapterKey", 120);
+  if (adapterKey !== "strict-delimited-v1") {
+    throw new ImportValidationError("UNSUPPORTED_ADAPTER", "only the reviewed strict-delimited-v1 adapter is available");
+  }
 
   const release = object(root.release, "release");
-  keys(release, ["snapshotKind", "snapshotComplete", "schemaVersion", "adapterVersion", "normalizerVersion"], "release");
+  keys(release, ["snapshotKind", "snapshotComplete", "schemaVersion", "adapterVersion", "normalizerVersion", "diffPolicy"], "release");
   const snapshotKind = oneOf(release.snapshotKind, ["full_snapshot", "delta"] as const, "release.snapshotKind");
   const snapshotComplete = boolean(release.snapshotComplete, "release.snapshotComplete");
   if (snapshotKind === "delta" && snapshotComplete) {
     throw new ImportValidationError("INVALID_SNAPSHOT", "delta releases cannot set snapshotComplete=true");
   }
 
+  const diffPolicy = release.diffPolicy === undefined ? undefined : object(release.diffPolicy, "release.diffPolicy");
+  if (diffPolicy) keys(diffPolicy, ["maxAddedPercent", "maxRemovedPercent"], "release.diffPolicy");
+
   const artifact = object(root.artifact, "artifact");
-  keys(artifact, ["path", "format", "sha256", "signatureStatus"], "artifact");
-  const artifactPath = string(artifact.path, "artifact.path", 1024);
-  if (artifactPath.startsWith("/") || artifactPath.split(/[\\/]/).includes("..")) {
-    throw new ImportValidationError("UNSAFE_ARTIFACT_PATH", "artifact.path must be a relative path without parent traversal");
-  }
-  const artifactHash = string(artifact.sha256, "artifact.sha256", 71);
-  if (!/^sha256:[0-9a-f]{64}$/.test(artifactHash)) {
-    throw new ImportValidationError("INVALID_ARTIFACT_HASH", "artifact.sha256 must use lowercase sha256:<64 hex>");
-  }
+  keys(artifact, ["path", "format", "sha256", "signatureStatus", "signature", "remote"], "artifact");
+  const artifactPath = safeRelativePath(artifact.path, "artifact.path");
+  const artifactHash = hash(artifact.sha256, "artifact.sha256");
+  const signatureStatus = oneOf(artifact.signatureStatus, ["verified", "unverified", "not_applicable"] as const, "artifact.signatureStatus");
+  const signature = artifact.signature === undefined ? undefined : object(artifact.signature, "artifact.signature");
+  if (signature) keys(signature, ["algorithm", "path", "publicKeyPath", "publicKeySha256", "url"], "artifact.signature");
+  const remote = artifact.remote === undefined ? undefined : object(artifact.remote, "artifact.remote");
+  if (remote) keys(remote, ["url", "allowedOrigins", "maxRedirects"], "artifact.remote");
+  const remoteUrl = remote ? httpsUrl(remote.url, "artifact.remote.url") : undefined;
+  const allowedOrigins = remote ? (() => {
+    if (!Array.isArray(remote.allowedOrigins) || remote.allowedOrigins.length < 1 || remote.allowedOrigins.length > 8) {
+      throw new ImportValidationError("INVALID_MANIFEST", "artifact.remote.allowedOrigins must contain 1..8 origins");
+    }
+    const values = remote.allowedOrigins.map((value, index) => {
+      const candidate = httpsUrl(value, `artifact.remote.allowedOrigins[${index}]`);
+      const url = new URL(candidate);
+      if (url.pathname !== "/") throw new ImportValidationError("INVALID_MANIFEST", "allowed origins cannot include a path");
+      return url.origin;
+    });
+    if (new Set(values).size !== values.length) throw new ImportValidationError("INVALID_MANIFEST", "allowed origins must be unique");
+    if (!values.includes(new URL(remoteUrl!).origin)) throw new ImportValidationError("REMOTE_ORIGIN_BLOCKED", "artifact URL origin is not allowlisted");
+    return values;
+  })() : undefined;
 
   const defaults = object(root.defaults, "defaults");
   keys(defaults, ["recordKind", "originType", "rightsBasis", "distributionScope", "verificationStatus", "registry"], "defaults");
@@ -123,7 +178,7 @@ export function parseManifest(value: unknown): SourceManifest {
       name: string(source.name, "source.name", 512),
       class: oneOf<SourceClass>(source.class, SOURCE_CLASSES, "source.class"),
       publishMode: oneOf<PublishMode>(source.publishMode, PUBLISH_MODES, "source.publishMode"),
-      adapterKey: string(source.adapterKey, "source.adapterKey", 120),
+      adapterKey,
       requiredForActivation: boolean(source.requiredForActivation, "source.requiredForActivation"),
       homepageUrl: optionalHttpsUrl(source.homepageUrl, "source.homepageUrl"),
       termsUrl: optionalHttpsUrl(source.termsUrl, "source.termsUrl"),
@@ -141,12 +196,28 @@ export function parseManifest(value: unknown): SourceManifest {
       schemaVersion: string(release.schemaVersion, "release.schemaVersion", 80),
       adapterVersion: string(release.adapterVersion, "release.adapterVersion", 80),
       normalizerVersion: string(release.normalizerVersion, "release.normalizerVersion", 80),
+      diffPolicy: diffPolicy ? {
+        maxAddedPercent: number(diffPolicy.maxAddedPercent, "release.diffPolicy.maxAddedPercent", 0, 1000),
+        maxRemovedPercent: number(diffPolicy.maxRemovedPercent, "release.diffPolicy.maxRemovedPercent", 0, 100),
+      } : undefined,
     },
     artifact: {
       path: artifactPath,
       format: oneOf(artifact.format, ["csv", "tsv", "jsonl"] as const, "artifact.format"),
       sha256: artifactHash,
-      signatureStatus: oneOf(artifact.signatureStatus, ["verified", "unverified", "not_applicable"] as const, "artifact.signatureStatus"),
+      signatureStatus,
+      signature: signature ? {
+        algorithm: oneOf(signature.algorithm, ["ed25519"] as const, "artifact.signature.algorithm"),
+        path: safeRelativePath(signature.path, "artifact.signature.path"),
+        publicKeyPath: safeRelativePath(signature.publicKeyPath, "artifact.signature.publicKeyPath"),
+        publicKeySha256: hash(signature.publicKeySha256, "artifact.signature.publicKeySha256"),
+        url: optionalHttpsUrl(signature.url, "artifact.signature.url"),
+      } : undefined,
+      remote: remote ? {
+        url: remoteUrl!,
+        allowedOrigins: allowedOrigins!,
+        maxRedirects: integer(remote.maxRedirects, "artifact.remote.maxRedirects", 0, 3),
+      } : undefined,
     },
     defaults: {
       recordKind: oneOf<RecordKind>(defaults.recordKind, RECORD_KINDS, "defaults.recordKind"),
@@ -159,8 +230,23 @@ export function parseManifest(value: unknown): SourceManifest {
   };
 
   validateRightsGate(manifest);
-  if (manifest.source.publishMode === "production" && manifest.artifact.signatureStatus === "unverified") {
-    throw new ImportValidationError("ARTIFACT_SIGNATURE_BLOCKED", "production artifacts cannot use signatureStatus=unverified");
+  if (manifest.artifact.signatureStatus === "verified" && !manifest.artifact.signature) {
+    throw new ImportValidationError("SIGNATURE_CONFIG_REQUIRED", "signatureStatus=verified requires artifact.signature");
+  }
+  if (manifest.artifact.signatureStatus !== "verified" && manifest.artifact.signature) {
+    throw new ImportValidationError("SIGNATURE_CONFIG_UNEXPECTED", "artifact.signature is valid only with signatureStatus=verified");
+  }
+  if (manifest.artifact.remote && manifest.artifact.signatureStatus === "verified" && !manifest.artifact.signature?.url) {
+    throw new ImportValidationError("SIGNATURE_URL_REQUIRED", "remote verified artifacts require artifact.signature.url");
+  }
+  if (manifest.source.publishMode === "production" && manifest.artifact.signatureStatus !== "verified") {
+    throw new ImportValidationError("ARTIFACT_SIGNATURE_BLOCKED", "production artifacts require a verified signature");
+  }
+  if (manifest.source.publishMode === "production" && manifest.release.snapshotKind === "delta") {
+    throw new ImportValidationError("PRODUCTION_DELTA_UNSUPPORTED", "production delta materialization is not implemented");
+  }
+  if (manifest.source.publishMode === "production" && !manifest.release.diffPolicy) {
+    throw new ImportValidationError("DIFF_POLICY_REQUIRED", "production releases require release.diffPolicy");
   }
   return manifest;
 }

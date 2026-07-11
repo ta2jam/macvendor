@@ -198,7 +198,8 @@ Aktif veri sürümünü, dahil edilen kaynak sürümlerini ve tazelik durumunu d
       "rightsStatusAtBuild": "approved",
       "currentRightsStatus": "approved",
       "rightsReviewExpiresAt": null,
-      "status": "included"
+      "status": "included",
+      "configVersion": 1
     }
   ]
 }

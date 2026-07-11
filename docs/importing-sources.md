@@ -1,7 +1,9 @@
 # Importing source releases
 
-Version `0.0.3` introduces an offline, local-file importer. It does not fetch a
-URL and does not make a source eligible for production by itself.
+The importer is an offline, local-file parser and database writer. Remote
+download is a separate phase documented in
+[`fetching-sources.md`](fetching-sources.md); fetching does not make a source
+eligible for production by itself.
 
 ## Command
 
@@ -31,13 +33,19 @@ Unknown manifest and record fields are rejected. Production manifests require:
 - approved third-party rights plus a review reference, or an owner-created source
   with at least an owner assertion;
 - a non-expired rights review when an expiry exists;
-- artifact signature state other than `unverified`;
+- a cryptographically verified Ed25519 artifact signature;
+- an explicit full-snapshot diff policy;
 - known record origin and rights;
 - a privacy review reference for `/37`–`/48` records.
 
 The importer never upgrades `corroborated` from a source row. Corroboration is a
 resolver decision across independent sources. `reviewed` rows require an opaque
 `reviewedBy` actor identifier.
+
+Production delta releases are rejected until deterministic base-snapshot
+materialization exists. Production full snapshots are compared with the most
+recent valid release and abort atomically when the configured added/removed
+percentages are exceeded.
 
 ## Accepted artifact formats
 

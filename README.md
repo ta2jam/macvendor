@@ -63,6 +63,8 @@ identity. MAC addresses can be reassigned, spoofed, or randomized.
 - unit, PostgreSQL integration, suppression, build, and HTTP smoke coverage.
 - offline CSV/TSV/JSONL source-release importer with manifest, hash, rights,
   privacy, encoding, size, and idempotency gates.
+- allowlisted HTTPS fetch with DNS/IP SSRF defense, redirect revalidation,
+  Ed25519 verification, snapshot completeness, and release-diff gates;
 
 ## Quick start
 
@@ -197,8 +199,8 @@ npm run source:import -- --manifest examples/sources/synthetic-import/manifest.j
 ```
 
 See [`docs/importing-sources.md`](docs/importing-sources.md). The importer reads
-only a manifest-relative local file; network fetching remains deliberately
-unimplemented until its SSRF and origin-allowlist boundary is complete.
+only a manifest-relative local file. Remote acquisition is a distinct
+`source:fetch` phase; see [`docs/fetching-sources.md`](docs/fetching-sources.md).
 
 Build and publish an explicit set of approved source releases with:
 

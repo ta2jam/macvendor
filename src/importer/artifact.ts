@@ -5,6 +5,7 @@ import { canonicalJson, sha256 } from "@/domain/canonical-json";
 import { formatPrefix } from "@/domain/mac";
 import { ImportValidationError } from "./errors";
 import type { ParsedSourceRecord, RecordKind, Registry, SourceManifest } from "./types";
+import { verifyArtifactSignature } from "./signature";
 
 const MAX_ARTIFACT_BYTES = 20 * 1024 * 1024;
 const MAX_LINE_BYTES = 64 * 1024;
@@ -174,6 +175,7 @@ export interface ParsedArtifact {
   contentHash: string;
   records: ParsedSourceRecord[];
   mimeType: string;
+  signatureKeyHash: string | null;
 }
 
 export async function parseArtifact(manifest: SourceManifest, manifestPath: string): Promise<ParsedArtifact> {
@@ -187,6 +189,7 @@ export async function parseArtifact(manifest: SourceManifest, manifestPath: stri
   const bytes = await readFile(candidate);
   const contentHash = sha256(bytes);
   if (contentHash !== manifest.artifact.sha256) throw new ImportValidationError("ARTIFACT_HASH_MISMATCH", "artifact SHA-256 does not match manifest");
+  const signatureKeyHash = await verifyArtifactSignature(manifest, manifestPath, bytes);
   let content: string;
   try { content = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
   catch { throw new ImportValidationError("INVALID_UTF8", "artifact must be valid UTF-8"); }
@@ -226,11 +229,27 @@ export async function parseArtifact(manifest: SourceManifest, manifestPath: stri
   if (rawRecords.length === 0) throw new ImportValidationError("EMPTY_ARTIFACT", "artifact contains no records");
   if (rawRecords.length > MAX_RECORDS) throw new ImportValidationError("TOO_MANY_RECORDS", "artifact exceeds 250,000 records");
   const records = rawRecords.map((record, index) => normalizeRecord(record, index + 1, manifest));
+  const recordHashes = new Set<string>();
+  const authoritativeKeys = new Set<string>();
+  for (const record of records) {
+    if (recordHashes.has(record.rawRecordHash)) {
+      throw new ImportValidationError("DUPLICATE_RECORD", "artifact contains duplicate normalized records");
+    }
+    recordHashes.add(record.rawRecordHash);
+    if (manifest.source.class === "authoritative" && record.recordKind === "assignment") {
+      const key = `${record.registry}:${record.prefixLength}:${record.prefixBits}`;
+      if (authoritativeKeys.has(key)) {
+        throw new ImportValidationError("DUPLICATE_ASSIGNMENT", "authoritative artifact contains multiple assignments for the same registry prefix");
+      }
+      authoritativeKeys.add(key);
+    }
+  }
   return {
     absolutePath: candidate,
     byteSize: bytes.byteLength,
     contentHash,
     records,
     mimeType: manifest.artifact.format === "jsonl" ? "application/x-ndjson" : "text/plain",
+    signatureKeyHash,
   };
 }
