@@ -2,7 +2,10 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 const wcagTags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
-const publicPages = ["/", "/methodology", "/data-sources", "/data-release", "/api-docs"];
+const publicPages = [
+  "/", "/methodology", "/data-sources", "/data-release", "/data-corrections",
+  "/legal/data-terms", "/api-docs",
+];
 
 async function expectNoAxeViolations(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
@@ -64,6 +67,13 @@ test.describe("public accessibility surface", () => {
       scrollWidth: document.documentElement.scrollWidth,
     }));
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+  });
+
+  test("correction page never claims intake is available without configuration", async ({ page }) => {
+    await page.goto("/data-corrections");
+    await expect(page.getByText("Düzeltme intake kanalı bu deployment'ta yapılandırılmamış."))
+      .toBeVisible();
+    await expect(page.getByRole("link", { name: "Başvuru e-postası oluştur" })).toHaveCount(0);
   });
 
   test("mobile navigation remains visible and keyboard reachable", async ({ page }, testInfo) => {

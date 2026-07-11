@@ -3,7 +3,7 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.0.10 durable foundation
+## Current — 0.0.11 durable foundation
 
 - [x] strict EUI-48 normalization;
 - [x] authoritative and curated layers kept separate;
@@ -32,6 +32,8 @@ correctness gates can delay or reject a feature.
   320 px mobile viewport;
 - [x] skip link, visible focus, async status/error semantics, mobile navigation,
   and measured text contrast fixes;
+- [x] public data-use/attribution terms and correction/takedown process pages;
+- [x] runtime-validated correction email with an explicit unavailable state;
 
 ## Next — production-data readiness
 
@@ -44,6 +46,9 @@ correctness gates can delay or reject a feature.
 - [x] provider-neutral surrogate-key headers, purge hook, and failure-injection
   tests; a real CDN adapter still requires provider validation — issue #18;
 - [ ] external/shared rate limiting based on measured traffic — blocked issue #19;
+- [ ] access-controlled external correction ticket backend, accountable owner,
+  and escalation rota; the public page must remain unavailable until configured
+  and proven — blocked issue #26;
 - [x] importer fuzz corpus and resource-limit enforcement — issue #17;
 - [x] source freshness and rights-expiry monitoring — issue #17;
 - [x] accessibility and cross-browser UI verification — issue #21;

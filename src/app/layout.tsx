@@ -26,6 +26,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               <Link href="/methodology">Metodoloji</Link>
               <Link href="/data-sources">Kaynaklar</Link>
               <Link href="/data-release">Veri sürümü</Link>
+              <Link href="/data-corrections">Düzeltme</Link>
               <Link href="/api-docs">API</Link>
             </nav>
           </div>
@@ -33,10 +34,16 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <main id="main-content" tabIndex={-1}>{children}</main>
         <footer>
           <div className="shell footer-grid">
-            <p>
-              Sonuçlar adres bloğu kayıtlarını ve ayrı kullanıcı iddialarını gösterir; cihazın gerçek
-              üreticisini, modelini veya sahibini kanıtlamaz.
-            </p>
+            <div className="footer-copy">
+              <p>
+                Sonuçlar adres bloğu kayıtlarını ve ayrı kullanıcı iddialarını gösterir; cihazın gerçek
+                üreticisini, modelini veya sahibini kanıtlamaz.
+              </p>
+              <div className="footer-links" aria-label="Veri yönetişimi bağlantıları">
+                <Link href="/legal/data-terms">Veri şartları</Link>
+                <Link href="/data-corrections">Düzeltme bildir</Link>
+              </div>
+            </div>
             <span>v{APP_VERSION} · local demo</span>
           </div>
         </footer>
