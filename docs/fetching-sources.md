@@ -46,7 +46,7 @@ responsible for invoking it in UTC with jitter and alerting on non-zero exit.
     "snapshotComplete": true,
     "schemaVersion": "1",
     "adapterVersion": "1",
-    "normalizerVersion": "1",
+    "normalizerVersion": "2",
     "diffPolicy": {
       "maxAddedPercent": 25,
       "maxRemovedPercent": 5

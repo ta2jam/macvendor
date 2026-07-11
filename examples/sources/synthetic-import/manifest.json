@@ -18,7 +18,7 @@
     "snapshotComplete": true,
     "schemaVersion": "1",
     "adapterVersion": "1",
-    "normalizerVersion": "1"
+    "normalizerVersion": "2"
   },
   "artifact": {
     "path": "records.csv",

@@ -7,6 +7,8 @@ import { downloadHttps, type FetchNetworkOptions } from "@/fetcher/network";
 import { parseArtifact } from "@/importer/artifact";
 import { loadManifest } from "@/importer/manifest";
 import { IEEE_ADAPTER_KEY, IEEE_DATASETS, IEEE_RA_ORIGIN, IEEE_RIGHTS_REVIEW } from "./ieee";
+import type { AdapterWarning } from "@/importer/adapters/types";
+import { RECORD_NORMALIZER_VERSION, SOURCE_SCHEMA_VERSION } from "@/importer/versions";
 
 const MAX_BYTES = 20 * 1024 * 1024;
 
@@ -16,7 +18,7 @@ export interface PreparedIeeeDataset {
   contentHash: string;
   records: number;
   bytes: number;
-  adapterWarnings: Array<{ code: string; assignment: string; sourceRows: number[] }>;
+  adapterWarnings: AdapterWarning[];
   finalOrigin: string;
   sourceUrl: string;
 }
@@ -80,8 +82,9 @@ export async function prepareIeeeSources(options: PrepareIeeeOptions = {}): Prom
         rights: { status: "approved", basis: "public_domain_claim", distributionScope: "api_output",
           reviewReference: IEEE_RIGHTS_REVIEW, reviewExpiresAt: "2027-07-11T00:00:00.000Z" },
       },
-      release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1",
-        adapterVersion: "1", normalizerVersion: "1", diffPolicy: { maxAddedPercent: 10, maxRemovedPercent: 2 } },
+      release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: SOURCE_SCHEMA_VERSION,
+        adapterVersion: "1", normalizerVersion: RECORD_NORMALIZER_VERSION,
+        diffPolicy: { maxAddedPercent: 10, maxRemovedPercent: 2 } },
       artifact: {
         path: dataset.file, format: "csv", sha256: sha256(downloaded.bytes), signatureStatus: "verified",
         signature: { algorithm: "ed25519", origin: "operator", path: signatureName,

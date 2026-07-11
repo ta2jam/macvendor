@@ -6,8 +6,8 @@ import { formatPrefix } from "@/domain/mac";
 import { ImportValidationError } from "./errors";
 import type { ParsedSourceRecord, RecordKind, Registry, SourceManifest } from "./types";
 import { verifyArtifactSignature } from "./signature";
-import { adaptIeeeRows, type IeeeAdapterWarning } from "./adapters/ieee";
-import { IEEE_ADAPTER_KEY } from "@/sources/ieee";
+import { adaptSourceRows } from "./adapters/registry";
+import { adapterRawLocator, type AdapterWarning, type RawAdapterRow } from "./adapters/types";
 
 export const IMPORT_LIMITS = Object.freeze({
   artifactBytes: 20 * 1024 * 1024,
@@ -25,7 +25,7 @@ const ALLOWED_FIELDS = new Set([
   "privacyReviewReference", "reviewedBy", "observedAt", "private", "claimValue",
 ]);
 
-type RawRecord = Record<string, unknown>;
+type RawRecord = RawAdapterRow;
 
 function text(value: unknown, field: string, required = false): string | null {
   if (value === undefined || value === null || value === "") {
@@ -229,7 +229,7 @@ function normalizeRecord(raw: RawRecord, row: number, manifest: SourceManifest):
     privacyReviewReference,
     observedAt: normalizedForHash.observedAt,
     rawRecordHash: sha256(canonicalJson(normalizedForHash)),
-    rawLocator: `row:${row}`,
+    rawLocator: adapterRawLocator(raw) ?? `row:${row}`,
   };
 }
 
@@ -240,7 +240,7 @@ export interface ParsedArtifact {
   records: ParsedSourceRecord[];
   mimeType: string;
   signatureKeyHash: string | null;
-  adapterWarnings: IeeeAdapterWarning[];
+  adapterWarnings: AdapterWarning[];
 }
 
 export async function parseArtifact(manifest: SourceManifest, manifestPath: string): Promise<ParsedArtifact> {
@@ -291,14 +291,12 @@ export async function parseArtifact(manifest: SourceManifest, manifestPath: stri
       throw new ImportValidationError("INVALID_DELIMITED_FILE", "CSV/TSV artifact could not be parsed with a single strict header row");
     }
   }
-  let adapterWarnings: IeeeAdapterWarning[] = [];
-  if (manifest.source.adapterKey === IEEE_ADAPTER_KEY) {
-    const adapted = adaptIeeeRows(rawRecords, manifest);
-    rawRecords = adapted.rows;
-    adapterWarnings = adapted.warnings;
-  }
+  if (rawRecords.length > IMPORT_LIMITS.records) throw new ImportValidationError("TOO_MANY_RECORDS", "artifact exceeds 250,000 source rows");
+  const adapted = adaptSourceRows(rawRecords, manifest);
+  rawRecords = adapted.rows;
+  const adapterWarnings = adapted.warnings;
   if (rawRecords.length === 0) throw new ImportValidationError("EMPTY_ARTIFACT", "artifact contains no records");
-  if (rawRecords.length > IMPORT_LIMITS.records) throw new ImportValidationError("TOO_MANY_RECORDS", "artifact exceeds 250,000 records");
+  if (rawRecords.length > IMPORT_LIMITS.records) throw new ImportValidationError("TOO_MANY_RECORDS", "artifact exceeds 250,000 adapted records");
   const records = rawRecords.map((record, index) => normalizeRecord(record, index + 1, manifest));
   const recordHashes = new Set<string>();
   const authoritativeKeys = new Set<string>();

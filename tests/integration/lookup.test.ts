@@ -305,7 +305,7 @@ describe("source importer", () => {
           requiredForActivation: false,
           rights: { status: "approved", basis: "licensed", distributionScope: "api_output", reviewReference: "TEST-RIGHTS-IMPORT" },
         },
-        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "1", diffPolicy: { maxAddedPercent: 25, maxRemovedPercent: 5 } },
+        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "2", diffPolicy: { maxAddedPercent: 25, maxRemovedPercent: 5 } },
         artifact: { path: "records.csv", format: "csv", sha256: sha256(csv), signatureStatus: "verified", signature },
         defaults: { recordKind: "assignment", originType: "imported", rightsBasis: "licensed", distributionScope: "api_output", verificationStatus: "single_observation", registry: "MA-L" },
       };
@@ -341,7 +341,7 @@ describe("source importer", () => {
           requiredForActivation: false,
           rights: { status: "approved", basis: "licensed", distributionScope: "api_output", reviewReference: "TEST-RIGHTS-INVALID" },
         },
-        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "1", diffPolicy: { maxAddedPercent: 25, maxRemovedPercent: 5 } },
+        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "2", diffPolicy: { maxAddedPercent: 25, maxRemovedPercent: 5 } },
         artifact: { path: "records.csv", format: "csv", sha256: sha256(csv), signatureStatus: "verified", signature },
         defaults: { recordKind: "assignment", originType: "imported", rightsBasis: "licensed", distributionScope: "api_output", verificationStatus: "single_observation", registry: "MA-L" },
       };
@@ -373,7 +373,7 @@ describe("source importer", () => {
       const firstSignature = await writeSignedArtifact(directory, firstCsv);
       await writeFile(manifestPath, JSON.stringify({
         schemaVersion: "macvendor-source/v1", source,
-        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "1", diffPolicy: { maxAddedPercent: 100, maxRemovedPercent: 0 } },
+        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "2", diffPolicy: { maxAddedPercent: 100, maxRemovedPercent: 0 } },
         artifact: { path: "records.csv", format: "csv", sha256: sha256(firstCsv), signatureStatus: "verified", signature: firstSignature },
         defaults,
       }));
@@ -383,7 +383,7 @@ describe("source importer", () => {
       const secondSignature = await writeSignedArtifact(directory, secondCsv);
       await writeFile(manifestPath, JSON.stringify({
         schemaVersion: "macvendor-source/v1", source,
-        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "1", diffPolicy: { maxAddedPercent: 100, maxRemovedPercent: 0 } },
+        release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1", adapterVersion: "1", normalizerVersion: "2", diffPolicy: { maxAddedPercent: 100, maxRemovedPercent: 0 } },
         artifact: { path: "records.csv", format: "csv", sha256: sha256(secondCsv), signatureStatus: "verified", signature: secondSignature },
         defaults,
       }));
@@ -509,7 +509,7 @@ async function writePreparedIeeeSnapshot(directory: string, preparedAt: string):
           reviewReference: IEEE_RIGHTS_REVIEW, reviewExpiresAt: "2027-07-11T00:00:00.000Z" },
       },
       release: { snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1",
-        adapterVersion: "1", normalizerVersion: "1", diffPolicy: { maxAddedPercent: 10, maxRemovedPercent: 2 } },
+        adapterVersion: "1", normalizerVersion: "2", diffPolicy: { maxAddedPercent: 10, maxRemovedPercent: 2 } },
       artifact: { path: dataset.file, format: "csv", sha256: sha256(csv), signatureStatus: "verified",
         signature: { ...signature, origin: "operator" },
         remote: { url: dataset.url, allowedOrigins: [IEEE_RA_ORIGIN], maxRedirects: 0 } },
