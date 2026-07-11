@@ -1,6 +1,8 @@
 import { ImportValidationError } from "../errors";
 import type { SourceManifest } from "../types";
+import { inheritRawLocator, type RawAdapterRow, type SourceAdapter } from "./types";
 import { ieeeDatasetForManifest } from "@/sources/ieee";
+import { IEEE_ADAPTER_KEY, IEEE_DATASETS } from "@/sources/ieee";
 
 const HEADERS = ["Registry", "Assignment", "Organization Name", "Organization Address"];
 const FORBIDDEN_TEXT = /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/gu;
@@ -15,8 +17,8 @@ export interface IeeeAdapterWarning {
   sourceRows: number[];
 }
 
-export function adaptIeeeRows(rows: Array<Record<string, unknown>>, manifest: SourceManifest): {
-  rows: Array<Record<string, unknown>>;
+export function adaptIeeeRows(rows: RawAdapterRow[], manifest: SourceManifest): {
+  rows: RawAdapterRow[];
   warnings: IeeeAdapterWarning[];
 } {
   const dataset = ieeeDatasetForManifest(manifest);
@@ -54,7 +56,7 @@ export function adaptIeeeRows(rows: Array<Record<string, unknown>>, manifest: So
     if (!organizationName) throw new ImportValidationError("IEEE_RECORD_INVALID", `IEEE row ${index + 1} has no assignee`);
     if (duplicated.has(assignment)) return [];
     const isPrivate = organizationName.toUpperCase() === "PRIVATE";
-    return [{
+    return [inheritRawLocator(row, {
       prefix: assignment.toUpperCase(),
       prefixLength: String(dataset.prefixLength),
       organizationName: isPrivate ? "" : organizationName,
@@ -62,7 +64,19 @@ export function adaptIeeeRows(rows: Array<Record<string, unknown>>, manifest: So
       registry: dataset.registry,
       private: isPrivate ? "true" : "false",
       evidenceReference: dataset.url,
-    }];
+    })];
   });
   return { rows: adapted, warnings };
 }
+
+export const ieeeAdapter: SourceAdapter = Object.freeze({
+  key: IEEE_ADAPTER_KEY,
+  versions: Object.freeze(["1"]),
+  sourceSlugs: Object.freeze(IEEE_DATASETS.map((dataset) => dataset.slug)),
+  validateManifest: (manifest: SourceManifest) => {
+    if (!ieeeDatasetForManifest(manifest)) {
+      throw new ImportValidationError("IEEE_MANIFEST_MISMATCH", "IEEE adapter manifest is not an approved fixed dataset");
+    }
+  },
+  adapt: adaptIeeeRows,
+});

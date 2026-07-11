@@ -3,7 +3,7 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.0.14 durable foundation
+## Current — 0.0.15 durable foundation
 
 - [x] strict EUI-48 normalization;
 - [x] authoritative and curated layers kept separate;
@@ -47,6 +47,9 @@ correctness gates can delay or reject a feature.
   continuity, and explicit post-commit failure reporting — issue #29;
 - [x] exact migration SHA-256 ledger, applied-history drift rejection, and
   transactional legacy checksum backfill — issue #31;
+- [x] compile-time reviewed source-adapter registry, version/source ownership
+  bindings, bounded transform contract, and database-free fixture validator —
+  issue #33;
 
 ## Independent hardening while data rights are blocked
 

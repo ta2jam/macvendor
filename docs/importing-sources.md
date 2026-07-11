@@ -8,8 +8,14 @@ eligible for production by itself.
 ## Command
 
 ```bash
+npm run source:validate -- --manifest examples/sources/synthetic-import/manifest.json
 npm run source:import -- --manifest examples/sources/synthetic-import/manifest.json
 ```
+
+`source:validate` performs the complete manifest, signature, adapter, schema,
+normalization, duplicate, privacy, rights, and resource validation without a
+database connection or write. Adapter development rules are in
+[`source-adapters.md`](source-adapters.md).
 
 The importer performs all file and record validation before opening a database
 transaction. A failed artifact therefore creates no source, release, artifact,

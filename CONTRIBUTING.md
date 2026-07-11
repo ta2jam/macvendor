@@ -53,6 +53,9 @@ fixtures, snapshots, examples, or screenshots without documented permission.
 - Keep dependencies and operational components small; justify every new one.
 
 The binding constraints are in [`docs/`](docs/).
+Source adapter proposals must also follow
+[`docs/source-adapters.md`](docs/source-adapters.md); parser success is not a
+rights approval.
 
 ## Database migrations
 

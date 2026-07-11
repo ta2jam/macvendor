@@ -38,7 +38,7 @@ function manifest(overrides: Partial<SourceManifest> = {}): SourceManifest {
       snapshotComplete: true,
       schemaVersion: "1",
       adapterVersion: "1",
-      normalizerVersion: "1",
+      normalizerVersion: "2",
       diffPolicy: { maxAddedPercent: 25, maxRemovedPercent: 5 },
     },
     artifact: {
@@ -95,6 +95,33 @@ describe("source manifest", () => {
     expect(() => parseManifest({ ...manifest(), surprise: true })).toThrowError(ImportValidationError);
   });
 
+  it("binds reserved source slugs to their reviewed adapter", () => {
+    const candidate = manifest();
+    candidate.source.slug = "ieee-ma-l";
+    expect(() => parseManifest(candidate)).toThrowError(expect.objectContaining({ code: "ADAPTER_SOURCE_RESERVED" }));
+  });
+
+  it("rejects unsupported adapter versions before artifact parsing", () => {
+    const candidate = manifest();
+    candidate.release.adapterVersion = "999";
+    expect(() => parseManifest(candidate)).toThrowError(expect.objectContaining({ code: "UNSUPPORTED_ADAPTER_VERSION" }));
+  });
+
+  it("rejects source schema and normalizer version claims the runtime does not implement", () => {
+    const schema = manifest();
+    schema.release.schemaVersion = "999";
+    expect(() => parseManifest(schema)).toThrowError(expect.objectContaining({ code: "UNSUPPORTED_SOURCE_SCHEMA_VERSION" }));
+    const normalizer = manifest();
+    normalizer.release.normalizerVersion = "999";
+    expect(() => parseManifest(normalizer)).toThrowError(expect.objectContaining({ code: "UNSUPPORTED_NORMALIZER_VERSION" }));
+  });
+
+  it("rejects an IEEE manifest that does not match its fixed dataset binding", () => {
+    const candidate = ieeeManifest();
+    candidate.defaults.registry = "MA-M";
+    expect(() => parseManifest(candidate)).toThrowError(expect.objectContaining({ code: "IEEE_MANIFEST_MISMATCH" }));
+  });
+
   it("rejects unreviewed adapter keys", () => {
     const candidate = manifest();
     candidate.source.adapterKey = "arbitrary-code";
@@ -139,10 +166,10 @@ describe("artifact parser", () => {
     temporaryDirectories.push(directory);
     const csv = [
       "Registry,Assignment,Organization Name,Organization Address",
-      `MA-L,001122,"Example, Inc.\t",\u200BExample Address`,
-      "MA-L,AABBCC,Private,Private",
       "MA-L,DDEEFF,Conflicting One,Address One",
       "MA-L,DDEEFF,Conflicting Two,Address Two",
+      `MA-L,001122,"Example, Inc.\t",\u200BExample Address`,
+      "MA-L,AABBCC,Private,Private",
       "",
     ].join("\n");
     const signature = await writeSignedArtifact(directory, csv);
@@ -156,11 +183,11 @@ describe("artifact parser", () => {
     expect(parsed.records).toHaveLength(2);
     expect(parsed.records[0]).toMatchObject({ registry: "MA-L", prefixBits: 0x001122n,
       prefixLength: 24, organizationName: "Example, Inc.", organizationAddress: "Example Address",
-      isPrivate: false });
+      isPrivate: false, rawLocator: "row:3" });
     expect(parsed.records[1]).toMatchObject({ registry: "MA-L", prefixBits: 0xaabbccn,
-      organizationName: null, organizationAddress: null, isPrivate: true });
+      organizationName: null, organizationAddress: null, isPrivate: true, rawLocator: "row:4" });
     expect(parsed.adapterWarnings).toEqual([{
-      code: "IEEE_DUPLICATE_ASSIGNMENT_OMITTED", assignment: "DDEEFF", sourceRows: [3, 4],
+      code: "IEEE_DUPLICATE_ASSIGNMENT_OMITTED", assignment: "DDEEFF", sourceRows: [1, 2],
     }]);
   });
 

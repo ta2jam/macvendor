@@ -30,7 +30,7 @@ function qaManifest(bytes: Uint8Array, format: SourceManifest["artifact"]["forma
       snapshotComplete: true,
       schemaVersion: "1",
       adapterVersion: "1",
-      normalizerVersion: "1",
+      normalizerVersion: "2",
     },
     artifact: {
       path: format === "jsonl" ? "records.jsonl" : "records.csv",

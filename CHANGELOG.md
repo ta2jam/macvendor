@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.0.15 — 2026-07-11
+
+- Replaced duplicated adapter-key branches with one typed, compile-time reviewed
+  registry; manifests cannot load runtime modules or claim unregistered keys.
+- Bound adapter keys to supported adapter versions and reserved source slugs,
+  and reject unimplemented source-schema/normalizer version claims before
+  artifact parsing.
+- Added bounded JSON warning validation and a no-row-expansion V1 contract while
+  retaining all downstream rights, privacy, signature, duplicate, diff, and
+  resource gates.
+- Preserved original source-row locators through filtering adapters instead of
+  silently renumbering provenance after omitted rows; this behavior change uses
+  `normalizerVersion=2`, producing new immutable releases instead of reusing
+  v1 import keys.
+- Added a database-free `source:validate` command, contributor adapter contract,
+  and regression coverage. No amateur or third-party dataset was admitted.
+
 ## 0.0.14 — 2026-07-11
 
 - Added a committed SHA-256 ledger covering the exact migration SQL set and a

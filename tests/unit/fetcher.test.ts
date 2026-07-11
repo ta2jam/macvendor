@@ -135,7 +135,7 @@ describe("HTTPS fetch boundary", () => {
       },
       release: {
         snapshotKind: "full_snapshot", snapshotComplete: true, schemaVersion: "1",
-        adapterVersion: "1", normalizerVersion: "1", diffPolicy: { maxAddedPercent: 25, maxRemovedPercent: 5 },
+        adapterVersion: "1", normalizerVersion: "2", diffPolicy: { maxAddedPercent: 25, maxRemovedPercent: 5 },
       },
       artifact: {
         path: "records.csv", format: "csv", sha256: sha256(artifact), signatureStatus: "verified",

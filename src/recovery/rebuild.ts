@@ -6,6 +6,7 @@ import { createPool } from "@/db/pool";
 import { migrate } from "@/db/migrate";
 import { getDataRelease, lookupMac } from "@/db/lookup";
 import { sha256 } from "@/domain/canonical-json";
+import { RECORD_NORMALIZER_VERSION, SOURCE_SCHEMA_VERSION } from "@/importer/versions";
 import { normalizeMac } from "@/domain/mac";
 import { APP_VERSION } from "@/lib/version";
 import { importSourceRelease } from "@/importer/import-source";
@@ -49,7 +50,7 @@ async function createSignedManifest(options: {
     },
     release: {
       snapshotKind: "full_snapshot", snapshotComplete: true,
-      schemaVersion: "1", adapterVersion: "1", normalizerVersion: "1",
+      schemaVersion: SOURCE_SCHEMA_VERSION, adapterVersion: "1", normalizerVersion: RECORD_NORMALIZER_VERSION,
       diffPolicy: { maxAddedPercent: 100, maxRemovedPercent: 100 },
     },
     artifact: {

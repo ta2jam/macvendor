@@ -12,7 +12,8 @@ import type {
   SourceManifest,
   VerificationStatus,
 } from "./types";
-import { IEEE_ADAPTER_KEY } from "@/sources/ieee";
+import { sourceAdapter, validateAdapterManifest } from "./adapters/registry";
+import { RECORD_NORMALIZER_VERSION, SOURCE_SCHEMA_VERSION } from "./versions";
 
 const SOURCE_CLASSES = ["authoritative", "enrichment", "owner_curated", "reference"] as const;
 const PUBLISH_MODES = ["production", "qa_only", "disabled"] as const;
@@ -130,14 +131,21 @@ export function parseManifest(value: unknown): SourceManifest {
   const rights = object(source.rights, "source.rights");
   keys(rights, ["status", "basis", "distributionScope", "reviewReference", "reviewExpiresAt"], "source.rights");
   const adapterKey = string(source.adapterKey, "source.adapterKey", 120);
-  if (!["strict-delimited-v1", IEEE_ADAPTER_KEY].includes(adapterKey)) {
-    throw new ImportValidationError("UNSUPPORTED_ADAPTER", "manifest requests an unreviewed adapter");
-  }
+  sourceAdapter(adapterKey);
 
   const release = object(root.release, "release");
   keys(release, ["snapshotKind", "snapshotComplete", "schemaVersion", "adapterVersion", "normalizerVersion", "diffPolicy"], "release");
   const snapshotKind = oneOf(release.snapshotKind, ["full_snapshot", "delta"] as const, "release.snapshotKind");
   const snapshotComplete = boolean(release.snapshotComplete, "release.snapshotComplete");
+  const schemaVersion = string(release.schemaVersion, "release.schemaVersion", 80);
+  const adapterVersion = string(release.adapterVersion, "release.adapterVersion", 80);
+  const normalizerVersion = string(release.normalizerVersion, "release.normalizerVersion", 80);
+  if (schemaVersion !== SOURCE_SCHEMA_VERSION) {
+    throw new ImportValidationError("UNSUPPORTED_SOURCE_SCHEMA_VERSION", `release.schemaVersion must be ${SOURCE_SCHEMA_VERSION}`);
+  }
+  if (normalizerVersion !== RECORD_NORMALIZER_VERSION) {
+    throw new ImportValidationError("UNSUPPORTED_NORMALIZER_VERSION", `release.normalizerVersion must be ${RECORD_NORMALIZER_VERSION}`);
+  }
   if (snapshotKind === "delta" && snapshotComplete) {
     throw new ImportValidationError("INVALID_SNAPSHOT", "delta releases cannot set snapshotComplete=true");
   }
@@ -201,9 +209,9 @@ export function parseManifest(value: unknown): SourceManifest {
     release: {
       snapshotKind,
       snapshotComplete,
-      schemaVersion: string(release.schemaVersion, "release.schemaVersion", 80),
-      adapterVersion: string(release.adapterVersion, "release.adapterVersion", 80),
-      normalizerVersion: string(release.normalizerVersion, "release.normalizerVersion", 80),
+      schemaVersion,
+      adapterVersion,
+      normalizerVersion,
       diffPolicy: diffPolicy ? {
         maxAddedPercent: number(diffPolicy.maxAddedPercent, "release.diffPolicy.maxAddedPercent", 0, 1000),
         maxRemovedPercent: number(diffPolicy.maxRemovedPercent, "release.diffPolicy.maxRemovedPercent", 0, 100),
@@ -238,6 +246,7 @@ export function parseManifest(value: unknown): SourceManifest {
     },
   };
 
+  validateAdapterManifest(manifest);
   validateRightsGate(manifest);
   if (manifest.artifact.signatureStatus === "verified" && !manifest.artifact.signature) {
     throw new ImportValidationError("SIGNATURE_CONFIG_REQUIRED", "signatureStatus=verified requires artifact.signature");
