@@ -60,6 +60,8 @@ identity. MAC addresses can be reassigned, spoofed, or randomized.
 - atomic active-release state and publication-suppression overlay;
 - responsive Next.js web interface;
 - unit, PostgreSQL integration, suppression, build, and HTTP smoke coverage.
+- offline CSV/TSV/JSONL source-release importer with manifest, hash, rights,
+  privacy, encoding, size, and idempotency gates.
 
 ## Quick start
 
@@ -183,6 +185,16 @@ npm run verify
 
 The integration suite resets only the database named by `TEST_DATABASE_URL` and
 refuses any name that does not end with `_test`.
+
+Import the synthetic QA-only example with:
+
+```bash
+npm run source:import -- --manifest examples/sources/synthetic-import/manifest.json
+```
+
+See [`docs/importing-sources.md`](docs/importing-sources.md). The importer reads
+only a manifest-relative local file; network fetching remains deliberately
+unimplemented until its SSRF and origin-allowlist boundary is complete.
 
 ## Contributing
 

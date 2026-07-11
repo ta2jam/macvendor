@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "macvendor-source/v1",
+  "source": {
+    "slug": "synthetic-import-example",
+    "name": "Synthetic Import Example",
+    "class": "reference",
+    "publishMode": "qa_only",
+    "adapterKey": "strict-delimited-v1",
+    "requiredForActivation": false,
+    "rights": {
+      "status": "unreviewed",
+      "basis": "unknown",
+      "distributionScope": "internal_only"
+    }
+  },
+  "release": {
+    "snapshotKind": "full_snapshot",
+    "snapshotComplete": true,
+    "schemaVersion": "1",
+    "adapterVersion": "1",
+    "normalizerVersion": "1"
+  },
+  "artifact": {
+    "path": "records.csv",
+    "format": "csv",
+    "sha256": "sha256:6de06c63556e8299834f984d3c797545e86d6da2bbbb53a1b49553d43f267549",
+    "signatureStatus": "not_applicable"
+  },
+  "defaults": {
+    "recordKind": "usage_note",
+    "originType": "unknown",
+    "rightsBasis": "unknown",
+    "distributionScope": "internal_only",
+    "verificationStatus": "unverified"
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://macvendor.io/schemas/source-manifest-v1.schema.json",
+  "title": "macvendor source manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "source", "release", "artifact", "defaults"],
+  "properties": {
+    "schemaVersion": { "const": "macvendor-source/v1" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slug", "name", "class", "publishMode", "adapterKey", "requiredForActivation", "rights"],
+      "properties": {
+        "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "maxLength": 80 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "class": { "enum": ["authoritative", "enrichment", "owner_curated", "reference"] },
+        "publishMode": { "enum": ["production", "qa_only", "disabled"] },
+        "adapterKey": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "requiredForActivation": { "type": "boolean" },
+        "homepageUrl": { "type": "string", "maxLength": 2048 },
+        "termsUrl": { "type": "string", "maxLength": 2048 },
+        "rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "basis", "distributionScope"],
+          "properties": {
+            "status": { "enum": ["unreviewed", "owner_asserted", "approved", "rejected", "expired"] },
+            "basis": { "enum": ["owner_created", "licensed", "permission_granted", "public_domain_claim", "unknown"] },
+            "distributionScope": { "enum": ["internal_only", "api_output", "raw_redistribution"] },
+            "reviewReference": { "type": "string", "maxLength": 512 },
+            "reviewExpiresAt": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["snapshotKind", "snapshotComplete", "schemaVersion", "adapterVersion", "normalizerVersion"],
+      "properties": {
+        "snapshotKind": { "enum": ["full_snapshot", "delta"] },
+        "snapshotComplete": { "type": "boolean" },
+        "schemaVersion": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "adapterVersion": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "normalizerVersion": { "type": "string", "minLength": 1, "maxLength": 80 }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "format", "sha256", "signatureStatus"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "format": { "enum": ["csv", "tsv", "jsonl"] },
+        "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "signatureStatus": { "enum": ["verified", "unverified", "not_applicable"] }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recordKind", "originType", "rightsBasis", "distributionScope", "verificationStatus"],
+      "properties": {
+        "recordKind": { "enum": ["assignment", "curated_vendor_claim", "vendor_alias", "device_hint", "usage_note", "tombstone"] },
+        "originType": { "enum": ["owner_observation", "derived", "imported", "unknown"] },
+        "rightsBasis": { "enum": ["owner_created", "licensed", "permission_granted", "public_domain_claim", "unknown"] },
+        "distributionScope": { "enum": ["internal_only", "api_output", "raw_redistribution"] },
+        "verificationStatus": { "enum": ["unverified", "single_observation", "corroborated", "reviewed"] },
+        "registry": { "enum": ["MA-L", "MA-M", "MA-S", "IAB", "CID"] }
+      }
+    }
+  }
+}

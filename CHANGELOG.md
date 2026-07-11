@@ -2,8 +2,17 @@
 
 ## Unreleased
 
+## 0.0.3 — 2026-07-11
+
 - Updated GitHub Actions to Node 24-native major versions after the initial
   v0.0.2 CI run reported Node 20 action-runtime deprecation warnings.
+- Added the offline manifest-driven CSV, TSV, and JSON Lines importer.
+- Added strict artifact hashing, path, UTF-8, field, size, snapshot, rights,
+  privacy, verification, and source-configuration gates.
+- Added atomic source-release persistence, source-scoped locking, bounded batch
+  inserts, deterministic import keys, and idempotent re-import behavior.
+- Added a machine-readable source manifest schema, synthetic QA-only example,
+  importer documentation, unit tests, and PostgreSQL integration tests.
 
 ## 0.0.2 — 2026-07-11
 
