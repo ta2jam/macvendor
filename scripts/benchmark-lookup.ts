@@ -21,6 +21,16 @@ import { normalizeMac } from "../src/domain/mac";
 import { APP_VERSION } from "../src/lib/version";
 
 const execFile = promisify(execFileCallback);
+const DATABASE_STATS_SETTLE_MS = 1_100;
+
+async function settleDatabaseStats(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, DATABASE_STATS_SETTLE_MS));
+}
+
+async function readSettledDatabaseIo(pool: Pool): Promise<DatabaseIoStats> {
+  await settleDatabaseStats();
+  return readDatabaseIo(pool);
+}
 
 interface Arguments {
   sizes: number[];
@@ -54,7 +64,7 @@ interface Measurement {
   clientFsWriteOperations: number;
   serverCpuMs: number | null;
   serverPeakRssBytes: number | null;
-  databaseIo: DatabaseIoStats;
+  databaseIo: DatabaseIoStats | null;
   explain?: {
     summary: ReturnType<typeof summarizeExplainPlan>;
     raw: unknown;
@@ -156,7 +166,7 @@ async function measure(
   serverPid?: number,
 ): Promise<Measurement> {
   for (let index = 0; index < warmup; index += 1) await task();
-  const ioBefore = await readDatabaseIo(pool);
+  const ioBefore = layer === "database" ? await readSettledDatabaseIo(pool) : null;
   const cpuBefore = process.cpuUsage();
   const resourcesBefore = process.resourceUsage();
   const serverBefore = serverPid ? await readProcessSnapshot(serverPid) : null;
@@ -183,7 +193,11 @@ async function measure(
   const cpu = process.cpuUsage(cpuBefore);
   const resourcesAfter = process.resourceUsage();
   const serverAfter = serverPid ? await readProcessSnapshot(serverPid) : null;
-  const ioAfter = await readDatabaseIo(pool);
+  // PostgreSQL cumulative statistics are published asynchronously. Direct
+  // queries reuse this pool, so the settling reads can delimit their counters.
+  // HTTP uses another process and pool; its database-wide delta cannot be
+  // attributed reliably and is intentionally reported as null.
+  const ioAfter = ioBefore ? await readSettledDatabaseIo(pool) : null;
   return {
     layer,
     scenario: scenario.name,
@@ -195,7 +209,7 @@ async function measure(
     clientFsWriteOperations: Math.max(0, resourcesAfter.fsWrite - resourcesBefore.fsWrite),
     serverCpuMs: serverBefore && serverAfter ? Math.max(0, serverAfter.cpuMs - serverBefore.cpuMs) : null,
     serverPeakRssBytes,
-    databaseIo: deltaDatabaseIo(ioBefore, ioAfter),
+    databaseIo: ioBefore && ioAfter ? deltaDatabaseIo(ioBefore, ioAfter) : null,
   };
 }
 
@@ -305,7 +319,8 @@ function markdownReport(report: Record<string, unknown> & { datasets: Array<Reco
     const assignmentCount = dataset.assignmentCount as number;
     for (const measurement of dataset.measurements as Measurement[]) {
       const clientCpu = measurement.clientCpuUserMs + measurement.clientCpuSystemMs;
-      lines.push(`| ${assignmentCount.toLocaleString("en-US")} | ${measurement.layer} | ${measurement.scenario} | ${clientCpu.toFixed(3)} | ${mib(measurement.clientPeakRssBytes)} | ${measurement.serverCpuMs ?? "—"} | ${mib(measurement.serverPeakRssBytes)} | ${measurement.databaseIo.blocksHit}/${measurement.databaseIo.blocksRead} | ${measurement.databaseIo.tempBytes} |`);
+      const io = measurement.databaseIo;
+      lines.push(`| ${assignmentCount.toLocaleString("en-US")} | ${measurement.layer} | ${measurement.scenario} | ${clientCpu.toFixed(3)} | ${mib(measurement.clientPeakRssBytes)} | ${measurement.serverCpuMs ?? "—"} | ${mib(measurement.serverPeakRssBytes)} | ${io ? `${io.blocksHit}/${io.blocksRead}` : "—"} | ${io?.tempBytes ?? "—"} |`);
     }
   }
   lines.push(

@@ -49,7 +49,13 @@ The JSON report contains:
 - application/git version plus operating-system, CPU, memory, Node, and
   PostgreSQL context.
 
-`pg_stat_database` is database-wide and includes measurement overhead.
+`pg_stat_database` is database-wide and includes measurement overhead. For
+direct-database measurements, the harness waits 1.1 seconds outside the latency
+and CPU window after warmup and again before the ending read so PostgreSQL can
+publish cumulative backend statistics without leaking setup or warmup work into
+the measured delta. HTTP uses a separate process and connection pool, so its
+database-wide delta cannot be attributed reliably and is intentionally `null`;
+the exact direct-query `EXPLAIN BUFFERS` plan remains the I/O evidence.
 `EXPLAIN ANALYZE` adds instrumentation cost. Standalone CPU time is limited by
 the operating system's process-time resolution. PostgreSQL process CPU and
 energy are not reported because there is no portable, attribution-safe method in
