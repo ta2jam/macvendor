@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://macvendor.io/schemas/public-api-v1.schema.json",
+  "title": "macvendor public API v1 schemas",
+  "$defs": {
+    "SourceReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slug", "sourceReleaseId"],
+      "properties": {
+        "slug": { "type": "string", "minLength": 1 },
+        "sourceReleaseId": { "type": "string", "pattern": "^sr_[0-9a-f-]+$" }
+      }
+    },
+    "ReleaseData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resolvedReleaseId", "activeVersion", "publicationVersion", "policyVersion", "generatedAt"],
+      "properties": {
+        "resolvedReleaseId": { "type": "string", "pattern": "^rr_[0-9a-f-]+$" },
+        "activeVersion": { "type": "integer", "minimum": 1 },
+        "publicationVersion": { "type": "integer", "minimum": 1 },
+        "policyVersion": { "type": "string", "minLength": 1 },
+        "generatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Assignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prefix", "prefixLength", "registry", "organizationName", "address", "source"],
+      "properties": {
+        "prefix": { "type": "string", "pattern": "^[0-9A-F]{6,9}$" },
+        "prefixLength": { "type": "integer", "enum": [24, 28, 36] },
+        "registry": { "type": "string", "enum": ["MA-L", "MA-M", "MA-S", "IAB", "CID"] },
+        "organizationName": { "type": ["string", "null"] },
+        "address": { "type": ["string", "null"] },
+        "source": { "$ref": "#/$defs/SourceReference" }
+      }
+    },
+    "CuratedMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claimId", "prefix", "prefixLength", "claimType", "organizationName", "verificationStatus", "originType", "conflictStatus", "source"],
+      "properties": {
+        "claimId": { "type": "string", "pattern": "^clm_[0-9a-f-]+$" },
+        "prefix": { "type": "string", "pattern": "^[0-9A-F]{1,12}$" },
+        "prefixLength": { "type": "integer", "minimum": 1, "maximum": 48 },
+        "claimType": { "const": "vendor_label" },
+        "organizationName": { "type": "string", "minLength": 1 },
+        "verificationStatus": { "type": "string", "enum": ["reviewed", "corroborated", "single_observation", "unverified"] },
+        "originType": { "type": "string", "enum": ["owner_observation", "derived", "imported"] },
+        "conflictStatus": { "type": "string", "enum": ["agrees", "conflicts", "no_official_match", "not_evaluated"] },
+        "source": { "$ref": "#/$defs/SourceReference" }
+      }
+    },
+    "LookupResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query", "assignment", "curatedMatches", "curatedMatchesTruncated", "data"],
+      "properties": {
+        "query": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["input", "normalized", "flags"],
+          "properties": {
+            "input": { "type": "string", "pattern": "^[0-9A-F]{12}$" },
+            "normalized": { "type": "string", "pattern": "^[0-9A-F]{12}$" },
+            "flags": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["locallyAdministered", "multicast"],
+              "properties": {
+                "locallyAdministered": { "type": "boolean" },
+                "multicast": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "assignment": { "oneOf": [{ "$ref": "#/$defs/Assignment" }, { "type": "null" }] },
+        "curatedMatches": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/CuratedMatch" } },
+        "curatedMatchesTruncated": { "type": "boolean" },
+        "data": { "$ref": "#/$defs/ReleaseData" }
+      }
+    },
+    "Evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidenceId", "sourceSlug", "sourceReleaseId", "role", "reasonCode", "observedAt"],
+      "properties": {
+        "evidenceId": { "type": "string", "pattern": "^ev_[0-9a-f-]+$" },
+        "sourceSlug": { "type": "string", "minLength": 1 },
+        "sourceReleaseId": { "type": "string", "pattern": "^sr_[0-9a-f-]+$" },
+        "role": { "type": "string", "enum": ["selected", "corroborating", "conflicting", "suppressed"] },
+        "reasonCode": { "type": "string", "minLength": 1 },
+        "observedAt": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "AssignmentResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assignment", "data"],
+      "dependentRequired": { "evidence": ["evidenceTruncated"], "evidenceTruncated": ["evidence"] },
+      "properties": {
+        "assignment": { "$ref": "#/$defs/Assignment" },
+        "data": { "$ref": "#/$defs/ReleaseData" },
+        "evidence": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/Evidence" } },
+        "evidenceTruncated": { "type": "boolean" }
+      }
+    },
+    "DataReleaseResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resolvedReleaseId", "activeVersion", "publicationVersion", "policyVersion", "outputSha256", "generatedAt", "sources"],
+      "properties": {
+        "resolvedReleaseId": { "type": "string", "pattern": "^rr_[0-9a-f-]+$" },
+        "activeVersion": { "type": "integer", "minimum": 1 },
+        "publicationVersion": { "type": "integer", "minimum": 1 },
+        "policyVersion": { "type": "string", "minLength": 1 },
+        "outputSha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["slug", "sourceReleaseId", "observedAt", "verificationStatus", "rightsScope", "rightsStatusAtBuild", "currentRightsStatus", "rightsReviewExpiresAt", "status"],
+            "properties": {
+              "slug": { "type": "string", "minLength": 1 },
+              "sourceReleaseId": { "type": "string", "pattern": "^sr_[0-9a-f-]+$" },
+              "observedAt": { "type": "string", "format": "date-time" },
+              "verificationStatus": { "type": "string", "enum": ["authoritative", "owner_asserted"] },
+              "rightsScope": { "type": "string", "enum": ["internal_only", "api_output", "raw_redistribution"] },
+              "rightsStatusAtBuild": { "type": "string", "enum": ["unreviewed", "owner_asserted", "approved", "rejected", "expired"] },
+              "currentRightsStatus": { "type": "string", "enum": ["unreviewed", "owner_asserted", "approved", "rejected", "expired"] },
+              "rightsReviewExpiresAt": { "type": ["string", "null"], "format": "date-time" },
+              "status": { "const": "included" }
+            }
+          }
+        }
+      }
+    },
+    "Problem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "title", "status", "code", "detail", "requestId"],
+      "properties": {
+        "type": { "type": "string", "format": "uri", "pattern": "^https://macvendor\\.io/problems/" },
+        "title": { "type": "string", "minLength": 1 },
+        "status": { "type": "integer", "enum": [400, 404, 429, 503] },
+        "code": { "type": "string", "enum": ["INVALID_MAC", "INVALID_PREFIX", "INVALID_REGISTRY", "UNSUPPORTED_PARAMETER", "ASSIGNMENT_NOT_FOUND", "RATE_LIMITED", "DATA_RELEASE_UNAVAILABLE", "SERVICE_UNAVAILABLE"] },
+        "detail": { "type": "string", "minLength": 1 },
+        "requestId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "code": { "enum": ["INVALID_MAC", "INVALID_PREFIX", "INVALID_REGISTRY", "UNSUPPORTED_PARAMETER"] } } },
+          "then": { "properties": { "status": { "const": 400 } } }
+        },
+        {
+          "if": { "properties": { "code": { "const": "ASSIGNMENT_NOT_FOUND" } } },
+          "then": { "properties": { "status": { "const": 404 } } }
+        },
+        {
+          "if": { "properties": { "code": { "const": "RATE_LIMITED" } } },
+          "then": { "properties": { "status": { "const": 429 } } }
+        },
+        {
+          "if": { "properties": { "code": { "enum": ["DATA_RELEASE_UNAVAILABLE", "SERVICE_UNAVAILABLE"] } } },
+          "then": { "properties": { "status": { "const": 503 } } }
+        }
+      ]
+    }
+  }
+}

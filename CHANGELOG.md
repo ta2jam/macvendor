@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.0.5 — 2026-07-11
+
+- Published OpenAPI 3.1 and JSON Schema documents for all public v1 endpoints,
+  canonical redirects, nullable fields, enums, and RFC 9457 errors.
+- Added schema-backed runtime response tests that fail on API contract drift.
+- Fixed assignment evidence provenance to report the evidence record's source
+  instead of always reporting the selected core source.
+- Added audited create, revoke, list, and expire publication-suppression CLIs
+  with exactly-one-target validation, race protection, opaque references, and
+  atomic publication-version increments.
+- Added uniqueness constraints and tests for suppression races, expiry, audit,
+  ETag invalidation, and contact-like reference rejection.
+- Added health/readiness probes, a multi-stage non-root standalone image,
+  provider-neutral staging Compose stack, graceful-shutdown smoke drill, and CI
+  container job.
+- Kept external staging deployment blocked until provider and deployment
+  authority are supplied.
+
 ## 0.0.4 — 2026-07-11
 
 - Added deterministic resolution builds from explicit immutable source releases.

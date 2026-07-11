@@ -116,7 +116,9 @@ curl -sS http://localhost:3000/v1/data-release | jq
 ```
 
 The complete public contract is in
-[`docs/api-contract.md`](docs/api-contract.md).
+[`docs/api-contract.md`](docs/api-contract.md). Machine-readable OpenAPI 3.1 and
+JSON Schema are served at [`/openapi.json`](http://localhost:3000/openapi.json)
+and [`/schemas/public-api-v1.schema.json`](http://localhost:3000/schemas/public-api-v1.schema.json).
 
 ## Architecture
 
@@ -208,6 +210,15 @@ npm run resolution:rollback -- --run UUID
 
 See [`docs/resolution-pipeline.md`](docs/resolution-pipeline.md) for rights,
 freshness, reproducibility, conflict, concurrency, and rollback behavior.
+
+Temporary correction/takedown publication overlays use the audited operator
+commands documented in
+[`docs/publication-suppressions.md`](docs/publication-suppressions.md). They store
+opaque ticket references, not requester contact data.
+
+The provider-neutral non-root staging image, Compose stack, probes, and smoke
+drill are documented in [`docs/staging.md`](docs/staging.md). No external staging
+deployment is claimed without a selected provider and deployment authority.
 
 ## Contributing
 

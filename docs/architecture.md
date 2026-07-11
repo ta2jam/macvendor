@@ -80,7 +80,10 @@ Başlangıç yaklaşımı:
 | Eski Gist snapshot'ı | Güncellik ve haklar yetersizse `disabled` |
 | Kullanıcının amatör veritabanları | Manifest ve satır kökeniyle `owner_curated`; varsayılan `qa_only` |
 
-Amatör kaynakların sisteme alınması desteklenen birincil gereksinimdir. Bunlar 1–48 bit CIDR-benzeri prefix iddiaları taşıyabilir; `/48` exact cihaz kaydı sayılır ve varsayılan olarak public değildir. Keyfi aralık ve wildcard V1'e girmez.
+Veri modeli ileride amatör kaynakları 1–48 bit CIDR-benzeri ayrı iddialar
+olarak taşıyabilir; `/48` exact cihaz kaydı sayılır ve varsayılan olarak public
+değildir. Ancak amatör veri ingestion'ı açıkça ertelenmiştir ve mevcut sürümün
+geliştirme ya da yayın kapsamına girmez. Keyfi aralık ve wildcard V1'e girmez.
 
 ## Resolver politikası
 

@@ -6,6 +6,7 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  output: "standalone",
   turbopack: { root },
 };
 

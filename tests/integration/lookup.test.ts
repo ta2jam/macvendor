@@ -8,10 +8,18 @@ import { getAssignment, getDataRelease, lookupMac } from "../../src/db/lookup";
 import { createPool } from "../../src/db/pool";
 import { normalizeMac, prefixBits } from "../../src/domain/mac";
 import { GET as lookupRoute } from "../../src/app/v1/lookup/[mac]/route";
+import { GET as assignmentRoute } from "../../src/app/v1/assignments/[registry]/[prefix]/route";
+import { GET as dataReleaseRoute } from "../../src/app/v1/data-release/route";
+import { GET as healthRoute } from "../../src/app/healthz/route";
+import { GET as readinessRoute } from "../../src/app/readyz/route";
 import { sha256 } from "../../src/domain/canonical-json";
 import { importSourceRelease } from "../../src/importer/import-source";
 import { buildResolution } from "../../src/resolver/build";
 import { activateResolution } from "../../src/resolver/activation";
+import { assertPublicContract } from "../helpers/contracts";
+import {
+  createSuppression, expireSuppressions, listSuppressions, revokeSuppression,
+} from "../../src/operations/suppressions";
 
 config({ path: ".env.local", quiet: true });
 
@@ -98,6 +106,109 @@ describe("database lookup", () => {
   });
 });
 
+describe("publication suppression operations", () => {
+  it("creates and revokes an active-target suppression with cache-version changes", async () => {
+    const target = await pool.query<{ id: string }>(
+      `SELECT ra.id FROM resolved_assignments ra JOIN active_resolution ar
+       ON ar.resolution_run_id = ra.resolution_run_id WHERE ar.singleton_id = 1 LIMIT 1`,
+    );
+    const beforeRequest = new NextRequest("http://localhost:3000/v1/lookup/02AABBCC0001");
+    const beforeResponse = await lookupRoute(beforeRequest, { params: Promise.resolve({ mac: "02AABBCC0001" }) });
+    const beforeEtag = beforeResponse.headers.get("etag");
+    const beforeVersion = (await beforeResponse.json()).data.publicationVersion as number;
+
+    const created = await createSuppression(pool, {
+      target: { assignmentId: target.rows[0]!.id },
+      reasonCode: "correction_review",
+      ticketReference: "CORR-1001",
+      actorId: "operator:integration",
+    });
+    expect(created).toMatchObject({ status: "created", publicationVersion: beforeVersion + 1 });
+    const active = await listSuppressions(pool, "active");
+    expect(active.some((row) => row.id === created.suppressionId)).toBe(true);
+
+    const hiddenRequest = new NextRequest("http://localhost:3000/v1/lookup/02AABBCC0001");
+    const hiddenResponse = await lookupRoute(hiddenRequest, { params: Promise.resolve({ mac: "02AABBCC0001" }) });
+    expect(hiddenResponse.headers.get("etag")).not.toBe(beforeEtag);
+    const hiddenBody = await hiddenResponse.json();
+    expect(hiddenBody.assignment).toBeNull();
+    expect(hiddenBody.data.publicationVersion).toBe(created.publicationVersion);
+
+    const revoked = await revokeSuppression(pool, {
+      suppressionId: created.suppressionId,
+      ticketReference: "CORR-1001-REVOKE",
+      actorId: "operator:integration",
+    });
+    expect(revoked.publicationVersion).toBe(created.publicationVersion + 1);
+    const restored = await lookupMac(pool, normalizeMac("02AABBCC0001"), "all");
+    expect(restored.assignment?.organizationName).toBe("Example Networks Lab");
+    const audits = await pool.query<{ event_type: string }>(
+      "SELECT event_type FROM audit_events WHERE target_id = $1 ORDER BY created_at, event_type",
+      [created.suppressionId],
+    );
+    expect(audits.rows.map((row) => row.event_type).sort()).toEqual(["suppression.created", "suppression.revoked"]);
+    await expect(pool.query(
+      "UPDATE audit_events SET actor_id = 'tampered' WHERE target_id = $1",
+      [created.suppressionId],
+    )).rejects.toThrow(/append-only/);
+  });
+
+  it("serializes concurrent creates so only one target suppression becomes active", async () => {
+    const target = await pool.query<{ id: string }>(
+      `SELECT rc.id FROM resolved_claims rc JOIN active_resolution ar
+       ON ar.resolution_run_id = rc.resolution_run_id WHERE ar.singleton_id = 1 LIMIT 1`,
+    );
+    const attempts = await Promise.allSettled([
+      createSuppression(pool, {
+        target: { claimId: target.rows[0]!.id }, reasonCode: "correction_review",
+        ticketReference: "RACE-ONE", actorId: "operator:race-one",
+      }),
+      createSuppression(pool, {
+        target: { claimId: target.rows[0]!.id }, reasonCode: "correction_review",
+        ticketReference: "RACE-TWO", actorId: "operator:race-two",
+      }),
+    ]);
+    expect(attempts.map((attempt) => attempt.status).sort()).toEqual(["fulfilled", "rejected"]);
+    const rejected = attempts.find((attempt) => attempt.status === "rejected") as PromiseRejectedResult;
+    expect(rejected.reason).toMatchObject({ code: "ALREADY_SUPPRESSED" });
+    const created = (attempts.find((attempt) => attempt.status === "fulfilled") as PromiseFulfilledResult<Awaited<ReturnType<typeof createSuppression>>>).value;
+    await revokeSuppression(pool, {
+      suppressionId: created.suppressionId, ticketReference: "RACE-CLEANUP", actorId: "operator:integration",
+    });
+  });
+
+  it("expires due suppressions once and increments publicationVersion in the same transaction", async () => {
+    const now = new Date();
+    const created = await createSuppression(pool, {
+      target: { prefixBits: 0x02aabbn, prefixLength: 24, surface: "both" },
+      reasonCode: "temporary_review",
+      ticketReference: "EXPIRY-1001",
+      actorId: "operator:integration",
+      now,
+      expiresAt: new Date(now.getTime() + 60_000),
+    });
+    const expired = await expireSuppressions(pool, {
+      actorId: "operator:expiry-job",
+      now: new Date(now.getTime() + 120_000),
+    });
+    expect(expired).toMatchObject({ status: "expired", expiredCount: 1, publicationVersion: created.publicationVersion + 1 });
+    await expect(expireSuppressions(pool, {
+      actorId: "operator:expiry-job", now: new Date(now.getTime() + 180_000),
+    })).resolves.toEqual({ status: "no_change", expiredCount: 0, publicationVersion: null });
+  });
+
+  it("rejects ambiguous targets and contact-like ticket values", async () => {
+    await expect(createSuppression(pool, {
+      target: { assignmentId: crypto.randomUUID(), claimId: crypto.randomUUID() } as never,
+      reasonCode: "correction_review", ticketReference: "CORR-INVALID", actorId: "operator:integration",
+    })).rejects.toMatchObject({ code: "INVALID_TARGET" });
+    await expect(createSuppression(pool, {
+      target: { assignmentId: crypto.randomUUID() }, reasonCode: "correction_review",
+      ticketReference: "person@example.com", actorId: "operator:integration",
+    })).rejects.toMatchObject({ code: "INVALID_REFERENCE" });
+  });
+});
+
 describe("lookup route", () => {
   it("redirects a valid noncanonical MAC", async () => {
     const request = new NextRequest("http://localhost:3000/v1/lookup/02:aa:bb:cc:00:01");
@@ -113,12 +224,14 @@ describe("lookup route", () => {
     expect(response.status).toBe(400);
     expect(response.headers.get("content-type")).toContain("application/problem+json");
     expect(body.code).toBe("INVALID_MAC");
+    assertPublicContract("Problem", body);
   });
 
   it("supports conditional GET with ETag", async () => {
     const firstRequest = new NextRequest("http://localhost:3000/v1/lookup/02AABBCC0001");
     const first = await lookupRoute(firstRequest, { params: Promise.resolve({ mac: "02AABBCC0001" }) });
     const etag = first.headers.get("etag");
+    assertPublicContract("LookupResponse", await first.clone().json());
     expect(first.status).toBe(200);
     expect(etag).toBeTruthy();
 
@@ -127,6 +240,38 @@ describe("lookup route", () => {
     });
     const second = await lookupRoute(secondRequest, { params: Promise.resolve({ mac: "02AABBCC0001" }) });
     expect(second.status).toBe(304);
+  });
+
+  it("matches the exact-assignment and evidence response contract", async () => {
+    const request = new NextRequest("http://localhost:3000/v1/assignments/ma-l/02AABB-24?include=evidence");
+    const response = await assignmentRoute(request, {
+      params: Promise.resolve({ registry: "ma-l", prefix: "02AABB-24" }),
+    });
+    expect(response.status).toBe(200);
+    assertPublicContract("AssignmentResponse", await response.json());
+  });
+
+  it("matches the active data-release response contract", async () => {
+    const request = new NextRequest("http://localhost:3000/v1/data-release");
+    const response = await dataReleaseRoute(request);
+    expect(response.status).toBe(200);
+    assertPublicContract("DataReleaseResponse", await response.json());
+  });
+});
+
+describe("operational probes", () => {
+  it("reports process health without caching", async () => {
+    const response = healthRoute();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    await expect(response.json()).resolves.toMatchObject({ status: "ok" });
+  });
+
+  it("reports readiness only with PostgreSQL and an active resolution", async () => {
+    const response = await readinessRoute();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    await expect(response.json()).resolves.toMatchObject({ status: "ready" });
   });
 });
 

@@ -1,0 +1,103 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "macvendor API",
+    "version": "1.0.0",
+    "description": "Source-aware MAC address block assignment lookup. Synthetic examples only; an assignment is not proof of a physical device manufacturer."
+  },
+  "servers": [
+    { "url": "https://macvendor.io" },
+    { "url": "http://localhost:3000", "description": "Local development" }
+  ],
+  "paths": {
+    "/v1/lookup/{mac}": {
+      "get": {
+        "operationId": "lookupMac",
+        "parameters": [
+          { "name": "mac", "in": "path", "required": true, "schema": { "type": "string" }, "example": "02AABBCC0001" },
+          { "name": "mode", "in": "query", "schema": { "type": "string", "enum": ["all", "official"], "default": "all" } }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/LookupSuccess" },
+          "308": { "$ref": "#/components/responses/CanonicalRedirect" },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "503": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/v1/assignments/{registry}/{prefix}": {
+      "get": {
+        "operationId": "getAssignment",
+        "parameters": [
+          { "name": "registry", "in": "path", "required": true, "schema": { "type": "string", "enum": ["ma-l", "ma-m", "ma-s", "iab", "cid"] }, "example": "ma-l" },
+          { "name": "prefix", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^[0-9A-F]+-(24|28|36)$" }, "example": "02AABB-24" },
+          { "name": "include", "in": "query", "schema": { "type": "string", "const": "evidence" } }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/AssignmentSuccess" },
+          "308": { "$ref": "#/components/responses/CanonicalRedirect" },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "404": { "$ref": "#/components/responses/Problem" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "503": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/v1/data-release": {
+      "get": {
+        "operationId": "getDataRelease",
+        "responses": {
+          "200": { "$ref": "#/components/responses/DataReleaseSuccess" },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "503": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    }
+  },
+  "components": {
+    "headers": {
+      "RequestId": { "description": "Opaque request identifier", "schema": { "type": "string" } },
+      "Location": { "description": "Canonical URL", "schema": { "type": "string", "format": "uri" } },
+      "RetryAfter": { "description": "Seconds before retry", "schema": { "type": "integer", "minimum": 1 } }
+    },
+    "responses": {
+      "LookupSuccess": {
+        "description": "Lookup result; no match is still a successful response",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/LookupResponse" } } }
+      },
+      "AssignmentSuccess": {
+        "description": "Exact active assignment",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/AssignmentResponse" } } }
+      },
+      "DataReleaseSuccess": {
+        "description": "Active release metadata",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/DataReleaseResponse" } } }
+      },
+      "CanonicalRedirect": {
+        "description": "Permanent redirect to the canonical path while preserving the query",
+        "headers": {
+          "X-Request-Id": { "$ref": "#/components/headers/RequestId" },
+          "Location": { "$ref": "#/components/headers/Location" }
+        }
+      },
+      "Problem": {
+        "description": "RFC 9457 problem response",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/problem+json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/Problem" } } }
+      },
+      "RateLimited": {
+        "description": "Rate limit exceeded",
+        "headers": {
+          "X-Request-Id": { "$ref": "#/components/headers/RequestId" },
+          "Retry-After": { "$ref": "#/components/headers/RetryAfter" }
+        },
+        "content": { "application/problem+json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/Problem" } } }
+      }
+    }
+  }
+}
