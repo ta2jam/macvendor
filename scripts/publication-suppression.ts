@@ -4,6 +4,9 @@ import { InvalidPrefixError, parsePrefix } from "../src/domain/mac";
 import {
   createSuppression, expireSuppressions, listSuppressions, revokeSuppression, SuppressionError,
 } from "../src/operations/suppressions";
+import {
+  CachePurgeError, DATA_RELEASE_SURROGATE_KEY, purgeSurrogateKeys, resolutionSurrogateKey,
+} from "../src/cache/surrogate";
 
 function usage(): never {
   console.error(`Usage:
@@ -44,9 +47,9 @@ if (!command) usage();
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is required");
 const pool = createPool(url);
+let result: unknown;
 
 try {
-  let result: unknown;
   if (command === "create") {
     const values = flags(args);
     exactKeys(values, ["--assignment", "--claim", "--prefix", "--surface", "--source", "--reason", "--ticket", "--expires-at"]);
@@ -92,10 +95,23 @@ try {
     if (args.length) usage();
     result = await expireSuppressions(pool, { actorId: actor() });
   } else usage();
+  const mutation = result && typeof result === "object"
+    ? result as { status?: string; resolutionRunId?: string }
+    : null;
+  if (mutation?.resolutionRunId && mutation.status !== "no_change") {
+    const cachePurge = await purgeSurrogateKeys([
+      resolutionSurrogateKey(mutation.resolutionRunId), DATA_RELEASE_SURROGATE_KEY,
+    ]);
+    result = { ...mutation, cachePurge };
+  }
   console.log(JSON.stringify(result, null, 2));
 } catch (error) {
   if (error instanceof SuppressionError || error instanceof InvalidPrefixError) {
     console.error(JSON.stringify({ error: error instanceof SuppressionError ? error.code : "INVALID_PREFIX", detail: error.message }));
+    process.exitCode = 1;
+  } else if (error instanceof CachePurgeError && result) {
+    console.error(JSON.stringify({ error: error.code,
+      detail: `suppression change committed but cache purge failed: ${error.message}`, committed: result }));
     process.exitCode = 1;
   } else throw error;
 } finally {

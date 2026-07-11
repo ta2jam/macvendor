@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 0.0.8 — 2026-07-11
+
+- Recorded the IEEE Registration Authority evidence review and kept production
+  ingestion blocked because public-listing access does not establish derived
+  public API-output rights.
+- Added bounded claim JSON depth, node count, nested text, and existing byte
+  limits before canonicalization or persistence.
+- Added a deterministic 64-case mutation corpus plus explicit UTF-8, artifact,
+  line, field, record-count, claim-size, nesting, complexity, and bidi tests.
+- Added a read-only PostgreSQL source-governance report and CLI with machine-
+  readable failures/warnings for rights status/scope/expiry, active-input and
+  release presence, freshness, and future timestamps.
+- Added a partial latest-valid-release index and documented `O(S)` report
+  evaluation. No IEEE or amateur records were imported.
+- Added bounded shared-cache surrogate headers and a provider-neutral HTTPS
+  purge adapter invoked after activation, rollback, and suppression commits.
+- Added explicit post-commit failure reporting plus unsafe endpoint, missing
+  credential, network, HTTP rejection, private-response, and success tests.
+- Kept distributed rate limiting blocked on an edge provider and measured
+  traffic instead of adding an unmeasured shared hot-path dependency.
+
 ## 0.0.7 — 2026-07-11
 
 - Added repeatable-read exported-snapshot PostgreSQL custom backups so dump bytes

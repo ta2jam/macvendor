@@ -74,6 +74,7 @@ Limitler configuration'dır; artırma ölçüm ve review ister.
 | Tek metin alanı | 16 KiB |
 | `claim_value` / validation JSONB | 32 KiB / 256 KiB |
 | JSON nesting | 20 |
+| `claim_value` JSON nodes | 4.096 |
 | Source sayısı | 32 |
 | Bir lookup'ta curated sonuç | 20 |
 | Evidence detay endpoint'i | 100 kayıt |
@@ -134,7 +135,7 @@ Pozitif ve curated sonuç:
 
 - `ETag: "rr-{activeVersion}-pv-{publicationVersion}-{responseHash}"`
 - `Cache-Control: public, max-age=300, s-maxage=86400, stale-while-revalidate=604800`
-- `Surrogate-Key: resolved-release-{resolutionRunId}`
+- `Surrogate-Key: data-release resolved-release-{resolutionRunId}`
 
 Geçerli fakat eşleşmeyen MAC:
 
@@ -151,6 +152,24 @@ Hata, rate-limit ve evidence içeren response shared cache'e girmez.
 
 Suppression ekleme/revoke/expire işlemi `publicationVersion` değerini atomik artırır ve aynı release surrogate key'ini purge eder. Origin yeni overlay'i transaction commit edildiği anda uygular; paylaşılan edge cache purge ile, istemci cache'i ise en geç beş dakikalık `max-age` sonunda temizlenir.
 
+Mutation CLI'ları commit sonrasında provider-bağımsız bir HTTPS adapter'ına şu
+sözleşmeyle çağrı yapar:
+
+```http
+POST ${CACHE_PURGE_ENDPOINT}
+Authorization: Bearer ${CACHE_PURGE_TOKEN}
+Content-Type: application/json
+
+{"surrogateKeys":["data-release","resolved-release-<uuid>"]}
+```
+
+Endpoint credentials/query/fragment içeremez; key sayısı ve biçimi sınırlıdır,
+redirect izlenmez ve çağrı 5 saniyede kesilir. Production'da
+`CACHE_PURGE_REQUIRED=true` olmalıdır. Purge hatası commit'i geri almış gibi
+sunulmaz: CLI non-zero çıkar ve commit edilmiş mutation bilgisini makine-okunur
+hata içinde döndürür. Gerçek provider adapter'ı ve alarm teslimatı, CDN seçilip
+staging'de doğrulanana kadar dış bağımlılıktır.
+
 Aktif build'de kullanılan bir source'un hak/config değişikliği `/v1/data-release` surrogate key'ini purge eder. Lookup çıktısı suppression/rollback olmadan değiştirilmez.
 
 Provider custom cache-key destekliyorsa active pointer version CDN key'e eklenir. Desteklemiyorsa purge zorunludur.
@@ -158,6 +177,11 @@ Provider custom cache-key destekliyorsa active pointer version CDN key'e eklenir
 Rate-limit header'ları cache edilen origin body ile birleştirilmez; edge response aşamasında eklenir.
 
 ## Rate limiting ve DoS
+
+Mevcut token bucket process-local fallback'tir; yatay ölçekli ortak kota
+değildir. Edge sağlayıcısı, güvenilen IP sözleşmesi ve gerçek trafik/abuse
+ölçümleri olmadan Redis veya PostgreSQL hot-path yazısı eklenmeyecektir. Bu iş
+[#19](https://github.com/ta2jam/macvendor/issues/19) üzerinde blocked durumdadır.
 
 - İlk koruma edge token bucket: IP başına 5 req/s, burst 25; ölçümle değişir.
 - Client IP yalnız güvenilen edge/load-balancer'ın overwrite ettiği header'dan alınır; public `X-Forwarded-For` zincirine doğrudan güvenilmez. Doğrudan origin erişimi firewall ile kapalıdır.
@@ -229,6 +253,23 @@ Bunlar ölçüm hedefidir; ölçülmeden garanti değildir.
 - Hak review expiry ve aktif build'in source-config hash uyumu.
 - Curated verification/origin dağılımı.
 - Correction queue age.
+
+Configured production-source freshness and rights state can be checked without
+changing the database:
+
+```bash
+npm run source:health
+npm run source:health -- --warning-days 45
+```
+
+The command emits JSON. Active-resolution inputs are monitored instead of being
+masked by a newer but unpublished release. It exits `1` for expired/blocked
+rights, non-API scope, missing or inactive required releases, stale active
+releases, invalid active inputs, or future-dated fetch timestamps;
+an approaching rights expiry or missing freshness threshold is a warning and
+does not change the exit code. The database query uses the latest-valid-release
+index and the evaluator is `O(S)` for `S` configured production sources; report
+memory is also `O(S)`.
 
 ### Alarm sahipliği
 

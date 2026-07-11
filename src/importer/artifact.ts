@@ -7,10 +7,15 @@ import { ImportValidationError } from "./errors";
 import type { ParsedSourceRecord, RecordKind, Registry, SourceManifest } from "./types";
 import { verifyArtifactSignature } from "./signature";
 
-const MAX_ARTIFACT_BYTES = 20 * 1024 * 1024;
-const MAX_LINE_BYTES = 64 * 1024;
-const MAX_FIELD_BYTES = 16 * 1024;
-const MAX_RECORDS = 250_000;
+export const IMPORT_LIMITS = Object.freeze({
+  artifactBytes: 20 * 1024 * 1024,
+  lineBytes: 64 * 1024,
+  fieldBytes: 16 * 1024,
+  claimValueBytes: 32 * 1024,
+  claimValueDepth: 20,
+  claimValueNodes: 4_096,
+  records: 250_000,
+});
 const FORBIDDEN_TEXT = /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/u;
 const ALLOWED_FIELDS = new Set([
   "prefix", "prefixLength", "organizationName", "organizationAddress", "registry", "recordKind",
@@ -27,7 +32,7 @@ function text(value: unknown, field: string, required = false): string | null {
   }
   if (typeof value !== "string") throw new ImportValidationError("INVALID_FIELD", `${field} must be string`);
   const normalized = value.trim().normalize("NFC");
-  if (Buffer.byteLength(normalized, "utf8") > MAX_FIELD_BYTES) throw new ImportValidationError("FIELD_TOO_LARGE", `${field} exceeds 16 KiB`);
+  if (Buffer.byteLength(normalized, "utf8") > IMPORT_LIMITS.fieldBytes) throw new ImportValidationError("FIELD_TOO_LARGE", `${field} exceeds 16 KiB`);
   if (FORBIDDEN_TEXT.test(normalized)) throw new ImportValidationError("UNSAFE_TEXT", `${field} contains control or invisible formatting characters`);
   return normalized || null;
 }
@@ -80,8 +85,65 @@ function claimValue(value: unknown, organizationName: string | null): Record<str
     try { parsed = JSON.parse(value); } catch { throw new ImportValidationError("INVALID_CLAIM_VALUE", "claimValue must be a JSON object"); }
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new ImportValidationError("INVALID_CLAIM_VALUE", "claimValue must be a JSON object");
-  if (Buffer.byteLength(JSON.stringify(parsed), "utf8") > 32 * 1024) throw new ImportValidationError("CLAIM_VALUE_TOO_LARGE", "claimValue exceeds 32 KiB");
-  return parsed as Record<string, unknown>;
+  validateClaimValueStructure(parsed);
+  const normalized = normalizeClaimJson(parsed) as Record<string, unknown>;
+  if (Buffer.byteLength(JSON.stringify(normalized), "utf8") > IMPORT_LIMITS.claimValueBytes) throw new ImportValidationError("CLAIM_VALUE_TOO_LARGE", "claimValue exceeds 32 KiB");
+  return normalized;
+}
+
+function validateClaimText(value: string, field: string): void {
+  if (Buffer.byteLength(value, "utf8") > IMPORT_LIMITS.fieldBytes) {
+    throw new ImportValidationError("FIELD_TOO_LARGE", `${field} string exceeds 16 KiB`);
+  }
+  if (FORBIDDEN_TEXT.test(value)) {
+    throw new ImportValidationError("UNSAFE_TEXT", `${field} contains control or invisible formatting characters`);
+  }
+}
+
+function validateClaimValueStructure(root: object): void {
+  const stack: Array<{ value: unknown; depth: number }> = [{ value: root, depth: 1 }];
+  let nodes = 0;
+  while (stack.length) {
+    const current = stack.pop()!;
+    nodes += 1;
+    if (nodes > IMPORT_LIMITS.claimValueNodes) {
+      throw new ImportValidationError("CLAIM_VALUE_TOO_COMPLEX", `claimValue exceeds ${IMPORT_LIMITS.claimValueNodes} JSON nodes`);
+    }
+    if (typeof current.value === "string") continue;
+    if (!current.value || typeof current.value !== "object") continue;
+    if (current.depth > IMPORT_LIMITS.claimValueDepth) {
+      throw new ImportValidationError("CLAIM_VALUE_TOO_DEEP", `claimValue exceeds JSON nesting depth ${IMPORT_LIMITS.claimValueDepth}`);
+    }
+    if (Array.isArray(current.value)) {
+      for (const item of current.value) stack.push({ value: item, depth: current.depth + 1 });
+      continue;
+    }
+    for (const item of Object.values(current.value)) {
+      stack.push({ value: item, depth: current.depth + 1 });
+    }
+  }
+}
+
+function normalizeClaimJson(value: unknown): unknown {
+  if (typeof value === "string") {
+    const normalized = value.normalize("NFC");
+    validateClaimText(normalized, "claimValue");
+    return normalized;
+  }
+  if (!value || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map(normalizeClaimJson);
+  const entries: Array<[string, unknown]> = [];
+  const keys = new Set<string>();
+  for (const [rawKey, item] of Object.entries(value)) {
+    const key = rawKey.normalize("NFC");
+    validateClaimText(key, "claimValue key");
+    if (keys.has(key)) {
+      throw new ImportValidationError("DUPLICATE_CLAIM_KEY", "claimValue contains keys that collide after Unicode normalization");
+    }
+    keys.add(key);
+    entries.push([key, normalizeClaimJson(item)]);
+  }
+  return Object.fromEntries(entries);
 }
 
 function normalizeRecord(raw: RawRecord, row: number, manifest: SourceManifest): ParsedSourceRecord {
@@ -185,7 +247,7 @@ export async function parseArtifact(manifest: SourceManifest, manifestPath: stri
   if (relative.startsWith("..") || path.isAbsolute(relative)) throw new ImportValidationError("UNSAFE_ARTIFACT_PATH", "artifact escapes manifest directory");
   const stat = await lstat(candidate).catch(() => null);
   if (!stat || !stat.isFile() || stat.isSymbolicLink()) throw new ImportValidationError("UNSAFE_ARTIFACT_FILE", "artifact must be a regular non-symlink file");
-  if (stat.size > MAX_ARTIFACT_BYTES) throw new ImportValidationError("ARTIFACT_TOO_LARGE", "artifact exceeds 20 MiB");
+  if (stat.size > IMPORT_LIMITS.artifactBytes) throw new ImportValidationError("ARTIFACT_TOO_LARGE", "artifact exceeds 20 MiB");
   const bytes = await readFile(candidate);
   const contentHash = sha256(bytes);
   if (contentHash !== manifest.artifact.sha256) throw new ImportValidationError("ARTIFACT_HASH_MISMATCH", "artifact SHA-256 does not match manifest");
@@ -197,7 +259,7 @@ export async function parseArtifact(manifest: SourceManifest, manifestPath: stri
   if (content.includes("\0")) throw new ImportValidationError("NUL_BYTE", "artifact contains NUL byte");
   const lines = content.split(/\r?\n/);
   for (const [index, line] of lines.entries()) {
-    if (Buffer.byteLength(line, "utf8") > MAX_LINE_BYTES) throw new ImportValidationError("LINE_TOO_LARGE", `line ${index + 1} exceeds 64 KiB`);
+    if (Buffer.byteLength(line, "utf8") > IMPORT_LIMITS.lineBytes) throw new ImportValidationError("LINE_TOO_LARGE", `line ${index + 1} exceeds 64 KiB`);
   }
 
   let rawRecords: RawRecord[];
@@ -220,14 +282,14 @@ export async function parseArtifact(manifest: SourceManifest, manifestPath: stri
         delimiter: manifest.artifact.format === "tsv" ? "\t" : ",",
         skip_empty_lines: true,
         relax_column_count: false,
-        max_record_size: MAX_LINE_BYTES,
+        max_record_size: IMPORT_LIMITS.lineBytes,
       }) as RawRecord[];
     } catch {
       throw new ImportValidationError("INVALID_DELIMITED_FILE", "CSV/TSV artifact could not be parsed with a single strict header row");
     }
   }
   if (rawRecords.length === 0) throw new ImportValidationError("EMPTY_ARTIFACT", "artifact contains no records");
-  if (rawRecords.length > MAX_RECORDS) throw new ImportValidationError("TOO_MANY_RECORDS", "artifact exceeds 250,000 records");
+  if (rawRecords.length > IMPORT_LIMITS.records) throw new ImportValidationError("TOO_MANY_RECORDS", "artifact exceeds 250,000 records");
   const records = rawRecords.map((record, index) => normalizeRecord(record, index + 1, manifest));
   const recordHashes = new Set<string>();
   const authoritativeKeys = new Set<string>();

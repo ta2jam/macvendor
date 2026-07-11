@@ -63,6 +63,10 @@ identity. MAC addresses can be reassigned, spoofed, or randomized.
 - unit, PostgreSQL integration, suppression, build, and HTTP smoke coverage.
 - offline CSV/TSV/JSONL source-release importer with manifest, hash, rights,
   privacy, encoding, size, and idempotency gates.
+- deterministic adversarial importer coverage plus read-only source freshness
+  and rights-expiry health reporting.
+- shared-cache surrogate keys and a bounded provider-neutral post-commit purge
+  hook; real CDN validation remains deployment-specific.
 - allowlisted HTTPS fetch with DNS/IP SSRF defense, redirect revalidation,
   Ed25519 verification, snapshot completeness, and release-diff gates;
 - snapshot-consistent logical backup, guarded restore verification, and
@@ -161,7 +165,9 @@ operational constraints in [`docs/operations.md`](docs/operations.md).
 Data availability and data rights are different facts.
 
 - IEEE is the candidate authoritative source, but production use remains blocked
-  until the intended API-output use is documented and approved.
+  until the intended API-output use is documented and approved. The current
+  evidence and exact unblock requirements are recorded in
+  [`docs/rights/ieee-registration-authority.md`](docs/rights/ieee-registration-authority.md).
 - KIT NETVS and community databases are reference/QA inputs, not automatically
   production sources.
 - Amateur database integration is deferred. No amateur records are admitted in
