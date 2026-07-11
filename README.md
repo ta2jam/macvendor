@@ -73,6 +73,8 @@ identity. MAC addresses can be reassigned, spoofed, or randomized.
   Ed25519 verification, snapshot completeness, and release-diff gates;
 - snapshot-consistent logical backup, guarded restore verification, and
   migration-plus-artifact zero-seed rebuild drills;
+- reproducible lookup benchmarks with exact PostgreSQL plans, buffer/I/O
+  counters, and separate database/origin latency distributions;
 
 ## Quick start
 
@@ -83,6 +85,7 @@ git clone https://github.com/ta2jam/macvendor.git
 cd macvendor
 createdb macvendor_dev
 createdb macvendor_test
+createdb macvendor_bench
 cp .env.example .env.local
 npm install
 npm run db:migrate
@@ -192,6 +195,7 @@ npm run test:integration
 npm run build
 npm run browser:install
 npm run test:browser
+npm run benchmark:lookup -- --sizes 1000,10000,100000,250000
 npm audit --audit-level=low
 ```
 
@@ -207,6 +211,11 @@ are documented in
 
 The integration suite resets only the database named by `TEST_DATABASE_URL` and
 refuses any name that does not end with `_test`.
+
+The benchmark likewise destroys and recreates only the database named by
+`BENCHMARK_DATABASE_URL`, and refuses a name that does not end with `_bench`.
+Read the safety boundary, metric definitions, and baseline interpretation in
+[`docs/performance-benchmark.md`](docs/performance-benchmark.md).
 
 Import the synthetic QA-only example with:
 

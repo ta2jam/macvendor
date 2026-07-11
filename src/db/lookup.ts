@@ -39,108 +39,121 @@ const ACTIVE_SUPPRESSION = `
   AND (ps.expires_at IS NULL OR ps.expires_at > now())
 `;
 
-export async function lookupMac(pool: Pool, mac: NormalizedMac, mode: "all" | "official"): Promise<LookupResult> {
-  const result = await pool.query<LookupRow>(
-    `
-      WITH active AS (
-        SELECT ar.resolution_run_id, ar.version, ar.publication_version,
-               rr.policy_version, rr.completed_at
-        FROM active_resolution ar
-        JOIN resolution_runs rr ON rr.id = ar.resolution_run_id
-        WHERE ar.singleton_id = 1 AND rr.status = 'active'
-      ), assignment_match AS (
-        SELECT ra.*
-        FROM active a
-        JOIN resolved_assignments ra ON ra.resolution_run_id = a.resolution_run_id
-        WHERE ra.registry <> 'CID'
-          AND ra.prefix_length IN (36, 28, 24)
-          AND ($1::bigint >> (48 - ra.prefix_length)) = ra.prefix_bits
-          AND NOT EXISTS (
-            SELECT 1 FROM publication_suppressions ps
-            WHERE ${ACTIVE_SUPPRESSION}
-              AND (
-                ps.resolved_assignment_id = ra.id
-                OR (
-                  ps.resolved_assignment_id IS NULL
-                  AND ps.resolved_claim_id IS NULL
-                  AND (ps.resolution_run_id IS NULL OR ps.resolution_run_id = a.resolution_run_id)
-                  AND ps.prefix_bits = ra.prefix_bits
-                  AND ps.prefix_length = ra.prefix_length
-                  AND ps.surface IN ('official', 'both')
-                  AND (ps.source_slug IS NULL OR ps.source_slug = ra.core_source_slug)
-                )
-              )
+export const LOOKUP_SQL = `
+  WITH active AS (
+    SELECT ar.resolution_run_id, ar.version, ar.publication_version,
+           rr.policy_version, rr.completed_at
+    FROM active_resolution ar
+    JOIN resolution_runs rr ON rr.id = ar.resolution_run_id
+    WHERE ar.singleton_id = 1 AND rr.status = 'active'
+  ), assignment_candidates (prefix_length, prefix_bits) AS (
+    VALUES
+      (36::smallint, ($1::bigint >> 12)),
+      (28::smallint, ($1::bigint >> 20)),
+      (24::smallint, ($1::bigint >> 24))
+  ), assignment_match AS (
+    SELECT ra.*
+    FROM active a
+    JOIN assignment_candidates candidate ON true
+    JOIN resolved_assignments ra
+      ON ra.resolution_run_id = a.resolution_run_id
+      AND ra.prefix_length = candidate.prefix_length
+      AND ra.prefix_bits = candidate.prefix_bits
+    WHERE ra.registry <> 'CID'
+      AND NOT EXISTS (
+        SELECT 1 FROM publication_suppressions ps
+        WHERE ${ACTIVE_SUPPRESSION}
+          AND (
+            ps.resolved_assignment_id = ra.id
+            OR (
+              ps.resolved_assignment_id IS NULL
+              AND ps.resolved_claim_id IS NULL
+              AND (ps.resolution_run_id IS NULL OR ps.resolution_run_id = a.resolution_run_id)
+              AND ps.prefix_bits = ra.prefix_bits
+              AND ps.prefix_length = ra.prefix_length
+              AND ps.surface IN ('official', 'both')
+              AND (ps.source_slug IS NULL OR ps.source_slug = ra.core_source_slug)
+            )
           )
-        ORDER BY ra.prefix_length DESC
-        LIMIT 1
-      ), claim_matches AS (
-        SELECT rc.*
-        FROM active a
-        JOIN resolved_claims rc ON rc.resolution_run_id = a.resolution_run_id
-        WHERE $2::boolean = false
-          AND rc.claim_type = 'curated_vendor_claim'
-          AND ($1::bigint >> (48 - rc.prefix_length)) = rc.prefix_bits
-          AND NOT EXISTS (
-            SELECT 1 FROM publication_suppressions ps
-            WHERE ${ACTIVE_SUPPRESSION}
-              AND (
-                ps.resolved_claim_id = rc.id
-                OR (
-                  ps.resolved_assignment_id IS NULL
-                  AND ps.resolved_claim_id IS NULL
-                  AND (ps.resolution_run_id IS NULL OR ps.resolution_run_id = a.resolution_run_id)
-                  AND ps.prefix_bits = rc.prefix_bits
-                  AND ps.prefix_length = rc.prefix_length
-                  AND ps.surface IN ('curated', 'both')
-                  AND (ps.source_slug IS NULL OR ps.source_slug = rc.source_slug)
-                )
-              )
-          )
-        ORDER BY rc.prefix_length DESC,
-          CASE rc.verification_status
-            WHEN 'reviewed' THEN 1
-            WHEN 'corroborated' THEN 2
-            WHEN 'single_observation' THEN 3
-            ELSE 4
-          END,
-          rc.source_slug ASC,
-          rc.id ASC
-        LIMIT 21
       )
-      SELECT
-        a.resolution_run_id, a.version AS active_version,
-        a.publication_version, a.policy_version, a.completed_at AS generated_at,
-        am.registry AS assignment_registry,
-        am.prefix_bits AS assignment_prefix_bits,
-        am.prefix_length AS assignment_prefix_length,
-        am.organization_name AS assignment_organization_name,
-        am.organization_address AS assignment_address,
-        am.core_source_slug AS assignment_source_slug,
-        am.core_source_release_id AS assignment_source_release_id,
-        cm.id AS claim_id,
-        cm.prefix_bits AS claim_prefix_bits,
-        cm.prefix_length AS claim_prefix_length,
-        cm.organization_name AS claim_organization_name,
-        cm.verification_status AS claim_verification_status,
-        cm.origin_type AS claim_origin_type,
-        cm.conflict_status AS claim_conflict_status,
-        cm.source_slug AS claim_source_slug,
-        cm.source_release_id AS claim_source_release_id
-      FROM active a
-      LEFT JOIN assignment_match am ON true
-      LEFT JOIN claim_matches cm ON true
-      ORDER BY cm.prefix_length DESC NULLS LAST,
-        CASE cm.verification_status
-          WHEN 'reviewed' THEN 1
-          WHEN 'corroborated' THEN 2
-          WHEN 'single_observation' THEN 3
-          ELSE 4
-        END,
-        cm.source_slug ASC,
-        cm.id ASC
-    `,
-    [mac.value.toString(), mode === "official"],
-  );
+    ORDER BY ra.prefix_length DESC
+    LIMIT 1
+  ), claim_candidates AS (
+    SELECT prefix_length::smallint AS prefix_length,
+      ($1::bigint >> (48 - prefix_length)) AS prefix_bits
+    FROM generate_series(1, 48) AS prefix_length
+  ), claim_matches AS (
+    SELECT rc.*
+    FROM active a
+    JOIN claim_candidates candidate ON true
+    JOIN resolved_claims rc
+      ON rc.resolution_run_id = a.resolution_run_id
+      AND rc.prefix_length = candidate.prefix_length
+      AND rc.prefix_bits = candidate.prefix_bits
+    WHERE $2::boolean = false
+      AND rc.claim_type = 'curated_vendor_claim'
+      AND NOT EXISTS (
+        SELECT 1 FROM publication_suppressions ps
+        WHERE ${ACTIVE_SUPPRESSION}
+          AND (
+            ps.resolved_claim_id = rc.id
+            OR (
+              ps.resolved_assignment_id IS NULL
+              AND ps.resolved_claim_id IS NULL
+              AND (ps.resolution_run_id IS NULL OR ps.resolution_run_id = a.resolution_run_id)
+              AND ps.prefix_bits = rc.prefix_bits
+              AND ps.prefix_length = rc.prefix_length
+              AND ps.surface IN ('curated', 'both')
+              AND (ps.source_slug IS NULL OR ps.source_slug = rc.source_slug)
+            )
+          )
+      )
+    ORDER BY rc.prefix_length DESC,
+      CASE rc.verification_status
+        WHEN 'reviewed' THEN 1
+        WHEN 'corroborated' THEN 2
+        WHEN 'single_observation' THEN 3
+        ELSE 4
+      END,
+      rc.source_slug ASC,
+      rc.id ASC
+    LIMIT 21
+  )
+  SELECT
+    a.resolution_run_id, a.version AS active_version,
+    a.publication_version, a.policy_version, a.completed_at AS generated_at,
+    am.registry AS assignment_registry,
+    am.prefix_bits AS assignment_prefix_bits,
+    am.prefix_length AS assignment_prefix_length,
+    am.organization_name AS assignment_organization_name,
+    am.organization_address AS assignment_address,
+    am.core_source_slug AS assignment_source_slug,
+    am.core_source_release_id AS assignment_source_release_id,
+    cm.id AS claim_id,
+    cm.prefix_bits AS claim_prefix_bits,
+    cm.prefix_length AS claim_prefix_length,
+    cm.organization_name AS claim_organization_name,
+    cm.verification_status AS claim_verification_status,
+    cm.origin_type AS claim_origin_type,
+    cm.conflict_status AS claim_conflict_status,
+    cm.source_slug AS claim_source_slug,
+    cm.source_release_id AS claim_source_release_id
+  FROM active a
+  LEFT JOIN assignment_match am ON true
+  LEFT JOIN claim_matches cm ON true
+  ORDER BY cm.prefix_length DESC NULLS LAST,
+    CASE cm.verification_status
+      WHEN 'reviewed' THEN 1
+      WHEN 'corroborated' THEN 2
+      WHEN 'single_observation' THEN 3
+      ELSE 4
+    END,
+    cm.source_slug ASC,
+    cm.id ASC
+`;
+
+export async function lookupMac(pool: Pool, mac: NormalizedMac, mode: "all" | "official"): Promise<LookupResult> {
+  const result = await pool.query<LookupRow>(LOOKUP_SQL, [mac.value.toString(), mode === "official"]);
 
   const first = result.rows[0];
   if (!first) throw new DataReleaseUnavailableError();
