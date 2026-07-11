@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -25,6 +25,7 @@ import { checkSourceGovernance } from "../../src/operations/source-health";
 import { IeeeUpdatePostCommitError, updateIeeeSources } from "../../src/operations/ieee-update";
 import { IEEE_ADAPTER_KEY, IEEE_DATASETS, IEEE_RA_ORIGIN, IEEE_RIGHTS_REVIEW } from "../../src/sources/ieee";
 import type { PreparedIeeeSnapshot } from "../../src/sources/prepare-ieee";
+import { migrate } from "../../src/db/migrate";
 
 config({ path: ".env.local", quiet: true });
 
@@ -599,5 +600,50 @@ describe("guarded IEEE update", () => {
     await expect(pool.query<{ resolution_run_id: string; version: string }>(
       "SELECT resolution_run_id, version FROM active_resolution WHERE singleton_id = 1",
     )).resolves.toMatchObject({ rows: before.rows });
+  });
+});
+
+describe("migration history integrity", () => {
+  it("backfills legacy checksums and rejects applied-file drift and missing history", async () => {
+    await pool.query("ALTER TABLE schema_migrations ALTER COLUMN checksum DROP NOT NULL");
+    await pool.query("UPDATE schema_migrations SET checksum = NULL WHERE name = '0007_source_fetch_observations.sql'");
+    await migrate(pool);
+    const repaired = await pool.query<{ checksum: string; nullable: string }>(
+      `SELECT sm.checksum, c.is_nullable AS nullable
+       FROM schema_migrations sm
+       JOIN information_schema.columns c ON c.table_schema = 'public'
+         AND c.table_name = 'schema_migrations' AND c.column_name = 'checksum'
+       WHERE sm.name = '0007_source_fetch_observations.sql'`,
+    );
+    expect(repaired.rows[0]).toMatchObject({ checksum: expect.stringMatching(/^sha256:[0-9a-f]{64}$/), nullable: "NO" });
+
+    const directory = await mkdtemp(path.join(tmpdir(), "macvendor-migration-drift-"));
+    try {
+      await cp(path.resolve("migrations"), directory, { recursive: true });
+      const name = "0007_source_fetch_observations.sql";
+      const tampered = `${await readFile(path.join(directory, name), "utf8")}-- tampered\n`;
+      await writeFile(path.join(directory, name), tampered);
+      const ledgerPath = path.join(directory, "checksums.json");
+      const ledger = JSON.parse(await readFile(ledgerPath, "utf8")) as { files: Record<string, string> };
+      ledger.files[name] = sha256(tampered);
+      await writeFile(ledgerPath, JSON.stringify({ schemaVersion: "macvendor-migrations/v1", files: ledger.files }));
+      await expect(migrate(pool, directory)).rejects.toMatchObject({ code: "APPLIED_MIGRATION_DRIFT" });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+
+    await pool.query(
+      "INSERT INTO schema_migrations (name, checksum) VALUES ('9999_missing.sql', $1)",
+      [`sha256:${"0".repeat(64)}`],
+    );
+    try {
+      await expect(migrate(pool)).rejects.toMatchObject({ code: "APPLIED_MIGRATION_MISSING" });
+    } finally {
+      await pool.query("DELETE FROM schema_migrations WHERE name = '9999_missing.sql'");
+    }
+    const before = await pool.query<{ count: string }>("SELECT count(*) FROM schema_migrations");
+    await migrate(pool);
+    const after = await pool.query<{ count: string }>("SELECT count(*) FROM schema_migrations");
+    expect(after.rows).toEqual(before.rows);
   });
 });

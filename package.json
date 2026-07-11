@@ -1,6 +1,6 @@
 {
   "name": "macvendor",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "type": "module",
   "private": false,
   "description": "Source-aware MAC address block assignment lookup service.",
@@ -20,6 +20,7 @@
     "test:browser": "playwright test",
     "benchmark:lookup": "tsx scripts/benchmark-lookup.ts",
     "db:migrate": "tsx scripts/migrate.ts",
+    "db:migrations:verify": "tsx scripts/verify-migrations.ts",
     "db:seed": "tsx scripts/seed.ts",
     "source:import": "tsx scripts/import-source.ts",
     "source:fetch": "tsx scripts/fetch-source.ts",
@@ -40,7 +41,7 @@
     "recovery:smoke": "tsx scripts/recovery-smoke.ts",
     "db:test:prepare": "tsx scripts/prepare-test-db.ts",
     "test:integration": "npm run db:test:prepare && vitest run tests/integration",
-    "verify": "npm run lint && npm run typecheck && npm run test && npm run test:integration && npm run build"
+    "verify": "npm run db:migrations:verify && npm run lint && npm run typecheck && npm run test && npm run test:integration && npm run build"
   },
   "dependencies": {
     "csv-parse": "^7.0.1",

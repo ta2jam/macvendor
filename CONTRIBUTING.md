@@ -54,6 +54,23 @@ fixtures, snapshots, examples, or screenshots without documented permission.
 
 The binding constraints are in [`docs/`](docs/).
 
+## Database migrations
+
+Applied migration files are immutable. Add a new sequential
+`NNNN_lowercase_name.sql` file; never edit, rename, or delete an existing one.
+Add the exact `sha256:<64 lowercase hex>` digest to
+`migrations/checksums.json`, then run:
+
+```bash
+npm run db:migrations:verify
+npm run test:integration
+```
+
+The ledger must cover the exact SQL filename set. Changing both an applied SQL
+file and its ledger entry still fails against the checksum already stored in
+deployed database history. Drift requires a forward migration, not history
+rewriting.
+
 ## Pull requests
 
 A pull request must contain:
