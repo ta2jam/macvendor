@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 import { formatPrefix, type NormalizedMac, type Registry } from "@/domain/mac";
-import type { Assignment, CuratedMatch, LookupResult, ReleaseData } from "@/domain/types";
+import type { Assignment, CuratedMatch, LookupInsight, LookupResult, ReleaseData } from "@/domain/types";
 
 export class DataReleaseUnavailableError extends Error {
   constructor() {
@@ -152,8 +152,65 @@ export const LOOKUP_SQL = `
     cm.id ASC
 `;
 
+interface InsightRow {
+  id: string;
+  prefix_bits: string;
+  prefix_length: number;
+  claim_type: LookupInsight["claimType"];
+  claim_value: Record<string, unknown>;
+  organization_name: string | null;
+  verification_status: LookupInsight["verificationStatus"];
+  source_slug: string;
+  source_release_id: string;
+}
+
+const INSIGHTS_SQL = `
+  WITH active AS (
+    SELECT resolution_run_id FROM active_resolution WHERE singleton_id = 1
+  ), candidates AS (
+    SELECT prefix_length::smallint AS prefix_length,
+      ($1::bigint >> (48 - prefix_length)) AS prefix_bits
+    FROM generate_series(1, 48) AS prefix_length
+  )
+  SELECT rc.id, rc.prefix_bits, rc.prefix_length, rc.claim_type, rc.claim_value,
+         rc.organization_name, rc.verification_status, rc.source_slug, rc.source_release_id
+  FROM active a
+  JOIN candidates candidate ON true
+  JOIN resolved_claims rc
+    ON rc.resolution_run_id = a.resolution_run_id
+    AND rc.prefix_length = candidate.prefix_length
+    AND rc.prefix_bits = candidate.prefix_bits
+  WHERE rc.claim_type IN ('vendor_alias', 'device_hint', 'usage_note')
+    AND NOT EXISTS (
+      SELECT 1 FROM publication_suppressions ps
+      WHERE ${ACTIVE_SUPPRESSION}
+        AND (
+          ps.resolved_claim_id = rc.id
+          OR (
+            ps.resolved_assignment_id IS NULL AND ps.resolved_claim_id IS NULL
+            AND (ps.resolution_run_id IS NULL OR ps.resolution_run_id = a.resolution_run_id)
+            AND ps.prefix_bits = rc.prefix_bits AND ps.prefix_length = rc.prefix_length
+            AND ps.surface IN ('curated', 'both')
+            AND (ps.source_slug IS NULL OR ps.source_slug = rc.source_slug)
+          )
+        )
+    )
+  ORDER BY rc.prefix_length DESC,
+    CASE rc.verification_status
+      WHEN 'reviewed' THEN 1 WHEN 'corroborated' THEN 2
+      WHEN 'single_observation' THEN 3 ELSE 4
+    END,
+    rc.claim_type, rc.source_slug, rc.id
+  LIMIT 51
+`;
+
 export async function lookupMac(pool: Pool, mac: NormalizedMac, mode: "all" | "official"): Promise<LookupResult> {
-  const result = await pool.query<LookupRow>(LOOKUP_SQL, [mac.value.toString(), mode === "official"]);
+  const [result, insightResult] = await Promise.all([
+    pool.query<LookupRow>(LOOKUP_SQL, [mac.value.toString(), mode === "official"]),
+    mode === "official"
+      ? Promise.resolve({ rows: [] as InsightRow[] })
+      : pool.query<InsightRow>(INSIGHTS_SQL, [mac.value.toString()]),
+  ]);
 
   const first = result.rows[0];
   if (!first) throw new DataReleaseUnavailableError();
@@ -198,10 +255,23 @@ export async function lookupMac(pool: Pool, mac: NormalizedMac, mode: "all" | "o
     }];
   });
 
+  const insights = insightResult.rows.map<LookupInsight>((row) => ({
+    claimId: `clm_${row.id}`,
+    prefix: formatPrefix(BigInt(row.prefix_bits), row.prefix_length),
+    prefixLength: row.prefix_length,
+    claimType: row.claim_type,
+    organizationName: row.organization_name,
+    details: row.claim_value,
+    verificationStatus: row.verification_status,
+    source: { slug: row.source_slug, sourceReleaseId: `sr_${row.source_release_id}` },
+  }));
+
   return {
     assignment,
     curatedMatches: allClaims.slice(0, 20),
     curatedMatchesTruncated: allClaims.length > 20,
+    insights: insights.slice(0, 50),
+    insightsTruncated: insights.length > 50,
     data,
   };
 }

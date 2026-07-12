@@ -8,10 +8,10 @@ export default function DataSourcesPage() {
     <section className="shell content-page">
       <p className="eyebrow">Transparency</p>
       <h1>Data sources</h1>
-      <p className="lead">The active resolution inputs for this deployment are shown live. The repository does not contain an IEEE snapshot.</p>
+      <p className="lead">The active resolution inputs are shown live. Authoritative assignments, protocol usage, historical aliases, and reviewed enrichment remain separate.</p>
       <ReleaseView sourcesOnly />
       <div className="callout warning">
-        IEEE use is not presented as risk-free or endorsed by IEEE. The tension between the 2013 and 2014 statements, the API-output scope, and mandatory controls are preserved in the rights review record. Verify active inputs on the Data release page.
+        No source is presented as risk-free or as an endorsement. IEEE residual risk, CC0 registries, licensed history, exact identity mappings, API-output scope, and mandatory controls are preserved in separate rights reviews. Verify active inputs on the Data release page.
       </div>
     </section>
   );

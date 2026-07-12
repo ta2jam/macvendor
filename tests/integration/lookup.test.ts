@@ -64,12 +64,53 @@ describe("database lookup", () => {
       organizationName: "Example Devices Community",
       conflictStatus: "agrees",
     });
+    expect(result.insights).toEqual([]);
   });
 
   it("supports official-only mode", async () => {
     const result = await lookupMac(pool, normalizeMac("02AABBCC0001"), "official");
     expect(result.assignment).not.toBeNull();
     expect(result.curatedMatches).toEqual([]);
+    expect(result.insights).toEqual([]);
+  });
+
+  it("returns protocol and enrichment claims through the separate insights layer", async () => {
+    const context = await pool.query<{ run_id: string; release_id: string }>(
+      `SELECT ar.resolution_run_id AS run_id, sr.id AS release_id
+       FROM active_resolution ar CROSS JOIN LATERAL (
+         SELECT sr.id FROM source_releases sr JOIN data_sources ds ON ds.id = sr.source_id
+         WHERE ds.slug = 'demo-curated' LIMIT 1
+       ) sr WHERE ar.singleton_id = 1`,
+    );
+    const recordId = crypto.randomUUID();
+    const claimId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO source_records (
+        id, source_release_id, record_kind, record_status, prefix_bits, prefix_length,
+        claim_value, origin_type, rights_basis, distribution_scope, verification_status,
+        evidence_reference, raw_record_hash, raw_locator
+      ) VALUES ($1, $2, 'usage_note', 'eligible', $3, 40,
+        '{"usage":"Integration protocol"}'::jsonb, 'imported', 'owner_created',
+        'api_output', 'reviewed', 'integration', $4, 'insight:test')`,
+      [recordId, context.rows[0]!.release_id, prefixBits(0x02aabbcc0000n, 40).toString(), sha256("insight:test")],
+    );
+    await pool.query(
+      `INSERT INTO resolved_claims (
+        id, resolution_run_id, claim_type, prefix_bits, prefix_length, claim_value,
+        verification_status, origin_type, conflict_status, source_record_id, source_slug, source_release_id
+      ) VALUES ($1, $2, 'usage_note', $3, 40, '{"usage":"Integration protocol"}'::jsonb,
+        'reviewed', 'imported', 'not_evaluated', $4, 'demo-curated', $5)`,
+      [claimId, context.rows[0]!.run_id, prefixBits(0x02aabbcc0000n, 40).toString(), recordId, context.rows[0]!.release_id],
+    );
+    try {
+      const result = await lookupMac(pool, normalizeMac("02AABBCC0001"), "all");
+      expect(result.insights).toEqual([expect.objectContaining({
+        claimType: "usage_note", prefixLength: 40, details: { usage: "Integration protocol" },
+      })]);
+    } finally {
+      await pool.query("DELETE FROM resolved_claims WHERE id = $1", [claimId]);
+      await pool.query("DELETE FROM source_records WHERE id = $1", [recordId]);
+    }
   });
 
   it("returns a valid empty lookup without treating it as an error", async () => {
@@ -508,7 +549,8 @@ describe("resolution publication lifecycle", () => {
 });
 
 async function writePreparedIeeeSnapshot(directory: string, preparedAt: string): Promise<PreparedIeeeSnapshot> {
-  const prefixes = { "MA-L": "001122", "MA-M": "AABBCCD", "MA-S": "DDEEFF001" } as const;
+  const prefixes = { "MA-L": "001122", "MA-M": "AABBCCD", "MA-S": "DDEEFF001",
+    IAB: "123456789", CID: "ABCDEF" } as const;
   const datasets = [];
   for (const dataset of IEEE_DATASETS) {
     const csv = [
@@ -522,7 +564,7 @@ async function writePreparedIeeeSnapshot(directory: string, preparedAt: string):
       source: {
         slug: dataset.slug, name: dataset.name, class: "authoritative", publishMode: "production",
         adapterKey: IEEE_ADAPTER_KEY, fetchPolicy: "scheduled", fetchIntervalSeconds: 86_400,
-        maxAcceptableAgeSeconds: 172_800, requiredForActivation: true,
+        maxAcceptableAgeSeconds: 172_800, requiredForActivation: dataset.requiredForActivation,
         rights: { status: "approved", basis: "public_domain_claim", distributionScope: "api_output",
           reviewReference: IEEE_RIGHTS_REVIEW, reviewExpiresAt: "2027-07-11T00:00:00.000Z" },
       },
@@ -560,8 +602,8 @@ describe("guarded IEEE update", () => {
         purge,
       };
       const first = await updateIeeeSources(pool, { ...common, prepare: async () => prepared });
-      expect(first).toMatchObject({ status: "updated", build: { status: "validated", assignmentCount: 3 },
-        activation: { status: "activated" }, observations: { recorded: 3, activeRecorded: 0, observedAt: firstPreparedAt },
+      expect(first).toMatchObject({ status: "updated", build: { status: "validated", assignmentCount: 6 },
+        activation: { status: "activated" }, observations: { recorded: 5, activeRecorded: 0, observedAt: firstPreparedAt },
         cachePurge: { observation: { status: "skipped", reason: "no_active_change" },
           activation: { status: "purged" } } });
       const firstReleaseResponse = await dataReleaseRoute(new NextRequest("http://localhost:3000/v1/data-release"));
@@ -574,7 +616,7 @@ describe("guarded IEEE update", () => {
         prepare: async () => ({ ...prepared, preparedAt: secondPreparedAt }) });
       expect(second).toMatchObject({ status: "updated", build: { status: "already_built" },
         activation: { status: "already_active" },
-        observations: { recorded: 3, activeRecorded: 3, observedAt: secondPreparedAt },
+        observations: { recorded: 5, activeRecorded: 5, observedAt: secondPreparedAt },
         cachePurge: { observation: { status: "purged", surrogateKeys: ["data-release"] },
           activation: { status: "skipped", reason: "no_change" } } });
       if (first.status !== "updated" || second.status !== "updated") throw new Error("unexpected update status");
@@ -602,7 +644,7 @@ describe("guarded IEEE update", () => {
          WHERE ds.slug = ANY($1::text[])`,
         [IEEE_DATASETS.map((dataset) => dataset.slug)],
       );
-      expect(counts.rows[0]).toEqual({ releases: "3", observations: "6" });
+      expect(counts.rows[0]).toEqual({ releases: "5", observations: "10" });
       await expect(pool.query("UPDATE source_fetch_observations SET actor_id = 'tampered'"))
         .rejects.toThrow(/append-only/);
       const health = await checkSourceGovernance(pool, { now: new Date(secondPreparedAt) });
@@ -656,7 +698,7 @@ describe("guarded IEEE update", () => {
       policyVersion: "v0.0.13-test", policyCommitSha: "integration-ieee-invalid",
       containerImageDigest: "sha256:integration-ieee-invalid", actorId: "operator:integration",
       prepare: async () => ({ status: "prepared", preparedAt: new Date().toISOString(), output: "fixture", datasets: [] }),
-    })).rejects.toThrow(/exactly three/);
+    })).rejects.toThrow(/exactly 5/);
     await expect(pool.query<{ resolution_run_id: string; version: string }>(
       "SELECT resolution_run_id, version FROM active_resolution WHERE singleton_id = 1",
     )).resolves.toMatchObject({ rows: before.rows });

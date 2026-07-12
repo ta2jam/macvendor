@@ -146,7 +146,7 @@ export function resolveRecords(records: ResolverRecord[]): ResolutionDraft {
     ["curated_vendor_claim", "vendor_alias", "device_hint", "usage_note"].includes(record.recordKind));
   const claims: ResolvedClaimDraft[] = claimRecords.map((record) => {
     const official = matchingAssignment(record, assignments);
-    const evaluatesOrganization = record.recordKind === "curated_vendor_claim" || record.recordKind === "vendor_alias";
+    const evaluatesOrganization = record.recordKind === "curated_vendor_claim";
     const conflictStatus = !evaluatesOrganization
       ? "not_evaluated"
       : !official

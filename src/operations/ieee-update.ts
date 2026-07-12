@@ -100,7 +100,7 @@ function validatePreparedSnapshot(prepared: PreparedIeeeSnapshot): Date {
     throw new Error("IEEE preparation timestamp is invalid or more than five minutes in the future");
   }
   if (prepared.datasets.length !== IEEE_DATASETS.length) {
-    throw new Error("IEEE preparation must produce exactly three datasets");
+    throw new Error(`IEEE preparation must produce exactly ${IEEE_DATASETS.length} datasets`);
   }
   for (const expected of IEEE_DATASETS) {
     const matches = prepared.datasets.filter((dataset) => dataset.registry === expected.registry);
@@ -124,6 +124,17 @@ export async function updateIeeeSources(pool: Pool, options: UpdateIeeeOptions) 
     const observedAt = validatePreparedSnapshot(prepared);
     const imports = [];
     for (const dataset of prepared.datasets) imports.push(await importSourceRelease(pool, dataset.manifestPath));
+    const retained = await lock.query<{ source_release_id: string }>(
+      `SELECT ri.source_release_id
+       FROM active_resolution ar
+       JOIN resolution_inputs ri ON ri.resolution_run_id = ar.resolution_run_id
+       JOIN source_releases sr ON sr.id = ri.source_release_id
+       JOIN data_sources ds ON ds.id = sr.source_id
+       WHERE ar.singleton_id = 1 AND ds.slug <> ALL($1::text[])
+         AND ds.publish_mode = 'production' AND ds.source_class <> 'reference'
+       ORDER BY ds.slug`,
+      [IEEE_DATASETS.map((dataset) => dataset.slug)],
+    );
     const observations = await recordObservations(lock, prepared, imports, options.actorId, observedAt);
     const purge = options.purge ?? purgeSurrogateKeys;
     let observationCachePurge;
@@ -139,7 +150,7 @@ export async function updateIeeeSources(pool: Pool, options: UpdateIeeeOptions) 
       );
     }
     const build = await buildResolution(pool, {
-      sourceReleaseIds: imports.map((item) => item.sourceReleaseId),
+      sourceReleaseIds: [...imports.map((item) => item.sourceReleaseId), ...retained.rows.map((row) => row.source_release_id)],
       policyVersion: options.policyVersion,
       policyCommitSha: options.policyCommitSha,
       containerImageDigest: options.containerImageDigest,

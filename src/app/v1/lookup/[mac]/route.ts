@@ -55,7 +55,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       },
       ...result,
     };
-    const positive = Boolean(result.assignment || result.curatedMatches.length);
+    const positive = Boolean(result.assignment || result.curatedMatches.length || result.insights.length);
     return jsonResponse(request, body, {
       requestId: id,
       cacheControl: positive

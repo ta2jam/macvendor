@@ -13,7 +13,7 @@ import { RECORD_NORMALIZER_VERSION, SOURCE_SCHEMA_VERSION } from "@/importer/ver
 const MAX_BYTES = 20 * 1024 * 1024;
 
 export interface PreparedIeeeDataset {
-  registry: "MA-L" | "MA-M" | "MA-S";
+  registry: "MA-L" | "MA-M" | "MA-S" | "IAB" | "CID";
   manifestPath: string;
   contentHash: string;
   records: number;
@@ -76,7 +76,7 @@ export async function prepareIeeeSources(options: PrepareIeeeOptions = {}): Prom
       source: {
         slug: dataset.slug, name: dataset.name, class: "authoritative", publishMode: "production",
         adapterKey: IEEE_ADAPTER_KEY, fetchPolicy: "scheduled", fetchIntervalSeconds: 86_400,
-        maxAcceptableAgeSeconds: 172_800, requiredForActivation: true,
+        maxAcceptableAgeSeconds: 172_800, requiredForActivation: dataset.requiredForActivation,
         homepageUrl: "https://standards.ieee.org/products-programs/regauth/",
         termsUrl: "https://standards.ieee.org/faqs/regauth/",
         rights: { status: "approved", basis: "public_domain_claim", distributionScope: "api_output",

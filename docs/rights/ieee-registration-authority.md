@@ -11,7 +11,7 @@ IEEE endorsement.
 ## Intended use
 
 macvendor periodically retrieves the IEEE Registration Authority MA-L, MA-M,
-and MA-S public CSV listings directly from `standards-oui.ieee.org`, stores an
+MA-S, legacy IAB, and CID public CSV listings directly from `standards-oui.ieee.org`, stores an
 immutable hash-pinned operator-signed snapshot, normalizes assignment rows, and
 returns selected prefix and organization fields through the public lookup API.
 Raw or bulk IEEE dataset redistribution is not approved by this decision.
@@ -43,7 +43,7 @@ they do not erase the later dataset-specific clarification.
 ## Decision 2026-07-11
 
 The repository owner explicitly accepted the residual legal risk on 2026-07-11.
-For macvendor's engineering gates, MA-L, MA-M, and MA-S are therefore classified
+For macvendor's engineering gates, MA-L, MA-M, MA-S, legacy IAB, and CID are therefore classified
 as:
 
 - `rights_status=approved`;
@@ -52,12 +52,12 @@ as:
 - `rights_review_reference=docs/rights/ieee-registration-authority.md#decision-2026-07-11`.
 
 This approval covers derived lookup responses only. It does not approve a raw
-download endpoint, third-party mirrors, IAB/CID ingestion, IEEE logo use, or a
+download endpoint, third-party mirrors, IEEE logo use, or a
 claim that IEEE sponsors or certifies macvendor.
 
 ## Mandatory controls
 
-- Retrieve only the three fixed official HTTPS CSV URLs; do not use KIT,
+- Retrieve only the five fixed official HTTPS CSV URLs; do not use KIT,
   GitHub mirrors, Debian package payloads, or commercial lookup services as the
   production source.
 - Pin every raw artifact with SHA-256 and sign it with the operator Ed25519
@@ -81,3 +81,12 @@ claim that IEEE sponsors or certifies macvendor.
 Issue [#8](https://github.com/ta2jam/macvendor/issues/8) may close only after the
 adapter, real import, deterministic resolution, lookup tests, and release gates
 pass.
+
+## Group MAC decision 2026-07-12
+
+The public Standards Group MAC listing consists of protocol and standards
+assignments published by IEEE for public implementation. The owner accepts the
+residual risk created by the absence of a dataset-specific modern license page.
+It is approved only for derived `usage_note` API output with the same hashing,
+operator signing, attribution, annual review, suppression, and no-raw-download
+controls above. Group entries never become device-vendor assignments.

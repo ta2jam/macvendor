@@ -25,6 +25,16 @@ interface ApiResult {
     conflictStatus: string;
     source: { slug: string; sourceReleaseId: string };
   }>;
+  insights: Array<{
+    claimId: string;
+    prefix: string;
+    prefixLength: number;
+    claimType: "vendor_alias" | "device_hint" | "usage_note";
+    organizationName: string | null;
+    details: Record<string, unknown>;
+    verificationStatus: string;
+    source: { slug: string; sourceReleaseId: string };
+  }>;
   data: { activeVersion: number; policyVersion: string; generatedAt: string };
 }
 
@@ -159,6 +169,28 @@ export function LookupForm() {
                 </article>
               ))}
             </section>
+
+            {result.insights.length > 0 && (
+              <section className="curated-section">
+                <div className="result-heading">
+                  <div>
+                    <p className="eyebrow">Protocol and enrichment layer</p>
+                    <h2>Additional context</h2>
+                  </div>
+                  <span>{result.insights.length}</span>
+                </div>
+                {result.insights.map((insight) => (
+                  <article className="claim" key={insight.claimId}>
+                    <div>
+                      <strong>{insight.organizationName
+                        ?? String(insight.details.usage ?? insight.details.platform ?? insight.claimType)}</strong>
+                      <p>{insight.prefix}/{insight.prefixLength} · {insight.source.slug}</p>
+                    </div>
+                    <span>{insight.claimType.replaceAll("_", " ")}</span>
+                  </article>
+                ))}
+              </section>
+            )}
           </div>
         )}
       </div>

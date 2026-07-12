@@ -53,10 +53,25 @@
         "source": { "$ref": "#/$defs/SourceReference" }
       }
     },
+    "LookupInsight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claimId", "prefix", "prefixLength", "claimType", "organizationName", "details", "verificationStatus", "source"],
+      "properties": {
+        "claimId": { "type": "string", "pattern": "^clm_[0-9a-f-]+$" },
+        "prefix": { "type": "string", "pattern": "^[0-9A-F]{1,12}$" },
+        "prefixLength": { "type": "integer", "minimum": 1, "maximum": 48 },
+        "claimType": { "type": "string", "enum": ["vendor_alias", "device_hint", "usage_note"] },
+        "organizationName": { "type": ["string", "null"] },
+        "details": { "type": "object" },
+        "verificationStatus": { "type": "string", "enum": ["reviewed", "corroborated", "single_observation", "unverified"] },
+        "source": { "$ref": "#/$defs/SourceReference" }
+      }
+    },
     "LookupResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["query", "assignment", "curatedMatches", "curatedMatchesTruncated", "data"],
+      "required": ["query", "assignment", "curatedMatches", "curatedMatchesTruncated", "insights", "insightsTruncated", "data"],
       "properties": {
         "query": {
           "type": "object",
@@ -79,6 +94,8 @@
         "assignment": { "oneOf": [{ "$ref": "#/$defs/Assignment" }, { "type": "null" }] },
         "curatedMatches": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/CuratedMatch" } },
         "curatedMatchesTruncated": { "type": "boolean" },
+        "insights": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/LookupInsight" } },
+        "insightsTruncated": { "type": "boolean" },
         "data": { "$ref": "#/$defs/ReleaseData" }
       }
     },

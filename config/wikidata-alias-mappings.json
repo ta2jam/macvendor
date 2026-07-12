@@ -1,0 +1,9 @@
+[
+  { "qid": "Q312", "registeredNames": ["Apple, Inc."] },
+  { "qid": "Q173395", "registeredNames": ["Cisco Systems, Inc", "Cisco Systems, Inc."] },
+  { "qid": "Q2283", "registeredNames": ["Microsoft Corporation", "Microsoft Corp."] },
+  { "qid": "Q248", "registeredNames": ["Intel Corporation"] },
+  { "qid": "Q20718", "registeredNames": ["Samsung Electronics Co.,Ltd", "Samsung Electronics Co., Ltd."] },
+  { "qid": "Q160120", "registeredNames": ["HUAWEI TECHNOLOGIES CO.,LTD", "Huawei Technologies Co., Ltd."] },
+  { "qid": "Q95", "registeredNames": ["Google, Inc.", "Google LLC"] }
+]
