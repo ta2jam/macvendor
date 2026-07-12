@@ -54,7 +54,7 @@
   },
   "dependencies": {
     "csv-parse": "^7.0.1",
-    "dotenv": "17.2.3",
+    "dotenv": "17.4.2",
     "next": "16.2.10",
     "pg": "8.22.0",
     "react": "19.2.7",
