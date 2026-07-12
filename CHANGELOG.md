@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.3.1 — 2026-07-12
+
+- Raised the bounded IEEE download wall-time from 30 to 90 seconds after the
+  production route measured 58.6 seconds for the direct 3.8 MB MA-L snapshot.
+- Made scheduled source-update shells fail immediately when IEEE preparation
+  fails instead of starting a dependent enrichment step with missing files.
+- Allowed first-run systemd jobs to create their source-work path without a
+  mount-namespace setup failure.
+
 ## 0.3.0 — 2026-07-12
 
 - Added ten governed sources: Wireshark well-known addresses; official Hyper-V,

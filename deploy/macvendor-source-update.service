@@ -12,4 +12,4 @@ IOSchedulingPriority=7
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=full
-ReadWritePaths=/srv/sites/macvendor/source-work /srv/sites/macvendor/releases
+ReadWritePaths=-/srv/sites/macvendor/source-work /srv/sites/macvendor/releases

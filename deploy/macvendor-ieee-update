@@ -14,6 +14,7 @@ docker run --rm \
   -v "$ROOT/source-work:/work" \
   -v "$ROOT/secrets/ingest-private.pem:/run/secrets/ingest-private.pem:ro" \
   --entrypoint sh macvendor-tooling:current -lc "
+    set -eu
     encoded=\"\$(node -e \"process.stdout.write(encodeURIComponent(process.env.POSTGRES_PASSWORD))\")\"
     export DATABASE_URL=\"postgresql://macvendor:\${encoded}@database:5432/macvendor\"
     npm run source:update:ieee -- --output /work/$(basename "$WORK") --private-key /run/secrets/ingest-private.pem
