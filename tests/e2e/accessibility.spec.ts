@@ -80,6 +80,17 @@ test.describe("public accessibility surface", () => {
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
   });
 
+  test("both homepage version labels open the GitHub repository in a new tab", async ({ page }) => {
+    await page.goto("/");
+    const links=page.getByRole("link", { name:/View macvendor v.+ on GitHub/ });
+    await expect(links).toHaveCount(2);
+    for (const link of await links.all()) {
+      await expect(link).toHaveAttribute("href", "https://github.com/ta2jam/macvendor");
+      await expect(link).toHaveAttribute("target", "_blank");
+      await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    }
+  });
+
   test("correction page never claims intake is available without configuration", async ({ page }) => {
     await page.goto("/data-corrections");
     await expect(page.getByText("The correction intake channel is not configured for this deployment."))

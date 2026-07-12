@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.3.2 — 2026-07-12
+
+- Linked both homepage version labels to the public GitHub repository, opening
+  in a new tab with explicit opener isolation and browser coverage.
+
 ## 0.3.1 — 2026-07-12
 
 - Raised the bounded IEEE download wall-time from 30 to 90 seconds after the

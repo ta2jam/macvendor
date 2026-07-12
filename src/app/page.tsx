@@ -1,5 +1,6 @@
 import { LookupForm } from "@/components/lookup-form";
 import { APP_VERSION } from "@/lib/version";
+import { GITHUB_REPOSITORY_URL } from "@/lib/project";
 
 export default function HomePage() {
   return (
@@ -14,7 +15,8 @@ export default function HomePage() {
             </p>
           </div>
           <div className="stat-card" aria-label={`v${APP_VERSION} feature summary`}>
-            <span>v{APP_VERSION}</span>
+            <a href={GITHUB_REPOSITORY_URL} target="_blank" rel="noopener noreferrer"
+              aria-label={`View macvendor v${APP_VERSION} on GitHub`}>v{APP_VERSION}</a>
             <strong>36 → 28 → 24 bit</strong>
             <p>Fixed candidate set, versioned results, and explicit provenance.</p>
           </div>

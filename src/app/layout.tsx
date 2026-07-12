@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { APP_VERSION } from "@/lib/version";
+import { GITHUB_REPOSITORY_URL } from "@/lib/project";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -45,7 +46,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 <Link href="/data-corrections">Report a correction</Link>
               </div>
             </div>
-            <span>v{APP_VERSION}</span>
+            <a className="footer-version" href={GITHUB_REPOSITORY_URL} target="_blank" rel="noopener noreferrer"
+              aria-label={`View macvendor v${APP_VERSION} on GitHub`}>v{APP_VERSION}</a>
           </div>
         </footer>
       </body>
