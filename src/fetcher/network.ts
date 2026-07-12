@@ -45,7 +45,8 @@ function parseIpv6(address: string): bigint | null {
   if (halves.length > 2) return null;
   const left = halves[0] ? halves[0].split(":") : [];
   const right = halves[1] ? halves[1].split(":") : [];
-  if ((halves.length === 1 && left.length !== 8) || left.length + right.length > 7) return null;
+  if ((halves.length === 1 && left.length !== 8)
+    || (halves.length === 2 && left.length + right.length > 7)) return null;
   const groups = [...left, ...Array(8 - left.length - right.length).fill("0"), ...right];
   if (groups.length !== 8 || groups.some((group) => !/^[0-9a-f]{1,4}$/.test(group))) return null;
   return groups.reduce((result, group) => (result << 16n) | BigInt(`0x${group}`), 0n);

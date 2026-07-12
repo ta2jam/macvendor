@@ -79,6 +79,7 @@ describe("HTTPS fetch boundary", () => {
     expect(isPublicAddress("10.0.0.1")).toBe(false);
     expect(isPublicAddress("127.0.0.1")).toBe(false);
     expect(isPublicAddress("2001:4860:4860::8888")).toBe(true);
+    expect(isPublicAddress("2606:4700:90:0:f22e:fbec:5bed:a9b9")).toBe(true);
     expect(isPublicAddress("::1")).toBe(false);
     expect(isPublicAddress("2001:db8::1")).toBe(false);
   });

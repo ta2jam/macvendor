@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.4.1 — 2026-07-12
+
+- Fixed full, uncompressed global IPv6 addresses being rejected by the SSRF
+  address classifier. The fail-closed bug blocked enrichment updates for
+  dual-stack GitLab and OpenDev origins even though every resolved address was
+  public; private, loopback, documentation, and mixed DNS results remain
+  blocked.
+
 ## 0.4.0 — 2026-07-12
 
 - Replaced quadratic claim-to-assignment resolution and per-row materialization
