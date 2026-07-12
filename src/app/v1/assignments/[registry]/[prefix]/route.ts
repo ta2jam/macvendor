@@ -34,7 +34,9 @@ export async function GET(
     const registry = normalizeRegistry(raw.registry);
     const prefix = parseAssignmentPrefix(raw.prefix, registry.prefixLength);
     if (raw.registry !== registry.path || raw.prefix !== prefix.canonical) {
-      const canonical = new URL(request.url);
+      const canonical = process.env.PUBLIC_ORIGIN
+        ? new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, process.env.PUBLIC_ORIGIN)
+        : new URL(request.url);
       canonical.pathname = `/v1/assignments/${registry.path}/${prefix.canonical}`;
       return redirectResponse(canonical, id);
     }

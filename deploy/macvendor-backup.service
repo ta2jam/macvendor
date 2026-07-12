@@ -1,0 +1,15 @@
+[Unit]
+Description=Verified macvendor PostgreSQL backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/flock -n /run/macvendor-backup.lock /usr/local/sbin/macvendor-backup
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/srv/sites/macvendor/backups /run

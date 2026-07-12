@@ -235,6 +235,19 @@ describe("lookup route", () => {
     expect(response.headers.get("location")).toBe("http://localhost:3000/v1/lookup/02AABBCC0001");
   });
 
+  it("uses the configured public origin for canonical redirects behind a proxy", async () => {
+    const previous = process.env.PUBLIC_ORIGIN;
+    process.env.PUBLIC_ORIGIN = "https://macvendor.io";
+    try {
+      const request = new NextRequest("http://0.0.0.0:3000/v1/lookup/02:aa:bb:cc:00:01");
+      const response = await lookupRoute(request, { params: Promise.resolve({ mac: "02:aa:bb:cc:00:01" }) });
+      expect(response.headers.get("location")).toBe("https://macvendor.io/v1/lookup/02AABBCC0001");
+    } finally {
+      if (previous === undefined) delete process.env.PUBLIC_ORIGIN;
+      else process.env.PUBLIC_ORIGIN = previous;
+    }
+  });
+
   it("returns problem JSON for malformed input", async () => {
     const request = new NextRequest("http://localhost:3000/v1/lookup/not-a-mac");
     const response = await lookupRoute(request, { params: Promise.resolve({ mac: "not-a-mac" }) });
