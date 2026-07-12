@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.4.2 — 2026-07-12
+
+- Fixed the external production monitor's freshness parser for PostgreSQL ISO
+  timestamps with fractional seconds. The monitor now evaluates the live
+  19-source release instead of producing a false failure in `jq`.
+
 ## 0.4.1 — 2026-07-12
 
 - Fixed full, uncompressed global IPv6 addresses being rejected by the SSRF

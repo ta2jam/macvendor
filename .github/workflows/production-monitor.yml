@@ -26,7 +26,7 @@ jobs:
             https://macvendor.io/v1/data-release > release.json
           jq -e '(.sources | length) >= 19
             and all(.sources[]; .currentRightsStatus == "approved" or .currentRightsStatus == "owner_asserted")
-            and (now - (.sources | map(.observedAt | fromdateiso8601) | min) < 691200)' release.json
+            and (now - (.sources | map(.observedAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) | min) < 691200)' release.json
           links=$(curl --fail --silent --show-error --retry 3 --retry-all-errors --max-time 20 \
             https://macvendor.io/ | grep -o 'href="https://github.com/ta2jam/macvendor"' | wc -l)
           test "$links" -ge 2
