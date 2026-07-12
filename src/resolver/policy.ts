@@ -1,0 +1,4 @@
+export const RESOLUTION_POLICY_VERSION="v2";
+export const RESOLUTION_POLICY_REVISION="resolver-policy-2026-07-12-2";
+export const RESOLUTION_SCHEMA_VERSION="1";
+export const RESOLUTION_NORMALIZER_VERSION="2";

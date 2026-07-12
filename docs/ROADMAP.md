@@ -3,9 +3,9 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.3.0 governed multi-source release
+## Current — 0.4.0 governed multi-source operations
 
-The 0.3.0 milestone publishes governed IEEE assignments, separately labelled
+The current release publishes governed IEEE assignments, separately labelled
 MAC context, and reviewed organization identities. Production releases must be tagged from a
 commit reachable from `main` and pass the release gate. Shared rate limiting
 and accountable correction intake are PostgreSQL-backed.
@@ -80,6 +80,13 @@ and accountable correction intake are PostgreSQL-backed.
   PostgreSQL buffer/I/O, Node CPU, and peak RSS baseline; deployment SLO and
   capacity remain intentionally unset until target infrastructure and traffic
   concurrency are known — issue #23;
+- [x] indexed resolver matching and batch materialization with unchanged-output
+  regression evidence;
+- [x] stable resolution-policy revision independent of application releases;
+- [x] correction key rotation, queue-SLA timer, bounded host backup retention,
+  external production probes, and CodeQL scanning;
+- [x] release synchronization verification across local, GitHub, release tag,
+  public health metadata, and the active VPS release marker.
 
 ## After data readiness
 

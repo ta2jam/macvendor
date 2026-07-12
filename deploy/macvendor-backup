@@ -2,7 +2,7 @@
 set -eu
 
 backup_dir=/srv/sites/macvendor/backups
-timestamp=$(date -u +%Y%m%dT%H%M%SZ)
+timestamp=$(date -u +%Y%m%dT%H%M%S-%NZ)
 partial="$backup_dir/macvendor-$timestamp.dump.partial"
 final="$backup_dir/macvendor-$timestamp.dump"
 
@@ -14,3 +14,13 @@ docker exec -i -u postgres macvendor-database-1 \
 mv "$partial" "$final"
 sha256sum "$final" > "$final.sha256"
 find "$backup_dir" -type f -name 'macvendor-*.dump*' -mtime +14 -delete
+
+# Releases can create pre- and post-deploy backups in addition to the daily
+# backup. Bound same-disk usage even during a busy release period.
+find "$backup_dir" -type f -name 'macvendor-*.dump' -printf '%T@ %p\n' \
+  | sort -rn \
+  | sed -n '21,$p' \
+  | cut -d ' ' -f 2- \
+  | while IFS= read -r stale; do
+      rm -f "$stale" "$stale.sha256"
+    done

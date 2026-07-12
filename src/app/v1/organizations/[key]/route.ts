@@ -13,7 +13,7 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{key:stri
   try {
     const body=await getOrganization(getPool(),key);
     if(!body)return problemResponse({status:404,code:"ORGANIZATION_NOT_FOUND",title:"Organization not found",detail:"No active reviewed organization has this key.",requestId:id});
-    return jsonResponse(request,body,{requestId:id,cacheControl:"public, max-age=300, s-maxage=3600",etagSeed:`${key}:${JSON.stringify(body)}`});
+    return jsonResponse(request,body,{requestId:id,cacheControl:"public, max-age=60, s-maxage=300",etagSeed:`${key}:${JSON.stringify(body)}`});
   } catch (error) {
     console.error("organization lookup failed", { requestId:id,error });
     return problemResponse({status:503,code:"SERVICE_UNAVAILABLE",title:"Service unavailable",detail:"Organization lookup is temporarily unavailable.",requestId:id});

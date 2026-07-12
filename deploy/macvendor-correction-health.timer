@@ -1,0 +1,11 @@
+[Unit]
+Description=Check macvendor correction queue SLA hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=10m
+Unit=macvendor-correction-health.service
+
+[Install]
+WantedBy=timers.target

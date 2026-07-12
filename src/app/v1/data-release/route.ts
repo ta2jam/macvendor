@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       .map((source) => `${source.slug}:${source.configVersion}:${source.currentRightsStatus}:${source.observedAt}`).join("|");
     return jsonResponse(request, result, {
       requestId: id,
-      cacheControl: "public, max-age=60, s-maxage=300",
+      cacheControl: "public, max-age=30, s-maxage=60",
       etagSeed: `${result.activeVersion}:${result.publicationVersion}:${sourceVersions}`,
       surrogateKeys: [resolutionSurrogateKey(result.resolvedReleaseId), DATA_RELEASE_SURROGATE_KEY],
     });

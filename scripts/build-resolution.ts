@@ -1,8 +1,7 @@
 import "./env";
-import { execFileSync } from "node:child_process";
-import { APP_VERSION } from "../src/lib/version";
 import { createPool } from "../src/db/pool";
 import { buildResolution, ResolutionBuildError } from "../src/resolver/build";
+import { RESOLUTION_POLICY_REVISION,RESOLUTION_POLICY_VERSION } from "../src/resolver/policy";
 
 const args = process.argv.slice(2);
 const releaseIds: string[] = [];
@@ -20,8 +19,8 @@ const pool = createPool(url);
 try {
   const result = await buildResolution(pool, {
     sourceReleaseIds: releaseIds,
-    policyVersion: `v${APP_VERSION}`,
-    policyCommitSha: process.env.GIT_COMMIT_SHA ?? execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+    policyVersion: RESOLUTION_POLICY_VERSION,
+    policyCommitSha: RESOLUTION_POLICY_REVISION,
     containerImageDigest: process.env.BUILD_IMAGE_DIGEST ?? "local",
   });
   console.log(JSON.stringify(result, null, 2));

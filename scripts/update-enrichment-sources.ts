@@ -1,5 +1,4 @@
 import "./env";
-import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { getPool } from "../src/db/pool";
 import { importSourceRelease } from "../src/importer/import-source";
@@ -9,7 +8,7 @@ import { buildResolution } from "../src/resolver/build";
 import { checkSourceGovernance } from "../src/operations/source-health";
 import { prepareEnrichmentSources } from "../src/sources/prepare-enrichments";
 import { DATA_RELEASE_SURROGATE_KEY,purgeSurrogateKeys,resolutionSurrogateKey } from "../src/cache/surrogate";
-import { APP_VERSION } from "../src/lib/version";
+import { RESOLUTION_POLICY_REVISION,RESOLUTION_POLICY_VERSION } from "../src/resolver/policy";
 
 const values=new Map<string,string>();
 for(let index=0;index<process.argv.slice(2).length;index+=2){
@@ -54,7 +53,7 @@ try{
     await lock.query("COMMIT");
   }catch(error){await lock.query("ROLLBACK");throw error;}
   const build=await buildResolution(pool,{sourceReleaseIds:[...imports.map((item)=>item.sourceReleaseId),...retained.rows.map((row)=>row.source_release_id)],
-    policyVersion:`v${APP_VERSION}`,policyCommitSha:process.env.GIT_COMMIT_SHA??execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim(),
+    policyVersion:RESOLUTION_POLICY_VERSION,policyCommitSha:RESOLUTION_POLICY_REVISION,
     containerImageDigest:process.env.BUILD_IMAGE_DIGEST??"local",now:observedAt});
   if(build.status==="rejected")throw new Error("enrichment resolution was rejected");
   const activation=await activateResolution(pool,build.resolutionRunId,{actorId:actor});

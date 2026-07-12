@@ -59,8 +59,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return jsonResponse(request, body, {
       requestId: id,
       cacheControl: positive
-        ? "public, max-age=300, s-maxage=86400, stale-while-revalidate=604800"
-        : "public, max-age=60, s-maxage=3600",
+        ? "public, max-age=60, s-maxage=300, stale-while-revalidate=60"
+        : "public, max-age=30, s-maxage=60",
       etagSeed: `${result.data.activeVersion}:${result.data.publicationVersion}:${mode}:${mac.normalized}`,
       surrogateKeys: [resolutionSurrogateKey(result.data.resolvedReleaseId), DATA_RELEASE_SURROGATE_KEY],
     });

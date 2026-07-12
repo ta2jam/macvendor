@@ -28,6 +28,7 @@ export default defineConfig({
       ...process.env,
       HOSTNAME: "127.0.0.1",
       PORT: String(port),
+      PUBLIC_ORIGIN: baseURL,
       RATE_LIMIT_ENABLED: "false",
     },
   },

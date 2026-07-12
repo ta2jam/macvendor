@@ -8,7 +8,9 @@ export type CorrectionCategory = typeof CATEGORIES[number];
 export type CorrectionStatus = typeof STATUSES[number];
 export class CorrectionValidationError extends Error {}
 
-interface EncryptedContact { v: 1; algorithm: "A256GCM"; iv: string; tag: string; ciphertext: string }
+interface EncryptedContactV1 { v: 1; algorithm: "A256GCM"; iv: string; tag: string; ciphertext: string }
+interface EncryptedContactV2 { v: 2; algorithm: "A256GCM"; keyId:string; iv: string; tag: string; ciphertext: string }
+type EncryptedContact=EncryptedContactV1|EncryptedContactV2;
 
 function invalid(message: string): never { throw new CorrectionValidationError(message); }
 
@@ -19,17 +21,34 @@ function encryptionKey(): Buffer {
   return key;
 }
 
-export function encryptCorrectionContact(email: string): EncryptedContact {
+function encryptionKeyId():string{
+  const value=process.env.CORRECTION_ENCRYPTION_KEY_ID??"primary";
+  if(!/^[A-Za-z0-9._-]{1,40}$/.test(value))throw new Error("CORRECTION_ENCRYPTION_KEY_ID is invalid");
+  return value;
+}
+
+function decryptionKey(value:EncryptedContact):Buffer{
+  if(value.v===1||value.keyId===encryptionKeyId())return encryptionKey();
+  let ring:unknown;
+  try{ring=JSON.parse(process.env.CORRECTION_DECRYPTION_KEYS??"{}");}catch{throw new Error("CORRECTION_DECRYPTION_KEYS must be valid JSON");}
+  if(!ring||typeof ring!=="object"||Array.isArray(ring))throw new Error("CORRECTION_DECRYPTION_KEYS must be a JSON object");
+  const encoded=(ring as Record<string,unknown>)[value.keyId];
+  const key=typeof encoded==="string"?Buffer.from(encoded,"base64"):Buffer.alloc(0);
+  if(key.length!==32)throw new Error(`correction decryption key is unavailable: ${value.keyId}`);
+  return key;
+}
+
+export function encryptCorrectionContact(email: string): EncryptedContactV2 {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", encryptionKey(), iv);
   const ciphertext = Buffer.concat([cipher.update(email, "utf8"), cipher.final()]);
-  return { v: 1, algorithm: "A256GCM", iv: iv.toString("base64"), tag: cipher.getAuthTag().toString("base64"),
+  return { v: 2, algorithm: "A256GCM", keyId:encryptionKeyId(),iv: iv.toString("base64"), tag: cipher.getAuthTag().toString("base64"),
     ciphertext: ciphertext.toString("base64") };
 }
 
 export function decryptCorrectionContact(value: EncryptedContact): string {
-  if (value?.v !== 1 || value.algorithm !== "A256GCM") throw new Error("unsupported correction contact ciphertext");
-  const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(value.iv, "base64"));
+  if (!value||![1,2].includes(value.v)||value.algorithm !== "A256GCM") throw new Error("unsupported correction contact ciphertext");
+  const decipher = createDecipheriv("aes-256-gcm", decryptionKey(value), Buffer.from(value.iv, "base64"));
   decipher.setAuthTag(Buffer.from(value.tag, "base64"));
   return Buffer.concat([decipher.update(Buffer.from(value.ciphertext, "base64")), decipher.final()]).toString("utf8");
 }

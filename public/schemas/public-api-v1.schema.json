@@ -164,19 +164,43 @@
     },
     "Organization": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["organizationKey", "name", "aliases", "registeredNames", "externalIdentifiers", "assignments", "assignmentsTruncated"],
       "properties": {
         "organizationKey": { "type": "string", "minLength": 1, "maxLength": 80 },
         "name": { "type": "string", "minLength": 1 },
         "aliases": { "type": "array", "items": { "type": "string" } },
         "registeredNames": { "type": "array", "items": { "type": "string" } },
-        "externalIdentifiers": { "type": "array", "items": { "type": "object" } },
-        "assignments": { "type": "array", "maxItems": 100, "items": { "type": "object" } },
+        "externalIdentifiers": { "type": "array", "items": { "$ref": "#/$defs/OrganizationIdentifier" } },
+        "assignments": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/OrganizationAssignment" } },
         "assignmentsTruncated": { "type": "boolean" }
+      }
+    },
+    "OrganizationIdentifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scheme", "identifier", "source", "details"],
+      "properties": {
+        "scheme": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "identifier": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "source": { "$ref": "#/$defs/SourceReference" },
+        "details": { "type": "object" }
+      }
+    },
+    "OrganizationAssignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registry", "prefix", "prefixLength", "organizationName"],
+      "properties": {
+        "registry": { "type": "string", "enum": ["MA-L", "MA-M", "MA-S", "IAB", "CID"] },
+        "prefix": { "type": "string", "pattern": "^[0-9A-F]{1,12}$" },
+        "prefixLength": { "type": "integer", "minimum": 1, "maximum": 48 },
+        "organizationName": { "type": "string", "minLength": 1 }
       }
     },
     "OrganizationSearchResponse": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["query", "results", "truncated"],
       "properties": {
         "query": { "type": "string" },

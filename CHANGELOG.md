@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## 0.4.0 — 2026-07-12
+
+- Replaced quadratic claim-to-assignment resolution and per-row materialization
+  with indexed longest-prefix matching and bounded JSONB batches. The governed
+  58,072-assignment/14,134-claim build fell from roughly nine minutes on the
+  production path to 4.7 seconds in the local benchmark without changing its
+  semantic output hash.
+- Decoupled the data-resolution policy revision from application commits and
+  container image digests, so UI-only releases no longer create redundant
+  resolution runs. Added an integration regression for runtime-image changes.
+- Added correction encryption-key identifiers and a backward-compatible
+  decryption ring, hourly correction-SLA checks, and bounded backup retention
+  with collision-resistant filenames.
+- Added a 15-minute external production monitor, weekly CodeQL analysis,
+  stricter organization API schemas, graceful organization-search failures,
+  baseline CSP/frame isolation, and shorter shared-cache lifetimes.
+- Fixed local WebKit CSP behavior and isolated Playwright's canonical origin;
+  the 57 applicable cross-browser/accessibility checks pass on Chromium,
+  Firefox, WebKit, and a 320 px mobile viewport.
+- Updated dotenv to 17.4.2 with a zero-vulnerability dependency audit and added
+  an explicit local/GitHub/release/production synchronization verifier.
+
 ## 0.3.2 — 2026-07-12
 
 - Linked both homepage version labels to the public GitHub repository, opening

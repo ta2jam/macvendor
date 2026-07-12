@@ -79,23 +79,27 @@ function assignmentGroupKey(record: ResolverRecord): string {
     : `EUI:${record.prefixLength}:${record.prefixBits}`;
 }
 
-function claimVerification(record: ResolverRecord, records: ResolverRecord[]): ResolvedClaimDraft["verificationStatus"] {
+function claimGroupKey(record: ResolverRecord): string {
+  return canonicalJson({ recordKind:record.recordKind,prefixBits:record.prefixBits.toString(),
+    prefixLength:record.prefixLength,organizationName:organizationKey(record.organizationName) });
+}
+
+function claimVerification(record: ResolverRecord, corroboration: Map<string,Set<string>>): ResolvedClaimDraft["verificationStatus"] {
   if (record.verificationStatus === "reviewed") return "reviewed";
-  const peers = new Set(records
-    .filter((candidate) => candidate.recordKind === record.recordKind
-      && candidate.prefixBits === record.prefixBits
-      && candidate.prefixLength === record.prefixLength
-      && organizationKey(candidate.organizationName) === organizationKey(record.organizationName))
-    .map((candidate) => candidate.sourceSlug));
-  if (peers.size >= 2) return "corroborated";
+  if ((corroboration.get(claimGroupKey(record))?.size??0) >= 2) return "corroborated";
   return record.verificationStatus === "unverified" ? "unverified" : "single_observation";
 }
 
-function matchingAssignment(claim: ResolverRecord, assignments: ResolvedAssignmentDraft[]): ResolvedAssignmentDraft | null {
-  return assignments
-    .filter((assignment) => assignment.registry !== "CID" && assignment.prefixLength <= claim.prefixLength
-      && (claim.prefixBits >> BigInt(claim.prefixLength - assignment.prefixLength)) === assignment.prefixBits)
-    .sort((left, right) => right.prefixLength - left.prefixLength)[0] ?? null;
+function assignmentLookupKey(length:number,bits:bigint):string { return `${length}:${bits}`; }
+
+function matchingAssignment(claim: ResolverRecord, index:Map<string,ResolvedAssignmentDraft>, lengths:number[]): ResolvedAssignmentDraft | null {
+  for(const length of lengths){
+    if(length>claim.prefixLength)continue;
+    const bits=claim.prefixBits>>BigInt(claim.prefixLength-length);
+    const match=index.get(assignmentLookupKey(length,bits));
+    if(match)return match;
+  }
+  return null;
 }
 
 export function resolveRecords(records: ResolverRecord[]): ResolutionDraft {
@@ -144,8 +148,17 @@ export function resolveRecords(records: ResolverRecord[]): ResolutionDraft {
 
   const claimRecords = eligible.filter((record) =>
     ["curated_vendor_claim", "vendor_alias", "device_hint", "usage_note"].includes(record.recordKind));
+  const assignmentIndex=new Map(assignments.filter((assignment)=>assignment.registry!=="CID")
+    .map((assignment)=>[assignmentLookupKey(assignment.prefixLength,assignment.prefixBits),assignment]));
+  const assignmentLengths=[...new Set(assignments.filter((assignment)=>assignment.registry!=="CID")
+    .map((assignment)=>assignment.prefixLength))].sort((left,right)=>right-left);
+  const corroboration=new Map<string,Set<string>>();
+  for(const record of claimRecords){
+    const key=claimGroupKey(record),sources=corroboration.get(key)??new Set<string>();
+    sources.add(record.sourceSlug);corroboration.set(key,sources);
+  }
   const claims: ResolvedClaimDraft[] = claimRecords.map((record) => {
-    const official = matchingAssignment(record, assignments);
+    const official = matchingAssignment(record, assignmentIndex, assignmentLengths);
     const evaluatesOrganization = record.recordKind === "curated_vendor_claim";
     const conflictStatus = !evaluatesOrganization
       ? "not_evaluated"
@@ -160,7 +173,7 @@ export function resolveRecords(records: ResolverRecord[]): ResolutionDraft {
       prefixLength: record.prefixLength,
       claimValue: record.claimValue,
       organizationName: record.organizationName,
-      verificationStatus: claimVerification(record, claimRecords),
+      verificationStatus: claimVerification(record, corroboration),
       originType: record.originType,
       conflictStatus,
       source: record,

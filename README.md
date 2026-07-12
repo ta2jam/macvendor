@@ -21,8 +21,9 @@ unverifiable “device manufacturer” string.
 </div>
 
 > [!WARNING]
-> The repository and GitHub release do not bundle an IEEE snapshot. v0.0.12 can
-> retrieve MA-L, MA-M, and MA-S directly from IEEE under the documented owner
+> The repository and GitHub releases do not bundle an IEEE snapshot. The
+> guarded source-update tooling retrieves MA-L, MA-M, and MA-S directly from
+> IEEE under the documented owner
 > risk acceptance, hash/sign/import them, and activate a derived lookup release.
 > Do not represent assignment-owner results as device identity or IEEE
 > endorsement.

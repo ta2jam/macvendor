@@ -8,7 +8,11 @@ export const dynamic="force-dynamic";
 
 export default async function OrganizationsPage({searchParams}:{searchParams:Promise<{q?:string}>}){
   const q=(await searchParams).q?.trim()??"";
-  const data=q.length>=2&&q.length<=100?await searchOrganizations(getPool(),q,10):null;
+  let data:Awaited<ReturnType<typeof searchOrganizations>>|null=null,unavailable=false;
+  if(q.length>=2&&q.length<=100){
+    try{data=await searchOrganizations(getPool(),q,10);}
+    catch(error){unavailable=true;console.error("organization page search failed",{error});}
+  }
   return <section className="shell content-page">
     <p className="eyebrow">Reviewed identity links</p><h1>Organizations</h1>
     <p className="lead">Search reviewed legal names and external identifiers. Identity links never replace IEEE address-block assignments and are not created by fuzzy matching.</p>
@@ -17,6 +21,7 @@ export default async function OrganizationsPage({searchParams}:{searchParams:Pro
       <div className="input-row"><input id="organization-query" name="q" defaultValue={q} minLength={2} maxLength={100} required />
       <button type="submit">Search</button></div>
     </form>
+    {unavailable&&<div className="problem-card" role="alert"><h2>Organization search is temporarily unavailable</h2><p>Please try again later.</p></div>}
     {data&&<div className="organization-results" aria-live="polite">
       <p>{data.results.length} reviewed organization{data.results.length===1?"":"s"} found.</p>
       {data.results.map((organization)=><article className="result-card" key={organization.organizationKey}>

@@ -12,7 +12,7 @@ export async function GET(request:NextRequest){
   if(unknown.length||q.length<2||q.length>100||!Number.isInteger(limit)||limit<1||limit>20)return problemResponse({status:400,code:"INVALID_ORGANIZATION_QUERY",title:"Invalid organization query",detail:"Use q with 2-100 characters and limit from 1 to 20.",requestId:id});
   try {
     const body=await searchOrganizations(getPool(),q,limit);
-    return jsonResponse(request,body,{requestId:id,cacheControl:"public, max-age=60, s-maxage=300",etagSeed:`${q}:${limit}:${JSON.stringify(body)}`});
+    return jsonResponse(request,body,{requestId:id,cacheControl:"public, max-age=30, s-maxage=300",etagSeed:`${q}:${limit}:${JSON.stringify(body)}`});
   } catch (error) {
     console.error("organization search failed", { requestId:id,error });
     return problemResponse({status:503,code:"SERVICE_UNAVAILABLE",title:"Service unavailable",detail:"Organization search is temporarily unavailable.",requestId:id});

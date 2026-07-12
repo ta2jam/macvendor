@@ -1,9 +1,8 @@
 import "./env";
-import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { createPool } from "../src/db/pool";
-import { APP_VERSION } from "../src/lib/version";
 import { IeeeUpdatePostCommitError, updateIeeeSources } from "../src/operations/ieee-update";
+import { RESOLUTION_POLICY_REVISION,RESOLUTION_POLICY_VERSION } from "../src/resolver/policy";
 
 const flags = new Map<string, string>();
 const values = process.argv.slice(2);
@@ -27,9 +26,8 @@ try {
       output: flags.get("--output") ? path.resolve(flags.get("--output")!) : undefined,
       privateKeyPath: flags.get("--private-key") ? path.resolve(flags.get("--private-key")!) : undefined,
       publicKeyPath: flags.get("--public-key") ? path.resolve(flags.get("--public-key")!) : undefined,
-      policyVersion: `v${APP_VERSION}`,
-      policyCommitSha: process.env.GIT_COMMIT_SHA
-        ?? execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+      policyVersion: RESOLUTION_POLICY_VERSION,
+      policyCommitSha: RESOLUTION_POLICY_REVISION,
       containerImageDigest: process.env.BUILD_IMAGE_DIGEST ?? "local",
       actorId: process.env.OPERATOR_ACTOR_ID ?? "cli:ieee-update",
     });

@@ -64,6 +64,7 @@ describe("organization identity and correction intake", () => {
       'imported','owner_created','api_output','reviewed','fixture',$3,'identity:1')`,[id,release.rows[0]!.id,sha256(`identity:${id}`)]);
     try {
       const result=await searchOrganizations(pool,"Example",10);
+      assertPublicContract("OrganizationSearchResponse",result);
       expect(result.results).toEqual([expect.objectContaining({organizationKey:"test:example",
         assignments:[expect.objectContaining({organizationName:"Example Networks Lab"})]})]);
       await pool.query("UPDATE source_records SET claim_value=jsonb_set(claim_value,'{registeredNames}','[\"Example Networks\"]'::jsonb) WHERE id=$1",[id]);
@@ -523,6 +524,16 @@ describe("resolution publication lifecycle", () => {
     const duplicate = concurrentBuild.find((result) => result.status === "already_built")!;
     expect(built).toMatchObject({ status: "validated", assignmentCount: 1, claimCount: 1, conflicts: [] });
     expect(duplicate).toMatchObject({
+      status: "already_built",
+      resolutionRunId: built.resolutionRunId,
+      inputManifestHash: built.inputManifestHash,
+      outputHash: built.outputHash,
+    });
+    const rebuiltImage = await buildResolution(pool, {
+      ...options,
+      containerImageDigest: "sha256:different-runtime-image",
+    });
+    expect(rebuiltImage).toMatchObject({
       status: "already_built",
       resolutionRunId: built.resolutionRunId,
       inputManifestHash: built.inputManifestHash,

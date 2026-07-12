@@ -8,7 +8,7 @@ import { getDataRelease, lookupMac } from "@/db/lookup";
 import { sha256 } from "@/domain/canonical-json";
 import { RECORD_NORMALIZER_VERSION, SOURCE_SCHEMA_VERSION } from "@/importer/versions";
 import { normalizeMac } from "@/domain/mac";
-import { APP_VERSION } from "@/lib/version";
+import { RESOLUTION_POLICY_REVISION,RESOLUTION_POLICY_VERSION } from "@/resolver/policy";
 import { importSourceRelease } from "@/importer/import-source";
 import { activateResolution } from "@/resolver/activation";
 import { buildResolution } from "@/resolver/build";
@@ -109,8 +109,8 @@ export async function rebuildFromSyntheticArtifacts(options: {
       const curated = await importSourceRelease(pool, curatedManifest);
       const resolution = await buildResolution(pool, {
         sourceReleaseIds: [authoritative.sourceReleaseId, curated.sourceReleaseId],
-        policyVersion: `v${APP_VERSION}`,
-        policyCommitSha: options.policyCommitSha ?? process.env.GIT_COMMIT_SHA ?? "recovery-drill-local",
+        policyVersion: RESOLUTION_POLICY_VERSION,
+        policyCommitSha: options.policyCommitSha ?? RESOLUTION_POLICY_REVISION,
         containerImageDigest: process.env.BUILD_IMAGE_DIGEST ?? "recovery-drill-local",
       });
       if (resolution.status !== "validated") {

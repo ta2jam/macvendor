@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { canonicalJson, sha256 } from "@/domain/canonical-json";
 import { resolveRecords, type ResolverRecord, type ResolutionDraft } from "./resolve";
+import { RESOLUTION_NORMALIZER_VERSION,RESOLUTION_SCHEMA_VERSION } from "./policy";
 
 export class ResolutionBuildError extends Error {
   constructor(public readonly code: string, message: string) {
@@ -110,50 +111,58 @@ function inputManifest(inputs: InputReleaseRow[]) {
 
 async function insertResolution(client: PoolClient, runId: string, draft: ResolutionDraft): Promise<void> {
   const assignmentIds = new Map<ResolutionDraft["assignments"][number], string>();
+  const assignments:Array<Record<string,unknown>>=[];
+  const evidenceRows:Array<Record<string,unknown>>=[];
   for (const assignment of draft.assignments) {
     const id = randomUUID();
     assignmentIds.set(assignment, id);
-    await client.query(
-      `INSERT INTO resolved_assignments (
-        id, resolution_run_id, registry, prefix_bits, prefix_length, organization_name,
-        organization_address, is_private, attribution_status, core_source_record_id,
-        core_source_slug, core_source_release_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-      [id, runId, assignment.registry, assignment.prefixBits.toString(), assignment.prefixLength,
-        assignment.organizationName, assignment.organizationAddress, assignment.isPrivate,
-        assignment.isPrivate ? "authoritative_private" : "authoritative",
-        assignment.core.id, assignment.core.sourceSlug, assignment.core.sourceReleaseId],
-    );
-    for (const evidence of assignment.evidence) {
-      await client.query(
-        `INSERT INTO resolution_evidence (
-          resolution_run_id, resolved_assignment_id, field_name, source_record_id, role, reason_code
-        ) VALUES ($1, $2, 'assignment', $3, $4, $5)`,
-        [runId, id, evidence.record.id, evidence.role,
-          evidence.role === "selected" ? "longest_prefix_authoritative" : "identical_authoritative_record"],
-      );
+    assignments.push({id,registry:assignment.registry,prefix_bits:assignment.prefixBits.toString(),
+      prefix_length:assignment.prefixLength,organization_name:assignment.organizationName,
+      organization_address:assignment.organizationAddress,is_private:assignment.isPrivate,
+      attribution_status:assignment.isPrivate?"authoritative_private":"authoritative",
+      core_source_record_id:assignment.core.id,core_source_slug:assignment.core.sourceSlug,
+      core_source_release_id:assignment.core.sourceReleaseId});
+    for (const evidenceItem of assignment.evidence) {
+      evidenceRows.push({resolved_assignment_id:id,source_record_id:evidenceItem.record.id,role:evidenceItem.role,
+        reason_code:evidenceItem.role==="selected"?"longest_prefix_authoritative":"identical_authoritative_record"});
     }
   }
+  for(let offset=0;offset<assignments.length;offset+=1_000)await client.query(`INSERT INTO resolved_assignments(
+    id,resolution_run_id,registry,prefix_bits,prefix_length,organization_name,organization_address,is_private,
+    attribution_status,core_source_record_id,core_source_slug,core_source_release_id)
+    SELECT x.id,$1,x.registry,x.prefix_bits::bigint,x.prefix_length,x.organization_name,x.organization_address,
+      x.is_private,x.attribution_status,x.core_source_record_id,x.core_source_slug,x.core_source_release_id
+    FROM jsonb_to_recordset($2::jsonb) AS x(id uuid,registry text,prefix_bits text,prefix_length smallint,
+      organization_name text,organization_address text,is_private boolean,attribution_status text,
+      core_source_record_id uuid,core_source_slug text,core_source_release_id uuid)`,[runId,JSON.stringify(assignments.slice(offset,offset+1_000))]);
+  for(let offset=0;offset<evidenceRows.length;offset+=1_000)await client.query(`INSERT INTO resolution_evidence(
+    resolution_run_id,resolved_assignment_id,field_name,source_record_id,role,reason_code)
+    SELECT $1,x.resolved_assignment_id,'assignment',x.source_record_id,x.role,x.reason_code
+    FROM jsonb_to_recordset($2::jsonb) AS x(resolved_assignment_id uuid,source_record_id uuid,role text,reason_code text)`,
+  [runId,JSON.stringify(evidenceRows.slice(offset,offset+1_000))]);
+  const claims:Array<Record<string,unknown>>=[];
+  const claimEvidence:Array<Record<string,unknown>>=[];
   for (const claim of draft.claims) {
     const id = randomUUID();
-    await client.query(
-      `INSERT INTO resolved_claims (
-        id, resolution_run_id, claim_type, prefix_bits, prefix_length, claim_value,
-        organization_name, verification_status, origin_type, conflict_status,
-        source_record_id, source_slug, source_release_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-      [id, runId, claim.claimType, claim.prefixBits.toString(), claim.prefixLength,
-        JSON.stringify(claim.claimValue), claim.organizationName, claim.verificationStatus,
-        claim.originType, claim.conflictStatus, claim.source.id, claim.source.sourceSlug,
-        claim.source.sourceReleaseId],
-    );
-    await client.query(
-      `INSERT INTO resolution_evidence (
-        resolution_run_id, resolved_claim_id, field_name, source_record_id, role, reason_code
-      ) VALUES ($1, $2, 'claim', $3, 'selected', 'source_claim')`,
-      [runId, id, claim.source.id],
-    );
+    claims.push({id,claim_type:claim.claimType,prefix_bits:claim.prefixBits.toString(),prefix_length:claim.prefixLength,
+      claim_value:claim.claimValue,organization_name:claim.organizationName,verification_status:claim.verificationStatus,
+      origin_type:claim.originType,conflict_status:claim.conflictStatus,source_record_id:claim.source.id,
+      source_slug:claim.source.sourceSlug,source_release_id:claim.source.sourceReleaseId});
+    claimEvidence.push({resolved_claim_id:id,source_record_id:claim.source.id});
   }
+  for(let offset=0;offset<claims.length;offset+=1_000)await client.query(`INSERT INTO resolved_claims(
+    id,resolution_run_id,claim_type,prefix_bits,prefix_length,claim_value,organization_name,verification_status,
+    origin_type,conflict_status,source_record_id,source_slug,source_release_id)
+    SELECT x.id,$1,x.claim_type,x.prefix_bits::bigint,x.prefix_length,x.claim_value,x.organization_name,
+      x.verification_status,x.origin_type,x.conflict_status,x.source_record_id,x.source_slug,x.source_release_id
+    FROM jsonb_to_recordset($2::jsonb) AS x(id uuid,claim_type text,prefix_bits text,prefix_length smallint,
+      claim_value jsonb,organization_name text,verification_status text,origin_type text,conflict_status text,
+      source_record_id uuid,source_slug text,source_release_id uuid)`,[runId,JSON.stringify(claims.slice(offset,offset+1_000))]);
+  for(let offset=0;offset<claimEvidence.length;offset+=1_000)await client.query(`INSERT INTO resolution_evidence(
+    resolution_run_id,resolved_claim_id,field_name,source_record_id,role,reason_code)
+    SELECT $1,x.resolved_claim_id,'claim',x.source_record_id,'selected','source_claim'
+    FROM jsonb_to_recordset($2::jsonb) AS x(resolved_claim_id uuid,source_record_id uuid)`,
+  [runId,JSON.stringify(claimEvidence.slice(offset,offset+1_000))]);
 }
 
 export interface BuildResolutionOptions {
@@ -214,19 +223,18 @@ export async function buildResolution(pool: Pool, options: BuildResolutionOption
       inputs: manifest,
       policyVersion: options.policyVersion,
       policyCommitSha: options.policyCommitSha,
-      schemaVersion: "1",
-      normalizerVersion: "1",
-      containerImageDigest: options.containerImageDigest,
+      schemaVersion: RESOLUTION_SCHEMA_VERSION,
+      normalizerVersion: RESOLUTION_NORMALIZER_VERSION,
       locale: "C",
       timezone: "UTC",
     }));
     const existing = await client.query<{ id: string; output_hash: string; validation_summary: { assignmentCount: number; claimCount: number } }>(
       `SELECT id, output_hash, validation_summary FROM resolution_runs
        WHERE input_manifest_hash = $1 AND policy_commit_sha = $2
-         AND schema_version = '1' AND normalizer_version = '1'
+         AND schema_version = $3 AND normalizer_version = $4
          AND status IN ('validated', 'active', 'retired')
        ORDER BY completed_at DESC LIMIT 1`,
-      [inputManifestHash, options.policyCommitSha],
+      [inputManifestHash, options.policyCommitSha,RESOLUTION_SCHEMA_VERSION,RESOLUTION_NORMALIZER_VERSION],
     );
     if (existing.rows[0]) {
       return {
@@ -274,10 +282,10 @@ export async function buildResolution(pool: Pool, options: BuildResolutionOption
           id, status, policy_version, policy_commit_sha, schema_version, normalizer_version,
           container_image_digest, input_manifest_hash, output_hash, started_at, completed_at,
           validation_summary
-        ) VALUES ($1, $2, $3, $4, '1', '1', $5, $6, $7, $8, $8, $9)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10, $11)`,
         [runId, draft.conflicts.length ? "rejected" : "validated", options.policyVersion,
-          options.policyCommitSha, options.containerImageDigest, inputManifestHash,
-          draft.outputHash, now, JSON.stringify(validationSummary)],
+          options.policyCommitSha,RESOLUTION_SCHEMA_VERSION,RESOLUTION_NORMALIZER_VERSION,
+          options.containerImageDigest,inputManifestHash,draft.outputHash,now,JSON.stringify(validationSummary)],
       );
       for (const input of inputResult.rows) {
         const snapshot = configSnapshot(input);
