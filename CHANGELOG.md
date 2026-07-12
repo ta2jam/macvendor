@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.1.1 — 2026-07-12
+
+- Standardized the entire public web interface on English, including document
+  language metadata, navigation, lookup states, active source/release views,
+  correction and data-terms pages, problem descriptions, empty/error states,
+  accessible names, and date/number formatting.
+- Updated cross-browser assertions to enforce the English public surface.
+
 ## 0.1.0 — 2026-07-12
 
 - Graduated the local product surface from foundation preview to the first

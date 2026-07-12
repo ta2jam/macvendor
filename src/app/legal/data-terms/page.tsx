@@ -2,80 +2,79 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Veri kullanım şartları",
-  description: "macvendor.io veri çıktısının kaynak, attribution ve kullanım sınırları.",
+  title: "Data terms",
+  description: "Source, attribution, and usage boundaries for macvendor.io data output.",
 };
 
 export default function DataTermsPage() {
   return (
     <section className="shell content-page policy-page">
-      <p className="eyebrow">Veri yönetişimi</p>
-      <h1>Veri kullanım şartları</h1>
+      <p className="eyebrow">Data governance</p>
+      <h1>Data terms</h1>
       <p className="lead">
-        Bu sayfa kaynak verisinin neyi ifade ettiğini ve public çıktının kullanım sınırlarını açıklar.
-        Uygulama kaynak kodunun MIT lisansı, üçüncü taraf veri üzerinde hak vermez.
+        This page explains what the source data represents and the boundaries for using public output.
+        The MIT license for the application source code grants no rights over third-party data.
       </p>
 
       <div className="callout warning">
-        Repository ve GitHub release IEEE snapshot&apos;ı paketlemez. Bir deployment doğrudan IEEE&apos;den
-        aldığı MA-L, MA-M ve MA-S verisinden türetilmiş lookup sonuçları yayınlayabilir; bu IEEE
-        endorsement&apos;ı veya cihaz üreticisi doğrulaması değildir.
+        The repository and GitHub release do not package an IEEE snapshot. A deployment may publish
+        lookup results derived from MA-L, MA-M, and MA-S data obtained directly from IEEE; this is not
+        IEEE endorsement or device-manufacturer verification.
       </div>
 
       <div className="policy-grid">
         <article>
-          <h2>Sonucun anlamı</h2>
+          <h2>Meaning of a result</h2>
           <p>
-            Resmî katman bir adres bloğunun kayıt sahibini, curated katman ise ayrı bir kaynak
-            iddiasını gösterir. Sonuç cihazın gerçek üreticisini, modelini, sahibini, konumunu veya
-            ağdaki kimliğini kanıtlamaz. MAC adresleri değiştirilebilir, taklit edilebilir veya
-            rastgeleleştirilebilir.
+            The official layer identifies the registrant of an address block; the curated layer shows
+            a separate source claim. A result does not prove a device&apos;s actual manufacturer, model,
+            owner, location, or network identity. MAC addresses can be changed, spoofed, or randomized.
           </p>
         </article>
         <article>
-          <h2>Kaynak ve attribution</h2>
+          <h2>Source and attribution</h2>
           <p>
-            Her public sonuç aktif veri sürümü ve kaynak release bilgisiyle ilişkilidir. Bir kaynağın
-            indirilebilir olması, yeniden dağıtım veya türetilmiş API çıktısı izni değildir. Kaynak
-            bazındaki hak ve kullanım kapsamı <Link href="/data-sources">Veri kaynakları</Link> ile
-            <Link href="/data-release"> aktif veri sürümünde</Link> gösterilir.
+            Every public result is linked to an active data release and source release. A downloadable
+            source does not imply permission for redistribution or derived API output. Source-specific
+            rights and usage scope appear under <Link href="/data-sources">Data sources</Link> and the
+            <Link href="/data-release"> active data release</Link>.
           </p>
         </article>
         <article>
-          <h2>Yeniden kullanım sınırı</h2>
+          <h2>Reuse boundary</h2>
           <p>
-            API çıktısını kullanmak ham kaynak artifact&apos;lerini yeniden dağıtma hakkı vermez.
-            Kullanıcı; geçerli kaynak koşullarına, attribution yükümlülüklerine ve kendi kullanım
-            alanındaki hukuka uymaktan sorumludur. macvendor.io hiçbir kaynak adına ek lisans vermez.
+            Using API output does not grant the right to redistribute raw source artifacts. Users are
+            responsible for applicable source terms, attribution obligations, and laws governing their
+            own use. macvendor.io grants no additional license on behalf of any source.
           </p>
         </article>
         <article>
-          <h2>Doğruluk ve süreklilik</h2>
+          <h2>Accuracy and continuity</h2>
           <p>
-            Veri eksik, eski veya hatalı olabilir. Eşleşme bulunmaması bir kayıt bulunmadığını kesin
-            olarak kanıtlamaz. Yanıt şeması SemVer ve API sözleşmesiyle yönetilir; belirli bir uptime,
-            veri kapsamı veya hatasızlık garantisi verilmez.
+            Data may be incomplete, stale, or incorrect. No match does not conclusively prove that no
+            registration exists. The response schema is governed by SemVer and the API contract; no
+            specific uptime, coverage, or error-free guarantee is provided.
           </p>
         </article>
         <article>
-          <h2>Otomatik erişim</h2>
+          <h2>Automated access</h2>
           <p>
-            İstemciler cache, ETag, canonical redirect, rate-limit ve <code>Retry-After</code>
-            başlıklarına uymalıdır. Rate limit&apos;i aşmaya, erişim kontrolünü atlatmaya veya servisi
-            cihaz/kişi takibi aracı gibi sunmaya yönelik kullanım desteklenmez.
+            Clients must follow caching, ETag, canonical redirect, rate-limit, and <code>Retry-After</code>
+            headers. Use intended to bypass limits or access controls, or present the service as a
+            device/person tracking tool, is not supported.
           </p>
         </article>
         <article>
-          <h2>Düzeltme ve geri çekme</h2>
+          <h2>Correction and withdrawal</h2>
           <p>
-            Hatalı atıf, gizlilik veya hak sorunu için <Link href="/data-corrections">veri düzeltme
-            sürecini</Link> kullanın. Mevcut release satırları sessizce değiştirilmez; kabul edilen
-            düzeltme yeni bir release veya denetlenebilir suppression kararı üretir.
+            For misattribution, privacy, or rights issues, use the <Link href="/data-corrections">data
+            correction process</Link>. Existing release rows are never silently changed; an accepted
+            correction produces a new release or an auditable suppression decision.
           </p>
         </article>
       </div>
 
-      <p className="policy-date">Son güncelleme: 11 Temmuz 2026 · Bu metin hukuk danışmanlığı değildir.</p>
+      <p className="policy-date">Last updated: 12 July 2026 · This text is not legal advice.</p>
     </section>
   );
 }

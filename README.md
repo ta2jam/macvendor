@@ -50,7 +50,7 @@ identity. MAC addresses can be reassigned, spoofed, or randomized.
 
 ## Current capabilities
 
-v0.1.0 is the first inspectable local release: the web UI reads the active
+v0.1.x is the first inspectable local release line: the English-only web UI reads the active
 resolution and source metadata from PostgreSQL instead of presenting a static
 demo inventory. It is not a claim of internet production readiness.
 

@@ -3,7 +3,7 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.1.0 inspectable local release
+## Current — 0.1.1 inspectable local release
 
 The 0.1.0 milestone means the real active dataset, provenance, rights state,
 config drift, and record counts can be inspected through the local web UI. It

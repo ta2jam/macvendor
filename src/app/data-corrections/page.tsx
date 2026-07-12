@@ -3,42 +3,42 @@ import Link from "next/link";
 import { dataCorrectionsEmail } from "@/lib/public-config";
 
 export const metadata: Metadata = {
-  title: "Veri düzeltme ve geri çekme",
-  description: "Yanlış MAC assignment veya curated claim bildirim süreci.",
+  title: "Data correction and withdrawal",
+  description: "Process for reporting an incorrect MAC assignment or curated claim.",
 };
 
 export const dynamic = "force-dynamic";
 
 export default function DataCorrectionsPage() {
   const email = dataCorrectionsEmail();
-  const subject = encodeURIComponent("[macvendor.io] Veri düzeltme başvurusu");
+  const subject = encodeURIComponent("[macvendor.io] Data correction request");
 
   return (
     <section className="shell content-page policy-page">
-      <p className="eyebrow">Düzeltme kanalı</p>
-      <h1>Veri düzeltme ve geri çekme</h1>
+      <p className="eyebrow">Correction channel</p>
+      <h1>Data correction and withdrawal</h1>
       <p className="lead">
-        Yanlış kayıt sahibi, curated iddia, gizlilik veya veri kullanım hakkı sorununu ilgili kaynak
-        ve kanıtla bildirin. Başvuru, public sonucu otomatik değiştirmez.
+        Report an incorrect registrant, curated claim, privacy issue, or data-rights concern with the
+        relevant source and evidence. A request does not automatically change the public result.
       </p>
 
       {email ? (
         <div className="callout intake-ready" role="status">
-          <strong>Düzeltme kanalı açık.</strong>
+          <strong>The correction channel is available.</strong>
           <p>
-            Başvuruyu <code>{email}</code> adresine gönderin. İletişim bilgileri ve kanıtlar public
-            edilmez; macvendor PostgreSQL veritabanına yazılmaz.
+            Send the request to <code>{email}</code>. Contact details and evidence are not made public
+            or written to the macvendor PostgreSQL database.
           </p>
           <a className="action-link" href={`mailto:${email}?subject=${subject}`}>
-            Başvuru e-postası oluştur
+            Create correction email
           </a>
         </div>
       ) : (
         <div className="callout warning" role="status">
-          <strong>Düzeltme intake kanalı bu deployment&apos;ta yapılandırılmamış.</strong>
+          <strong>The correction intake channel is not configured for this deployment.</strong>
           <p>
-            Uygulama çalışıyor görünse de bu durum production açılış kapısını başarısız sayar.
-            Başvuru alınmış gibi davranan sahte bir form gösterilmez.
+            Even if the application appears healthy, this fails the production launch gate. No fake
+            form is shown that pretends to accept a request.
           </p>
         </div>
       )}
@@ -47,39 +47,39 @@ export default function DataCorrectionsPage() {
         <li>
           <span>1</span>
           <div>
-            <h2>Kaydı tanımlayın</h2>
-            <p>İlgili MAC veya prefix, kaynak adı ve ekranda görünen iddiayı aynen belirtin.</p>
+            <h2>Identify the record</h2>
+            <p>Provide the relevant MAC or prefix, source name, and the exact claim shown on screen.</p>
           </div>
         </li>
         <li>
           <span>2</span>
           <div>
-            <h2>Talebi ve dayanağı açıklayın</h2>
+            <h2>Explain the request and its basis</h2>
             <p>
-              İstenen düzeltmeyi, doğrulanabilir reference veya kanıt bağlantısını ve size dönüş için
-              gerekli iletişim bilgisini ekleyin. Parola, özel anahtar veya gereksiz kişisel veri
-              göndermeyin.
+              Include the requested correction, a verifiable reference or evidence link, and contact
+              details needed for a response. Do not send passwords, private keys, or unnecessary
+              personal data.
             </p>
           </div>
         </li>
         <li>
           <span>3</span>
           <div>
-            <h2>İnceleme ve geçici önlem</h2>
+            <h2>Review and temporary action</h2>
             <p>
-              İlk insan incelemesi hedefi 2 iş günü, normal karar hedefi 10 iş günüdür. Açık kişisel
-              veri, güvenlik veya ağır yanlış atıf iddiası 24 saatlik geçici suppression review
-              kuyruğuna alınır.
+              The target for initial human review is 2 business days; the normal decision target is
+              10 business days. Clear personal-data, security, or severe misattribution reports enter
+              a 24-hour temporary suppression review queue.
             </p>
           </div>
         </li>
         <li>
           <span>4</span>
           <div>
-            <h2>Denetlenebilir karar</h2>
+            <h2>Auditable decision</h2>
             <p>
-              Talep gerekçeyle reddedilebilir, yeni source release ile düzeltilebilir, geçici veya
-              kalıcı suppression uygulanabilir ya da hak/gizlilik incelemesine yönlendirilebilir.
+              A request may be rejected with reasons, corrected through a new source release, handled
+              with temporary or permanent suppression, or escalated for rights/privacy review.
             </p>
           </div>
         </li>
@@ -87,26 +87,26 @@ export default function DataCorrectionsPage() {
 
       <div className="policy-grid compact">
         <article>
-          <h2>Değişmez kayıt ilkesi</h2>
+          <h2>Immutable record policy</h2>
           <p>
-            Kaynak ve resolution release satırları geriye dönük mutate edilmez. Acil görünürlük
-            değişikliği ticket referanslı suppression ile; kalıcı veri değişikliği yeni release ile
-            yapılır. Her karar audit izi üretir.
+            Source and resolution release rows are never retroactively mutated. Emergency visibility
+            changes use ticket-referenced suppression; permanent data changes use a new release. Every
+            decision produces an audit trail.
           </p>
         </article>
         <article>
-          <h2>Güvenlik bildirimi ayrı kanaldır</h2>
+          <h2>Security reports use a separate channel</h2>
           <p>
-            Uygulama açığı veya credential sızıntısını düzeltme e-postasına göndermeyin. Bunun için
+            Do not send application vulnerabilities or credential leaks to the correction address. Use the
             <a href="https://github.com/ta2jam/macvendor/security/advisories/new"> private security
-            advisory</a> kanalını kullanın.
+            advisory</a> channel instead.
           </p>
         </article>
       </div>
 
       <p className="policy-date">
-        Süreç ayrıntıları <Link href="/legal/data-terms">veri kullanım şartları</Link> ve aktif
-        <Link href="/data-release"> veri sürümü</Link> ile birlikte değerlendirilir.
+        Process details should be read together with the <Link href="/legal/data-terms">data terms</Link> and the active
+        <Link href="/data-release"> data release</Link>.
       </p>
     </section>
   );

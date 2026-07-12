@@ -36,10 +36,10 @@ interface Problem {
 }
 
 const verificationLabels: Record<string, string> = {
-  reviewed: "Kanıtı incelendi",
-  corroborated: "Birden fazla kayıtla destekleniyor",
-  single_observation: "Tek gözlem",
-  unverified: "Doğrulanmamış",
+  reviewed: "Evidence reviewed",
+  corroborated: "Corroborated by multiple records",
+  single_observation: "Single observation",
+  unverified: "Unverified",
 };
 
 export function LookupForm() {
@@ -65,7 +65,7 @@ export function LookupForm() {
         setResult(body as ApiResult);
       }
     } catch {
-      setProblem({ title: "Bağlantı kurulamadı", detail: "Lokal API yanıt vermiyor." });
+      setProblem({ title: "Connection failed", detail: "The local API is not responding." });
     } finally {
       setLoading(false);
     }
@@ -74,7 +74,7 @@ export function LookupForm() {
   return (
     <div className="lookup-card">
       <form onSubmit={submit} aria-describedby="mac-hint">
-        <label htmlFor="mac">MAC adresi</label>
+        <label htmlFor="mac">MAC address</label>
         <div className="input-row">
           <input
             id="mac"
@@ -84,7 +84,7 @@ export function LookupForm() {
               setMac(event.target.value);
               if (problem) setProblem(null);
             }}
-            placeholder="Örn. 02:AA:BB:CC:00:01"
+            placeholder="e.g. 02:AA:BB:CC:00:01"
             autoComplete="off"
             spellCheck={false}
             maxLength={32}
@@ -92,18 +92,18 @@ export function LookupForm() {
             aria-describedby="mac-hint"
             aria-invalid={problem?.code === "INVALID_MAC" ? true : undefined}
           />
-          <button type="submit" disabled={loading}>{loading ? "Sorgulanıyor…" : "Sorgula"}</button>
+          <button type="submit" disabled={loading}>{loading ? "Looking up…" : "Look up"}</button>
         </div>
         <p className="input-hint" id="mac-hint">
-          12 hexadecimal karakter veya iki nokta, tire ya da nokta ayraçlı MAC girin.
+          Enter 12 hexadecimal characters or a colon-, hyphen-, or dot-separated MAC address.
         </p>
       </form>
 
       <p className="sr-only" role="status" aria-live="polite">
-        {loading ? "MAC adresi sorgulanıyor." : result ? "Sorgu sonucu hazır." : ""}
+        {loading ? "Looking up the MAC address." : result ? "Lookup result ready." : ""}
       </p>
-      <div className="result-region" role="region" aria-label="MAC sorgu durumu" aria-busy={loading}>
-        {loading && <p className="loading-line lookup-loading" aria-hidden="true">Sorgulanıyor…</p>}
+      <div className="result-region" role="region" aria-label="MAC lookup status" aria-busy={loading}>
+        {loading && <p className="loading-line lookup-loading" aria-hidden="true">Looking up…</p>}
         {problem && (
           <div className="problem-card" role="alert">
             <strong>{problem.title}</strong>
@@ -117,7 +117,7 @@ export function LookupForm() {
             <div className="result-meta">
               <span>{result.query.normalized}</span>
               <span>release #{result.data.activeVersion}</span>
-              {result.query.flags.locallyAdministered && <span className="flag">Yerel yönetilen</span>}
+              {result.query.flags.locallyAdministered && <span className="flag">Locally administered</span>}
               {result.query.flags.multicast && <span className="flag">Multicast</span>}
             </div>
 
@@ -125,30 +125,30 @@ export function LookupForm() {
               <div className="result-heading">
                 <div>
                   <p className="eyebrow">Authoritative assignment</p>
-                  <h2>{result.assignment?.organizationName ?? "Resmî eşleşme bulunamadı"}</h2>
+                  <h2>{result.assignment?.organizationName ?? "No official match found"}</h2>
                 </div>
                 {result.assignment && <span className="registry-badge">{result.assignment.registry}</span>}
               </div>
               {result.assignment && (
                 <dl>
                   <div><dt>Prefix</dt><dd>{result.assignment.prefix}/{result.assignment.prefixLength}</dd></div>
-                  <div><dt>Kaynak</dt><dd>{result.assignment.source.slug}</dd></div>
-                  <div><dt>Adres</dt><dd>{result.assignment.address ?? "Yayımlanmıyor"}</dd></div>
+                  <div><dt>Source</dt><dd>{result.assignment.source.slug}</dd></div>
+                  <div><dt>Address</dt><dd>{result.assignment.address ?? "Not published"}</dd></div>
                 </dl>
               )}
-              <p className="notice">Bu kayıt cihazın gerçek üreticisini kesin olarak tanımlamaz.</p>
+              <p className="notice">This record does not conclusively identify the device&apos;s actual manufacturer.</p>
             </article>
 
             <section className="curated-section">
               <div className="result-heading">
                 <div>
-                  <p className="eyebrow">Ayrı veri katmanı</p>
-                  <h2>Kürasyonlu eşleşmeler</h2>
+                  <p className="eyebrow">Separate data layer</p>
+                  <h2>Curated matches</h2>
                 </div>
                 <span>{result.curatedMatches.length}</span>
               </div>
               {result.curatedMatches.length === 0 ? (
-                <p className="empty-state">Bu MAC için public kürasyonlu iddia yok.</p>
+                <p className="empty-state">No public curated claim exists for this MAC address.</p>
               ) : result.curatedMatches.map((claim) => (
                 <article className="claim" key={claim.claimId}>
                   <div>

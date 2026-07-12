@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
 import { ReleaseView } from "@/components/release-view";
 
-export const metadata: Metadata = { title: "Veri kaynakları" };
+export const metadata: Metadata = { title: "Data sources" };
 
 export default function DataSourcesPage() {
   return (
     <section className="shell content-page">
-      <p className="eyebrow">Şeffaflık</p>
-      <h1>Veri kaynakları</h1>
-      <p className="lead">Bu deployment&apos;ın aktif resolution girdileri canlı olarak gösterilir. Repository IEEE snapshot&apos;ı içermez.</p>
+      <p className="eyebrow">Transparency</p>
+      <h1>Data sources</h1>
+      <p className="lead">The active resolution inputs for this deployment are shown live. The repository does not contain an IEEE snapshot.</p>
       <ReleaseView sourcesOnly />
       <div className="callout warning">
-        IEEE kullanımı risksiz veya IEEE tarafından onaylanmış olarak sunulmaz. 2013 ve 2014 ifadeleri arasındaki gerilim, API-output kapsamı ve zorunlu kontroller hak inceleme kaydında korunur. Aktif girdileri Veri sürümü sayfasından doğrulayın.
+        IEEE use is not presented as risk-free or endorsed by IEEE. The tension between the 2013 and 2014 statements, the API-output scope, and mandatory controls are preserved in the rights review record. Verify active inputs on the Data release page.
       </div>
     </section>
   );
