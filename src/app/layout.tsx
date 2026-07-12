@@ -25,6 +25,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <nav aria-label="Main navigation">
               <Link href="/methodology">Methodology</Link>
               <Link href="/data-sources">Sources</Link>
+              <Link href="/organizations">Organizations</Link>
               <Link href="/data-release">Data release</Link>
               <Link href="/data-corrections">Corrections</Link>
               <Link href="/api-docs">API</Link>
@@ -44,7 +45,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 <Link href="/data-corrections">Report a correction</Link>
               </div>
             </div>
-            <span>v{APP_VERSION} · local demo</span>
+            <span>v{APP_VERSION}</span>
           </div>
         </footer>
       </body>

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run macvendor.io database maintenance daily
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 UTC
+Persistent=true
+RandomizedDelaySec=15m
+Unit=macvendor-maintenance.service
+
+[Install]
+WantedBy=timers.target

@@ -3,12 +3,15 @@ import openapi from "../../public/openapi.json";
 import { assertPublicContract } from "../helpers/contracts";
 
 describe("OpenAPI 3.1 publication", () => {
-  it("documents exactly the three public v1 endpoints", () => {
+  it("documents every public v1 endpoint", () => {
     expect(openapi.openapi).toBe("3.1.1");
     expect(Object.keys(openapi.paths).sort()).toEqual([
       "/v1/assignments/{registry}/{prefix}",
+      "/v1/corrections",
       "/v1/data-release",
       "/v1/lookup/{mac}",
+      "/v1/organizations",
+      "/v1/organizations/{key}",
     ]);
     expect(openapi.paths["/v1/lookup/{mac}"].get.responses["308"]).toBeDefined();
     expect(openapi.paths["/v1/assignments/{registry}/{prefix}"].get.responses["308"]).toBeDefined();

@@ -1,0 +1,13 @@
+[
+  {"organizationKey":"Q312","registeredNames":["Apple, Inc.","Apple Computer, Inc."],"pen":["63"],"pci":["106b"],"usb":["05ac"],"gleif":["HWUPKR0MPOU8FGXBT394"],"sec":["0000320193"]},
+  {"organizationKey":"Q2283","registeredNames":["Microsoft Corporation","Microsoft"],"pen":["311"],"pci":["1414"],"usb":["045e"],"gleif":["INR2EJN1ERAN0W5ZP974"],"sec":["0000789019"]},
+  {"organizationKey":"Q248","registeredNames":["Intel Corporation","Intel Corp."],"pen":["343"],"pci":["8086"],"usb":["8087"],"gleif":["KNX4USFCNGPY45LOCE31"],"sec":["0000050863"]},
+  {"organizationKey":"Q173395","registeredNames":["Cisco Systems, Inc","Cisco Systems, Inc."],"pen":["9"],"pci":["1137"],"usb":["05a6"],"gleif":["549300LKFJ962MZ46593"],"sec":["0000858877"]},
+  {"organizationKey":"Q20718","registeredNames":["Samsung Electronics","Samsung Electronics Co.,Ltd","Samsung Electronics Co., Ltd."],"pen":["236"],"pci":["144d"],"usb":["04e8"]},
+  {"organizationKey":"Q160120","registeredNames":["HUAWEI TECHNOLOGIES CO.,LTD","Huawei Technologies Co., Ltd."],"pen":["2011"],"pci":["19e5"],"usb":["12d1"]},
+  {"organizationKey":"Q95","registeredNames":["Google, Inc.","Google LLC"],"pen":["11129"],"pci":["1ae0"],"usb":["18d1"],"gleif":["7ZW8QJWVPR4P1J1KQY45"]},
+  {"organizationKey":"GB:02558939","registeredNames":["CISCO SYSTEMS LIMITED"],"companiesHouse":["02558939"]},
+  {"organizationKey":"GB:01134945","registeredNames":["INTEL CORPORATION (UK) LIMITED"],"companiesHouse":["01134945"]},
+  {"organizationKey":"GB:01624297","registeredNames":["MICROSOFT LIMITED"],"companiesHouse":["01624297"]},
+  {"organizationKey":"GB:03977902","registeredNames":["GOOGLE UK LIMITED"],"companiesHouse":["03977902"]}
+]

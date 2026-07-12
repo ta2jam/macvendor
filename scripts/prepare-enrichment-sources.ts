@@ -19,5 +19,6 @@ const result = await prepareEnrichmentSources({
   privateKeyPath: flags.get("--private-key") ? path.resolve(flags.get("--private-key")!) : undefined,
   publicKeyPath: flags.get("--public-key") ? path.resolve(flags.get("--public-key")!) : undefined,
   mappingPath: flags.get("--mapping") ? path.resolve(flags.get("--mapping")!) : undefined,
+  identityMappingPath: flags.get("--identity-mapping") ? path.resolve(flags.get("--identity-mapping")!) : undefined,
 });
 process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

@@ -247,6 +247,7 @@ export async function buildResolution(pool: Pool, options: BuildResolutionOption
        JOIN source_releases sr ON sr.id = r.source_release_id
        JOIN data_sources ds ON ds.id = sr.source_id
        WHERE r.source_release_id = ANY($1::uuid[]) AND r.record_status = 'eligible'
+         AND r.record_kind <> 'organization_identity'
        ORDER BY ds.slug, r.raw_record_hash, r.id`,
       [requestedIds],
     );

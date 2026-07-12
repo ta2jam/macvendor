@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ mac: string }> }) {
   const id = requestId(request);
-  const rate = consumeRateLimit(request);
+  const rate = await consumeRateLimit(request);
   if (!rate.allowed) {
     return problemResponse({
       status: 429,

@@ -10,3 +10,14 @@ export function dataCorrectionsEmail(value = process.env.DATA_CORRECTIONS_EMAIL)
   }
   return candidate;
 }
+
+export function validateContactEmail(value: unknown): string {
+  if (typeof value !== "string") throw new Error("contactEmail must be a valid email address");
+  const candidate = value.trim();
+  const localPart = candidate.slice(0, candidate.indexOf("@"));
+  if (candidate.length > 254 || localPart.length > 64 || localPart.startsWith(".")
+    || localPart.endsWith(".") || localPart.includes("..") || !PUBLIC_EMAIL_PATTERN.test(candidate)) {
+    throw new Error("contactEmail must be a valid email address");
+  }
+  return candidate;
+}

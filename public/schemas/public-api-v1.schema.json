@@ -162,6 +162,50 @@
         }
       }
     },
+    "Organization": {
+      "type": "object",
+      "required": ["organizationKey", "name", "aliases", "registeredNames", "externalIdentifiers", "assignments", "assignmentsTruncated"],
+      "properties": {
+        "organizationKey": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "name": { "type": "string", "minLength": 1 },
+        "aliases": { "type": "array", "items": { "type": "string" } },
+        "registeredNames": { "type": "array", "items": { "type": "string" } },
+        "externalIdentifiers": { "type": "array", "items": { "type": "object" } },
+        "assignments": { "type": "array", "maxItems": 100, "items": { "type": "object" } },
+        "assignmentsTruncated": { "type": "boolean" }
+      }
+    },
+    "OrganizationSearchResponse": {
+      "type": "object",
+      "required": ["query", "results", "truncated"],
+      "properties": {
+        "query": { "type": "string" },
+        "results": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/Organization" } },
+        "truncated": { "type": "boolean" }
+      }
+    },
+    "CorrectionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "target", "requestedChange", "evidenceUrl", "contactEmail"],
+      "properties": {
+        "category": { "type": "string", "enum": ["incorrect_assignment", "incorrect_context", "privacy", "rights", "withdrawal"] },
+        "target": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "requestedChange": { "type": "string", "minLength": 20, "maxLength": 2000 },
+        "evidenceUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "contactEmail": { "type": "string", "format": "email", "maxLength": 254 }
+      }
+    },
+    "CorrectionAccepted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "status", "receivedAt"],
+      "properties": {
+        "reference": { "type": "string", "pattern": "^CORR-[0-9]{8}-[A-F0-9]{8}$" },
+        "status": { "const": "received" },
+        "receivedAt": { "type": "string", "format": "date-time" }
+      }
+    },
     "Problem": {
       "type": "object",
       "additionalProperties": false,
@@ -169,8 +213,8 @@
       "properties": {
         "type": { "type": "string", "format": "uri", "pattern": "^https://macvendor\\.io/problems/" },
         "title": { "type": "string", "minLength": 1 },
-        "status": { "type": "integer", "enum": [400, 404, 429, 503] },
-        "code": { "type": "string", "enum": ["INVALID_MAC", "INVALID_PREFIX", "INVALID_REGISTRY", "UNSUPPORTED_PARAMETER", "ASSIGNMENT_NOT_FOUND", "RATE_LIMITED", "DATA_RELEASE_UNAVAILABLE", "SERVICE_UNAVAILABLE"] },
+        "status": { "type": "integer", "enum": [400, 404, 413, 415, 429, 503] },
+        "code": { "type": "string", "enum": ["INVALID_MAC", "INVALID_PREFIX", "INVALID_REGISTRY", "UNSUPPORTED_PARAMETER", "ASSIGNMENT_NOT_FOUND", "INVALID_ORGANIZATION_QUERY", "INVALID_ORGANIZATION_KEY", "ORGANIZATION_NOT_FOUND", "INVALID_CORRECTION_REQUEST", "PAYLOAD_TOO_LARGE", "UNSUPPORTED_MEDIA_TYPE", "CORRECTION_INTAKE_UNAVAILABLE", "RATE_LIMITED", "DATA_RELEASE_UNAVAILABLE", "SERVICE_UNAVAILABLE"] },
         "detail": { "type": "string", "minLength": 1 },
         "requestId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$" }
       },

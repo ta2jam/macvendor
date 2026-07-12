@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 0.3.0 — 2026-07-12
+
+- Added ten governed sources: Wireshark well-known addresses; official Hyper-V,
+  VMware and OpenStack MAC hints; and reviewed IANA PEN, PCI, USB, GLEIF, SEC,
+  and Companies House organization identifiers.
+- Added exact-only organization identity search and reverse assignment views;
+  identity claims remain separate from IEEE assignment authority and never use
+  fuzzy matching.
+- Added PostgreSQL-backed shared rate limiting, encrypted correction intake,
+  append-only correction audit events, retention maintenance, and operator CLIs.
+- Added daily IEEE, weekly enrichment, six-hour source-health, and daily
+  maintenance systemd jobs with backup boundaries.
+- Disabled synthetic demo sources for governed deployments, documented all six
+  public API endpoints, added the contributor adapter fixture, and enforced a
+  tag-to-main release gate.
+
 ## 0.1.1 — 2026-07-12
 
 - Standardized the entire public web interface on English, including document

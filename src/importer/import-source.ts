@@ -87,7 +87,7 @@ async function ensureSource(client: PoolClient, manifest: SourceManifest): Promi
 async function insertRecordChunk(client: PoolClient, sourceReleaseId: string, records: ParsedSourceRecord[]): Promise<void> {
   const payload = records.map((record) => ({
     id: randomUUID(), record_kind: record.recordKind, record_status: record.recordStatus,
-    registry: record.registry, prefix_bits: record.prefixBits.toString(), prefix_length: record.prefixLength,
+    registry: record.registry, prefix_bits: record.prefixBits?.toString() ?? null, prefix_length: record.prefixLength,
     organization_name_raw: record.organizationName, organization_name_display: record.organizationName,
     organization_address_raw: record.organizationAddress, is_private: record.isPrivate,
     claim_value: record.claimValue, origin_type: record.originType, rights_basis: record.rightsBasis,

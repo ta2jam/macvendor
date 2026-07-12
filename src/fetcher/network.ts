@@ -20,6 +20,7 @@ export interface DownloadPolicy {
   maxRedirects: number;
   maxBytes: number;
   timeoutMs: number;
+  accept?: "application/octet-stream" | "application/json" | "text/plain" | "text/html";
 }
 
 function ipv4Number(address: string): number {
@@ -110,7 +111,8 @@ async function pinnedAddress(url: URL, options: FetchNetworkOptions, timeoutMs: 
   return [...addresses].sort((left, right) => left.family - right.family || left.address.localeCompare(right.address))[0]!;
 }
 
-function requestBuffer(url: URL, address: LookupAddress, maximumBytes: number, timeoutMs: number, ca: SecureContextOptions["ca"]): Promise<{
+function requestBuffer(url: URL, address: LookupAddress, maximumBytes: number, timeoutMs: number,
+  ca: SecureContextOptions["ca"], accept: DownloadPolicy["accept"]): Promise<{
   status: number; location: string | null; body: Buffer;
 }> {
   return new Promise((resolve, reject) => {
@@ -125,7 +127,7 @@ function requestBuffer(url: URL, address: LookupAddress, maximumBytes: number, t
     const req = request(url, {
       method: "GET",
       agent: false,
-      headers: { Accept: "application/octet-stream", "Accept-Encoding": "identity", "User-Agent": "macvendor-fetcher/1" },
+      headers: { Accept: accept ?? "application/octet-stream", "Accept-Encoding": "identity", "User-Agent": "macvendor-fetcher/1" },
       ca,
       lookup: ((_hostname: string, options: { all?: boolean }, callback: (...args: unknown[]) => void) => {
         if (options?.all) callback(null, [address]);
@@ -213,7 +215,7 @@ export async function downloadHttps(
     if (remainingForRequest < 1) throw new ImportValidationError("FETCH_TIMEOUT", "remote fetch exceeded its wall-time limit");
     let result;
     try {
-      result = await requestBuffer(url, address, policy.maxBytes, remainingForRequest, options.ca);
+      result = await requestBuffer(url, address, policy.maxBytes, remainingForRequest, options.ca, policy.accept);
     } catch (error) {
       if (error instanceof ImportValidationError) throw error;
       throw new ImportValidationError("FETCH_FAILED", "HTTPS fetch failed TLS or transport validation");

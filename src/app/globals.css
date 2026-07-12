@@ -15,12 +15,25 @@
 html { background: var(--paper); color: var(--ink); }
 body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 a { color: inherit; text-decoration: none; }
-button, input { font: inherit; }
+button, input, select, textarea { font: inherit; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; padding: 11px 14px; border-radius: 8px; color: white; background: var(--green-dark); transform: translateY(-160%); }
 .skip-link:focus { transform: translateY(0); }
-:where(a, button, input, [tabindex]):focus-visible { outline: 3px solid #a85f00; outline-offset: 3px; }
+:where(a, button, input, select, textarea, [tabindex]):focus-visible { outline: 3px solid #a85f00; outline-offset: 3px; }
+
+.correction-form { display: grid; gap: 16px; margin-top: 20px; }
+.correction-form label { display: grid; gap: 6px; font-weight: 700; }
+.correction-form input, .correction-form select, .correction-form textarea { width: 100%; padding: 11px 12px; border: 1px solid #aeb8b3; border-radius: 9px; background: #fff; color: var(--ink); }
+.correction-form textarea { resize: vertical; }
+.correction-form button { justify-self: start; padding: 12px 18px; border: 0; border-radius: 9px; background: var(--green); color: white; font-weight: 750; cursor: pointer; }
+.correction-form button:disabled { opacity: .65; cursor: wait; }
+.error-text { color: #8d1b12; }
+.organization-search { display: grid; gap: 8px; margin: 30px 0; }
+.organization-search label { font-weight: 750; }
+.organization-results { display: grid; gap: 18px; }
+.organization-results .result-card { padding: 20px; border: 1px solid #d7ded9; border-radius: 14px; background: #fff; }
+.organization-results ul { columns: 2; padding-left: 20px; }
 #main-content { scroll-margin-top: 100px; }
 #main-content:focus { outline: none; }
 .shell { width: min(1120px, calc(100% - 40px)); margin-inline: auto; }

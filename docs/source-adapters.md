@@ -1,5 +1,7 @@
 # Source adapter contract
 
+The synthetic contribution kit is in [`examples/source-adapter`](../examples/source-adapter/README.md). Production review additionally requires provenance, an explicit rights decision, deterministic normalization, deletion handling, fixtures, diff thresholds, and maintainer approval. New sources remain in `review` mode until every gate passes.
+
 Adapters translate one reviewed upstream row shape into macvendor's strict raw
 record contract. They do not grant data rights, select production status, relax
 privacy checks, or execute code named by a manifest.

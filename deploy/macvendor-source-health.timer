@@ -1,0 +1,11 @@
+[Unit]
+Description=Check macvendor source health every six hours
+
+[Timer]
+OnCalendar=*-*-* 00/6:15:00 UTC
+RandomizedDelaySec=10m
+Persistent=true
+Unit=macvendor-source-health.service
+
+[Install]
+WantedBy=timers.target

@@ -54,6 +54,48 @@
           "503": { "$ref": "#/components/responses/Problem" }
         }
       }
+    },
+    "/v1/organizations": {
+      "get": {
+        "operationId": "searchOrganizations",
+        "parameters": [
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string", "minLength": 2, "maxLength": 100 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 20, "default": 10 } }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/OrganizationSearchSuccess" },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "503": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/v1/organizations/{key}": {
+      "get": {
+        "operationId": "getOrganization",
+        "parameters": [{ "name": "key", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^[A-Za-z0-9:._-]{1,80}$" } }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/OrganizationSuccess" },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "404": { "$ref": "#/components/responses/Problem" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "503": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/v1/corrections": {
+      "post": {
+        "operationId": "submitCorrection",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/CorrectionRequest" } } } },
+        "responses": {
+          "202": { "$ref": "#/components/responses/CorrectionAccepted" },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "413": { "$ref": "#/components/responses/Problem" },
+          "415": { "$ref": "#/components/responses/Problem" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "503": { "$ref": "#/components/responses/Problem" }
+        }
+      }
     }
   },
   "components": {
@@ -77,6 +119,18 @@
         "description": "Active release metadata",
         "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
         "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/DataReleaseResponse" } } }
+      },
+      "OrganizationSearchSuccess": {
+        "description": "Reviewed organization identity search",
+        "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/OrganizationSearchResponse" } } }
+      },
+      "OrganizationSuccess": {
+        "description": "Reviewed organization identity",
+        "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/Organization" } } }
+      },
+      "CorrectionAccepted": {
+        "description": "Correction request durably accepted",
+        "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/CorrectionAccepted" } } }
       },
       "CanonicalRedirect": {
         "description": "Permanent redirect to the canonical path while preserving the query",

@@ -17,3 +17,11 @@ before upgrades or destructive database work.
 `macvendor-backup.timer` creates and validates a daily logical backup, retains
 14 days on the host, and must be paired with an off-host copy. A same-disk
 backup does not protect against VPS or disk loss.
+
+`macvendor-ieee-update.timer` runs the guarded IEEE update daily.
+`macvendor-source-update.timer` refreshes IEEE and all enrichment sources weekly
+with verified backups before and after activation.
+`macvendor-source-health.timer` checks freshness, rights and active-config
+drift every six hours. `macvendor-maintenance.timer` removes expired limiter
+windows and correction contact data daily. These jobs use the immutable `macvendor-tooling:current` image,
+`/srv/sites/macvendor/release.env`, and the read-only ingest signing key.

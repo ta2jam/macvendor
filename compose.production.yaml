@@ -50,8 +50,13 @@ services:
     environment:
       DATABASE_URL: postgresql://macvendor:${POSTGRES_PASSWORD}@database:5432/macvendor
       DATA_CORRECTIONS_EMAIL: ${DATA_CORRECTIONS_EMAIL:-}
+      CORRECTION_ENCRYPTION_KEY: ${CORRECTION_ENCRYPTION_KEY:?CORRECTION_ENCRYPTION_KEY is required}
       PUBLIC_ORIGIN: https://macvendor.io
       RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_BACKEND: postgres
+      RATE_LIMIT_SALT: ${RATE_LIMIT_SALT:?RATE_LIMIT_SALT is required}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-10}
+      RATE_LIMIT_MAX_COST: ${RATE_LIMIT_MAX_COST:-50}
       TRUST_PROXY: "true"
     ports:
       - 127.0.0.1:3000:3000

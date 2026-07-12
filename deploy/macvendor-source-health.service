@@ -1,0 +1,12 @@
+[Unit]
+Description=macvendor source governance health check
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/macvendor-source-health
+Nice=10
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
