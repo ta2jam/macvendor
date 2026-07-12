@@ -50,6 +50,10 @@ identity. MAC addresses can be reassigned, spoofed, or randomized.
 
 ## Current capabilities
 
+v0.1.x is the first inspectable local release line: the English-only web UI reads the active
+resolution and source metadata from PostgreSQL instead of presenting a static
+demo inventory. It is not a claim of internet production readiness.
+
 - strict parsing for bare, colon, hyphen, and dotted EUI-48 forms;
 - canonical uppercase redirects and conditional requests with ETag/304;
 - fixed authoritative lookup order: 36-bit → 28-bit → 24-bit;
@@ -164,8 +168,8 @@ The application is a low-dependency modular monolith:
 - no Redis, queue, search engine, microservice split, account system, or payment
   layer in the current scope.
 
-Authoritative lookup performs exactly three indexed candidates. Curated lookup
-has a hard upper bound of 48 prefix candidates. Candidate generation is `O(1)`
+Authoritative lookup performs exactly three indexed candidates. Curated and
+insight lookup each have a hard upper bound of 48 prefix candidates. Candidate generation is `O(1)`
 for fixed 48-bit input; each PostgreSQL B-tree probe is `O(log N)`. Request-time
 source-table joins are excluded from the hot path.
 
@@ -177,12 +181,14 @@ operational constraints in [`docs/operations.md`](docs/operations.md).
 
 Data availability and data rights are different facts.
 
-- IEEE MA-L, MA-M, and MA-S derived API output is approved under an explicit
+- IEEE MA-L, MA-M, MA-S, legacy IAB, and CID derived API output is approved under an explicit
   owner risk acceptance and mandatory controls. The evidence, adverse 2013
   statement, later 2014 clarification, residual ambiguity, and scope are in
   [`docs/rights/ieee-registration-authority.md`](docs/rights/ieee-registration-authority.md).
-- KIT NETVS and community databases are reference/QA inputs, not automatically
-  production sources.
+- IANA Ethernet Numbers, IEEE Group MAC, reviewed runZero history/virtual
+  prefixes, and exact-mapped Wikidata aliases remain separate enrichment layers.
+- KIT NETVS and unreviewed community databases are reference/QA inputs, not
+  automatically production sources.
 - Amateur database integration is deferred. No amateur records are admitted in
   the current release.
 - Exact `/48` claims are treated as device identifiers and are not public by
@@ -207,7 +213,7 @@ OPERATOR_ACTOR_ID=operator:ieee-scheduler npm run source:update:ieee
 ```
 
 The guarded command prepares, verifies, imports, resolves, activates, and purges
-all three fixed IEEE registries. A database advisory lock rejects overlap. An
+all five fixed IEEE registries. A database advisory lock rejects overlap. An
 unchanged download records a new immutable fetch observation without duplicating
 the source release or incrementing the active version.
 
@@ -215,6 +221,16 @@ Generated raw files, signatures, and manifests stay under ignored `.local/` and
 are not redistributed through GitHub. See [`NOTICE`](NOTICE) and the importing
 runbook before rotating keys or changing URLs. The lower-level prepare/import/
 build/activate commands remain available for diagnosis and controlled recovery.
+
+Prepare the reviewed enrichment sources from the same signed IEEE snapshot with:
+
+```bash
+npm run source:prepare:enrichments -- --ieee-dir .local/ieee/YYYY-MM-DD
+```
+
+The generated production manifests cover IANA protocol ranges, IEEE Group MAC
+usage, runZero historical aliases and virtual-platform hints, and exact-name
+Wikidata mappings. Fuzzy entity matching is intentionally unsupported.
 
 Public attribution and reuse boundaries are available at
 [`/legal/data-terms`](http://localhost:3000/legal/data-terms). Incorrect

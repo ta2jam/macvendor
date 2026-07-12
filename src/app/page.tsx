@@ -7,17 +7,16 @@ export default function HomePage() {
       <section className="hero">
         <div className="shell hero-grid">
           <div>
-            <p className="eyebrow">Kaynağı belli. Sonucu açıklanabilir.</p>
-            <h1>MAC adres bloğunun kayıt sahibini bul.</h1>
+            <p className="eyebrow">Known source. Explainable result.</p>
+            <h1>Find the registrant of a MAC address block.</h1>
             <p className="hero-copy">
-              Resmî atamalar ile amatör/kürasyonlu iddiaları birbirine karıştırmadan, longest-prefix
-              eşleşmesiyle sorgula.
+              Query official assignments and separate owner-curated claims using longest-prefix matching.
             </p>
           </div>
-          <div className="stat-card" aria-label={`v${APP_VERSION} özellik özeti`}>
+          <div className="stat-card" aria-label={`v${APP_VERSION} feature summary`}>
             <span>v{APP_VERSION}</span>
             <strong>36 → 28 → 24 bit</strong>
-            <p>Sabit aday kümesi, sürümlü sonuç, açık kaynak bilgisi.</p>
+            <p>Fixed candidate set, versioned results, and explicit provenance.</p>
           </div>
         </div>
       </section>
@@ -26,24 +25,24 @@ export default function HomePage() {
       </section>
       <section className="shell principles" aria-labelledby="principles-title">
         <div>
-          <p className="eyebrow">Sınırlar</p>
-          <h2 id="principles-title">Ne söylediğimizi net tutuyoruz.</h2>
+          <p className="eyebrow">Boundaries</p>
+          <h2 id="principles-title">We keep every claim precise.</h2>
         </div>
         <div className="principle-grid">
           <article>
             <span aria-hidden="true">01</span>
-            <h3>Atama, cihaz kimliği değildir</h3>
-            <p>Sonuç registry sahibini gösterir. MAC değiştirilebilir veya rastgeleleştirilebilir.</p>
+            <h3>An assignment is not a device identity</h3>
+            <p>The result identifies a registry holder. A MAC address can be changed or randomized.</p>
           </article>
           <article>
             <span aria-hidden="true">02</span>
-            <h3>Kaynaklar ayrı kalır</h3>
-            <p>Authoritative kayıt, owner-curated iddia tarafından sessizce ezilemez.</p>
+            <h3>Sources remain separate</h3>
+            <p>An owner-curated claim can never silently overwrite an authoritative assignment.</p>
           </article>
           <article>
             <span aria-hidden="true">03</span>
-            <h3>Her sonuç sürümlüdür</h3>
-            <p>Aktif release ve politika sürümü API yanıtında görünür.</p>
+            <h3>Every result is versioned</h3>
+            <p>The active release and policy version are included in every API response.</p>
           </article>
         </div>
       </section>

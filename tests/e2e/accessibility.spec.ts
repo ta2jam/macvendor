@@ -17,8 +17,8 @@ test.describe("public accessibility surface", () => {
     test(`${path} has no automated WCAG A/AA violations`, async ({ page }) => {
       await page.goto(path);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-      if (path === "/data-release") {
-        await expect(page.getByLabel("Aktif veri sürümü JSON çıktısı")).toBeVisible();
+      if (path === "/data-release" || path === "/data-sources") {
+        await expect(page.getByLabel("Active data sources")).toBeVisible();
       }
       await expectNoAxeViolations(page);
     });
@@ -26,7 +26,7 @@ test.describe("public accessibility surface", () => {
 
   test("skip link moves keyboard focus to main content", async ({ page }, testInfo) => {
     await page.goto("/");
-    const skipLink = page.getByRole("link", { name: "Ana içeriğe geç" });
+    const skipLink = page.getByRole("link", { name: "Skip to main content" });
     if (testInfo.project.name === "webkit") {
       await skipLink.focus();
     } else {
@@ -37,10 +37,21 @@ test.describe("public accessibility surface", () => {
     await expect(page.locator("#main-content")).toBeFocused();
   });
 
+  test("release and source pages render live active inputs", async ({ page }) => {
+    await page.goto("/data-sources");
+    const sources = page.getByLabel("Active data sources");
+    await expect(sources.getByRole("heading", { name: "demo-authoritative" })).toBeVisible();
+    await expect(sources.getByRole("heading", { name: "demo-curated" })).toBeVisible();
+    await page.goto("/data-release");
+    await expect(page.getByLabel("Total records").getByText("2", { exact: true })).toBeVisible();
+    await page.getByText("Show raw API response").click();
+    await expect(page.getByLabel("Active data release JSON response")).toBeVisible();
+  });
+
   test("lookup exposes success, no-match, and validation states", async ({ page }) => {
     await page.goto("/");
-    const input = page.getByRole("textbox", { name: "MAC adresi" });
-    const submit = page.getByRole("button", { name: "Sorgula" });
+    const input = page.getByRole("textbox", { name: "MAC address" });
+    const submit = page.getByRole("button", { name: "Look up" });
 
     await input.fill("02:AA:BB:CC:00:01");
     await submit.click();
@@ -50,7 +61,7 @@ test.describe("public accessibility surface", () => {
 
     await input.fill("001122334455");
     await submit.click();
-    await expect(page.getByRole("heading", { name: "Resmî eşleşme bulunamadı" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "No official match found" })).toBeVisible();
     await expectNoAxeViolations(page);
 
     await input.fill("not-a-mac");
@@ -71,18 +82,18 @@ test.describe("public accessibility surface", () => {
 
   test("correction page never claims intake is available without configuration", async ({ page }) => {
     await page.goto("/data-corrections");
-    await expect(page.getByText("Düzeltme intake kanalı bu deployment'ta yapılandırılmamış."))
+    await expect(page.getByText("The correction intake channel is not configured for this deployment."))
       .toBeVisible();
-    await expect(page.getByRole("link", { name: "Başvuru e-postası oluştur" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Create correction email" })).toHaveCount(0);
   });
 
   test("mobile navigation remains visible and keyboard reachable", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium-mobile", "mobile-only assertion");
     await page.goto("/");
-    const navigation = page.getByRole("navigation", { name: "Ana navigasyon" });
+    const navigation = page.getByRole("navigation", { name: "Main navigation" });
     await expect(navigation).toBeVisible();
-    await expect(navigation.getByRole("link", { name: "Metodoloji" })).toBeVisible();
-    await navigation.getByRole("link", { name: "Kaynaklar" }).focus();
-    await expect(navigation.getByRole("link", { name: "Kaynaklar" })).toBeFocused();
+    await expect(navigation.getByRole("link", { name: "Methodology" })).toBeVisible();
+    await navigation.getByRole("link", { name: "Sources" }).focus();
+    await expect(navigation.getByRole("link", { name: "Sources" })).toBeFocused();
   });
 });

@@ -3,7 +3,12 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.0.18 durable foundation
+## Current — 0.1.1 inspectable local release
+
+The 0.1.0 milestone means the real active dataset, provenance, rights state,
+config drift, and record counts can be inspected through the local web UI. It
+does not mean internet production readiness: shared rate limiting and an
+accountable correction backend still require deployment decisions.
 
 - [x] strict EUI-48 normalization;
 - [x] authoritative and curated layers kept separate;
@@ -57,6 +62,8 @@ correctness gates can delay or reject a feature.
   health/release metadata, and rebuild closure — issue #37;
 - [x] latest fetch-observation release metadata, observation-aware ETags, and
   targeted unchanged-snapshot cache invalidation — issue #39;
+- [x] live active-source and human-readable release UI backed by the public
+  data-release contract;
 
 ## Independent hardening while data rights are blocked
 

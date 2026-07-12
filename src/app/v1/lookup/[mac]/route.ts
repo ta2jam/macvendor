@@ -39,7 +39,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { mac: rawMac } = await params;
     const mac = normalizeMac(rawMac);
     if (rawMac !== mac.normalized) {
-      const canonical = new URL(request.url);
+      const canonical = process.env.PUBLIC_ORIGIN
+        ? new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, process.env.PUBLIC_ORIGIN)
+        : new URL(request.url);
       canonical.pathname = `/v1/lookup/${mac.normalized}`;
       return redirectResponse(canonical, id);
     }
@@ -53,7 +55,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       },
       ...result,
     };
-    const positive = Boolean(result.assignment || result.curatedMatches.length);
+    const positive = Boolean(result.assignment || result.curatedMatches.length || result.insights.length);
     return jsonResponse(request, body, {
       requestId: id,
       cacheControl: positive

@@ -37,9 +37,25 @@ export interface CuratedMatch {
   };
 }
 
+export interface LookupInsight {
+  claimId: string;
+  prefix: string;
+  prefixLength: number;
+  claimType: "vendor_alias" | "device_hint" | "usage_note";
+  organizationName: string | null;
+  details: Record<string, unknown>;
+  verificationStatus: VerificationStatus;
+  source: {
+    slug: string;
+    sourceReleaseId: string;
+  };
+}
+
 export interface LookupResult {
   assignment: Assignment | null;
   curatedMatches: CuratedMatch[];
   curatedMatchesTruncated: boolean;
+  insights: LookupInsight[];
+  insightsTruncated: boolean;
   data: ReleaseData;
 }

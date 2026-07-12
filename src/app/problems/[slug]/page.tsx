@@ -3,14 +3,14 @@ import type { Metadata } from "next";
 export const metadata: Metadata = { title: "API problem type" };
 
 const descriptions: Record<string, string> = {
-  "invalid-mac": "MAC değeri desteklenen dört 48-bit biçimden biri olmalıdır.",
-  "invalid-prefix": "Prefix ve uzunluk registry sözleşmesiyle eşleşmelidir.",
-  "invalid-registry": "Registry ma-l, ma-m, ma-s, iab veya cid olmalıdır.",
-  "unsupported-parameter": "Endpoint yalnız sözleşmede tanımlanan query parametrelerini kabul eder.",
-  "assignment-not-found": "Aktif release içinde exact registry/prefix kaydı yoktur.",
-  "rate-limited": "İstek hızı koruma eşiğini aştı; Retry-After başlığını izleyin.",
-  "data-release-unavailable": "Servis doğrulanmış aktif bir release bulamadı.",
-  "service-unavailable": "Geçici altyapı hatası oluştu; request ID ile tekrar deneyin.",
+  "invalid-mac": "The MAC value must use one of the four supported 48-bit formats.",
+  "invalid-prefix": "The prefix and length must match the registry contract.",
+  "invalid-registry": "The registry must be ma-l, ma-m, ma-s, iab, or cid.",
+  "unsupported-parameter": "The endpoint accepts only query parameters defined by its contract.",
+  "assignment-not-found": "No exact registry/prefix record exists in the active release.",
+  "rate-limited": "The request rate exceeded the protection threshold; follow the Retry-After header.",
+  "data-release-unavailable": "The service could not find a validated active release.",
+  "service-unavailable": "A temporary infrastructure error occurred; retry with the request ID.",
 };
 
 export default async function ProblemPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -19,7 +19,7 @@ export default async function ProblemPage({ params }: { params: Promise<{ slug: 
     <section className="shell content-page">
       <p className="eyebrow">RFC 9457 problem type</p>
       <h1>{slug}</h1>
-      <p className="lead">{descriptions[slug] ?? "Bu problem türü için public açıklama bulunamadı."}</p>
+      <p className="lead">{descriptions[slug] ?? "No public description is available for this problem type."}</p>
     </section>
   );
 }

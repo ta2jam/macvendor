@@ -109,7 +109,7 @@ describe("deterministic resolver", () => {
 
     expect(Object.fromEntries(result.claims.map((claim) => [claim.source.id, claim.conflictStatus]))).toEqual({
       "claim-agrees": "agrees",
-      "claim-no-match": "no_official_match",
+      "claim-no-match": "not_evaluated",
       hint: "not_evaluated",
     });
   });

@@ -22,7 +22,8 @@ describe("IEEE source preparation", () => {
     const publicKeyPath = path.join(directory, "public.pem");
     await writeFile(privateKeyPath, keys.privateKey.export({ type: "pkcs8", format: "pem" }), { mode: 0o600 });
     await writeFile(publicKeyPath, keys.publicKey.export({ type: "spki", format: "pem" }), { mode: 0o600 });
-    const prefixes = { "MA-L": "001122", "MA-M": "AABBCCD", "MA-S": "DDEEFF001" } as const;
+    const prefixes = { "MA-L": "001122", "MA-M": "AABBCCD", "MA-S": "DDEEFF001",
+      IAB: "123456789", CID: "ABCDEF" } as const;
 
     const prepared = await prepareIeeeSources({
       output: path.join(directory, "prepared"), privateKeyPath, publicKeyPath,
@@ -40,11 +41,12 @@ describe("IEEE source preparation", () => {
     });
 
     expect(prepared).toMatchObject({ status: "prepared", preparedAt: "2026-07-11T10:00:00.000Z" });
-    expect(prepared.datasets.map((dataset) => dataset.registry)).toEqual(["MA-L", "MA-M", "MA-S"]);
+    expect(prepared.datasets.map((dataset) => dataset.registry)).toEqual(["MA-L", "MA-M", "MA-S", "IAB", "CID"]);
     for (const dataset of prepared.datasets) {
       const manifest = await loadManifest(dataset.manifestPath);
       expect(manifest).toMatchObject({
-        source: { slug: `ieee-${dataset.registry.toLowerCase()}`, requiredForActivation: true,
+        source: { slug: `ieee-${dataset.registry.toLowerCase()}`,
+          requiredForActivation: dataset.registry !== "CID",
           rights: { status: "approved", distributionScope: "api_output" } },
         artifact: { remote: { url: dataset.sourceUrl, allowedOrigins: [IEEE_RA_ORIGIN], maxRedirects: 0 },
           signature: { origin: "operator" } },

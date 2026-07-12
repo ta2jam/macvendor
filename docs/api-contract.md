@@ -41,7 +41,7 @@ Prefix alanı `(prefix, prefixLength)` birlikte yorumlanır. Nibble dışı cura
 
 ### Sorgu parametreleri
 
-- `mode=all|official`: varsayılan `all`. `official`, `curatedMatches` hesabını ve alanını boş dizi olarak döndürür.
+- `mode=all|official`: varsayılan `all`. `official`, `curatedMatches` ve `insights` alanlarını boş dizi olarak döndürür.
 - Başka parametre V1'de kabul edilmez; bilinmeyen parametre `400 UNSUPPORTED_PARAMETER` üretir.
 
 ### Başarılı yanıt
@@ -84,6 +84,19 @@ Prefix alanı `(prefix, prefixLength)` birlikte yorumlanır. Nibble dışı cura
     }
   ],
   "curatedMatchesTruncated": false,
+  "insights": [
+    {
+      "claimId": "clm_03...",
+      "prefix": "00005E0001",
+      "prefixLength": 40,
+      "claimType": "usage_note",
+      "organizationName": null,
+      "details": { "usage": "VRRP (Virtual Router Redundancy Protocol)", "reference": "[RFC9568]" },
+      "verificationStatus": "reviewed",
+      "source": { "slug": "iana-ethernet-numbers", "sourceReleaseId": "sr_03..." }
+    }
+  ],
+  "insightsTruncated": false,
   "data": {
     "resolvedReleaseId": "rr_01...",
     "activeVersion": 42,
@@ -115,6 +128,11 @@ Alan sözleşmesi:
 | `curatedMatches[].originType`, `conflictStatus` | enum string | Hayır |
 | `curatedMatches[].source.slug`, `sourceReleaseId` | string | Hayır |
 | `curatedMatchesTruncated` | boolean | Hayır |
+| `insights` | array | Hayır; sonuç yoksa `[]` |
+| `insights[].claimType` | enum string | Hayır; `vendor_alias`, `device_hint`, `usage_note` |
+| `insights[].organizationName` | string | Evet |
+| `insights[].details` | object | Hayır |
+| `insightsTruncated` | boolean | Hayır |
 | `data.resolvedReleaseId`, `data.policyVersion` | string | Hayır |
 | `data.activeVersion`, `data.publicationVersion` | integer | Hayır |
 | `data.generatedAt` | RFC 3339 string | Hayır |
@@ -137,6 +155,9 @@ Public enum değerleri:
 4. `claimId` artan.
 
 Daha fazla sonuç varsa `curatedMatchesTruncated: true` olur. V1 public lookup, tüm kanıt kayıtlarını veya kişisel cihaz düzeyindeki ham veriyi döndürmez.
+
+`insights` en fazla 50 kayıt içerir. Bu alan protokol kullanımı, tarihsel ad
+ve olasılıksal cihaz/platform ipuçlarını taşır; `assignment` sonucunu değiştirmez.
 
 ### Cache
 
@@ -197,6 +218,8 @@ observation yoksa release fetch zamanına düşer.
       "sourceReleaseId": "sr_01...",
       "observedAt": "2026-07-11T02:00:00Z",
       "verificationStatus": "authoritative",
+      "sourceClass": "authoritative",
+      "recordCount": 39722,
       "rightsScope": "api_output",
       "rightsStatusAtBuild": "approved",
       "currentRightsStatus": "approved",
@@ -216,6 +239,9 @@ sonradan expired/rejected olan veya config'i değişen kaynak gizlenmez.
 resolution'ın kullandığı sürümdür. Eşitsizlik rebuild gerektiğini gösterir fakat
 tek başına lookup çıktısını değiştirmez. Kaynak lisans metninin yerine geçmez.
 Hassas artifact URL'leri, imza anahtarları, iç notlar ve ham kayıtlar döndürülmez.
+`sourceClass` kaynak katmanını, `recordCount` ise dahil edilen immutable source
+release içindeki normalize edilmiş kayıt sayısını gösterir; resolved assignment
+sayısı değildir.
 
 Cache: `Cache-Control: public, max-age=60, s-maxage=300`. ETag; `activeVersion`,
 `publicationVersion`, dahil edilen kaynakların güncel `configVersion`, hak
