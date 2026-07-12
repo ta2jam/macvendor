@@ -14,7 +14,7 @@ export async function GET(
   { params }: { params: Promise<{ registry: string; prefix: string }> },
 ) {
   const id = requestId(request);
-  const rate = consumeRateLimit(request, request.nextUrl.searchParams.get("include") === "evidence" ? 5 : 1);
+  const rate = await consumeRateLimit(request, request.nextUrl.searchParams.get("include") === "evidence" ? 5 : 1);
   if (!rate.allowed) {
     return problemResponse({ status: 429, code: "RATE_LIMITED", title: "Rate limit exceeded", detail: "Too many requests.", requestId: id, retryAfter: rate.retryAfter });
   }

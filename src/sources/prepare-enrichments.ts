@@ -16,18 +16,34 @@ const IANA_ORIGIN = "https://www.iana.org";
 const IEEE_SITE_ORIGIN = "https://standards.ieee.org";
 const RUNZERO_ORIGIN = "https://raw.githubusercontent.com";
 const WIKIDATA_ORIGIN = "https://www.wikidata.org";
+const WIRESHARK_ORIGIN = "https://gitlab.com";
+const MICROSOFT_ORIGIN = "https://learn.microsoft.com";
+const BROADCOM_ORIGIN = "https://knowledge.broadcom.com";
+const OPENSTACK_ORIGIN = "https://opendev.org";
+const PCI_ORIGIN = "https://pci-ids.ucw.cz";
+const GLEIF_ORIGIN = "https://api.gleif.org";
+const SEC_ORIGIN = "https://data.sec.gov";
+const COMPANIES_HOUSE_ORIGIN = "https://data.companieshouse.gov.uk";
 const IANA_UNICAST_URL = `${IANA_ORIGIN}/assignments/ethernet-numbers/ethernet-numbers-2.csv`;
 const IANA_MULTICAST_URL = `${IANA_ORIGIN}/assignments/ethernet-numbers/ethernet-numbers-3.csv`;
 const IEEE_GROUP_URL = `${IEEE_SITE_ORIGIN}/products-programs/regauth/grpmac/public/`;
 const RUNZERO_HISTORY_URL = `${RUNZERO_ORIGIN}/runZeroInc/mac-tracker/main/data/macs.json`;
 const RUNZERO_VIRTUAL_URL = `${RUNZERO_ORIGIN}/runZeroInc/mac-tracker/main/oui_virtual.go`;
 const WIKIDATA_ENTITY = `${WIKIDATA_ORIGIN}/wiki/Special:EntityData`;
+const WIRESHARK_WKA_URL = `${WIRESHARK_ORIGIN}/wireshark/wireshark/-/raw/master/wka`;
+const HYPERV_URL = `${MICROSOFT_ORIGIN}/en-us/troubleshoot/windows-server/virtualization/default-limit-256-dynamic-mac-addresses`;
+const VMWARE_URL = `${BROADCOM_ORIGIN}/external/article/316642`;
+const OPENSTACK_MAC_URL = `${OPENSTACK_ORIGIN}/openstack/neutron/raw/branch/master/neutron/conf/common.py`;
+const OPENSTACK_DVR_URL = `${OPENSTACK_ORIGIN}/openstack/neutron/raw/branch/master/neutron/conf/db/dvr_mac_db.py`;
+const IANA_PEN_URL = `${IANA_ORIGIN}/assignments/enterprise-numbers.txt`;
+const PCI_IDS_URL = `${PCI_ORIGIN}/v2.2/pci.ids`;
+const USB_IDS_URL = `${RUNZERO_ORIGIN}/vcrhonek/hwdata/master/usb.ids`;
 const MAX_BYTES = 20 * 1024 * 1024;
 
 interface OutputRecord {
-  prefix: string;
-  prefixLength: string;
-  recordKind: "vendor_alias" | "device_hint" | "usage_note";
+  prefix?: string;
+  prefixLength?: string;
+  recordKind: "vendor_alias" | "device_hint" | "usage_note" | "organization_identity";
   organizationName?: string;
   originType: "imported" | "derived";
   rightsBasis: RightsBasis;
@@ -41,6 +57,10 @@ interface OutputRecord {
 }
 
 interface WikidataMapping { qid: string; registeredNames: string[] }
+interface IdentityMapping {
+  organizationKey: string; registeredNames: string[]; pen?: string[]; pci?: string[]; usb?: string[];
+  gleif?: string[]; sec?: string[]; companiesHouse?: string[];
+}
 interface IeeeRow { Registry: string; Assignment: string; "Organization Name": string }
 interface RunZeroEvent { d?: string; t?: string; a?: string; c?: string; o?: string; s?: string }
 
@@ -84,9 +104,9 @@ function outputPrefix(item: { bits: bigint; length: number }): Pick<OutputRecord
   return { prefix: formatPrefix(item.bits, item.length), prefixLength: String(item.length) };
 }
 
-async function download(url: string, origins: string[]): Promise<Buffer> {
+async function download(url: string, origins: string[], accept: "application/octet-stream" | "application/json" = "application/octet-stream"): Promise<Buffer> {
   return (await downloadHttps(url, {
-    allowedOrigins: origins, maxRedirects: 0, maxBytes: MAX_BYTES, timeoutMs: 60_000,
+    allowedOrigins: origins, maxRedirects: 0, maxBytes: MAX_BYTES, timeoutMs: 60_000, accept,
   })).bytes;
 }
 
@@ -138,6 +158,155 @@ async function ieeeGroupRecords(): Promise<OutputRecord[]> {
   });
   if (records.length < 50) throw new Error("IEEE group MAC public listing produced too few records");
   return records;
+}
+
+export function wiresharkWkaRecords(source: string): OutputRecord[] {
+  const records: OutputRecord[] = [];
+  for (const [index, line] of source.split(/\r?\n/u).entries()) {
+    const value = line.trim();
+    if (!value || value.startsWith("#")) continue;
+    const [address, ...labelParts] = value.split(/\s+/u);
+    const match = /^([0-9A-Fa-f]{2}(?:-[0-9A-Fa-f]{2}){2,5})(?:\/(\d{1,2}))?$/.exec(address ?? "");
+    if (!match || !labelParts.length) throw new Error(`invalid Wireshark WKA row ${index + 1}`);
+    const octets = match[1]!.split("-");
+    const length = match[2] ? Number(match[2]) : octets.length * 8;
+    if (length < 1 || length > 48) throw new Error(`invalid Wireshark WKA prefix row ${index + 1}`);
+    const padded = `${octets.join("")}${"00".repeat(6 - octets.length)}`;
+    const bits = BigInt(`0x${padded}`) >> BigInt(48 - length);
+    const label = clean(labelParts.join(" "));
+    records.push({ ...outputPrefix({ bits, length }), recordKind: "usage_note", originType: "imported",
+      rightsBasis: "licensed", distributionScope: "api_output", verificationStatus: "reviewed",
+      reviewedBy: "operator:wireshark-wka-review-2026-07-12", evidenceReference: WIRESHARK_WKA_URL,
+      privacyReviewReference: length >= 37 ? "docs/privacy.md#group-and-protocol-addresses" : undefined,
+      claimValue: { usage: label, sourceLine: index + 1, scope: "Wireshark well-known address" } });
+  }
+  if (records.length < 50) throw new Error("Wireshark WKA produced too few records");
+  return records;
+}
+
+function reviewedHint(prefix: string, platform: string, evidenceReference: string,
+  details: Record<string, unknown>): OutputRecord {
+  const length = 24;
+  return { prefix, prefixLength: String(length), recordKind: "device_hint", organizationName: platform,
+    originType: "derived", rightsBasis: "permission_granted", distributionScope: "api_output",
+    verificationStatus: "reviewed", reviewedBy: "operator:virtual-mac-review-2026-07-12", evidenceReference,
+    claimValue: { platform, confidence: "possible", configurable: true, ...details } };
+}
+
+function identityRecord(mapping: IdentityMapping, scheme: string, identifier: string, organizationName: string,
+  aliases: string[], evidenceReference: string, rightsBasis: RightsBasis, extra: Record<string, unknown> = {}): OutputRecord {
+  return { recordKind: "organization_identity", organizationName: clean(organizationName), originType: "imported",
+    rightsBasis, distributionScope: "api_output", verificationStatus: "reviewed",
+    reviewedBy: "operator:organization-identity-review-2026-07-12", evidenceReference,
+    claimValue: { organizationKey: mapping.organizationKey, scheme, identifier,
+      registeredNames: mapping.registeredNames.map(clean), aliases: aliases.map(clean).filter(Boolean), ...extra } };
+}
+
+function vendorIdRecords(source: string, mappings: IdentityMapping[], field: "pci" | "usb", scheme: string,
+  evidenceReference: string): OutputRecord[] {
+  const names = new Map<string,string>();
+  for (const line of source.split(/\r?\n/u)) {
+    const match = /^([0-9A-Fa-f]{4})  (.+)$/u.exec(line);
+    if (match) names.set(match[1]!.toLowerCase(), clean(match[2]!));
+  }
+  const records: OutputRecord[] = [];
+  for (const mapping of mappings) for (const identifier of mapping[field] ?? []) {
+    const name = names.get(identifier.toLowerCase());
+    if (!name) throw new Error(`${scheme} identifier ${identifier} is missing`);
+    records.push(identityRecord(mapping, scheme, identifier.toLowerCase(), name, [], evidenceReference, "licensed"));
+  }
+  return records;
+}
+
+async function organizationIdentityRecords(mappingPath: string): Promise<Record<string, OutputRecord[]>> {
+  const mappings = JSON.parse(await readFile(mappingPath, "utf8")) as IdentityMapping[];
+  if (!mappings.length || new Set(mappings.map((item) => item.organizationKey)).size !== mappings.length) {
+    throw new Error("organization identity mappings must contain unique organizationKey values");
+  }
+  const [penBytes, pciBytes, usbBytes] = await Promise.all([
+    download(IANA_PEN_URL, [IANA_ORIGIN]), download(PCI_IDS_URL, [PCI_ORIGIN]), download(USB_IDS_URL, [RUNZERO_ORIGIN]),
+  ]);
+  const penNames = new Map<string,string>();
+  for (const match of penBytes.toString("utf8").matchAll(/^(\d+)\r?\n {2}([^\r\n]+)$/gmu)) {
+    penNames.set(match[1]!, clean(match[2]!));
+  }
+  const pen: OutputRecord[] = [];
+  for (const mapping of mappings) for (const identifier of mapping.pen ?? []) {
+    const name = penNames.get(identifier);
+    if (!name) throw new Error(`IANA PEN ${identifier} is missing`);
+    pen.push(identityRecord(mapping, "iana-pen", identifier, name, [], IANA_PEN_URL, "public_domain_claim"));
+  }
+  const pci = vendorIdRecords(pciBytes.toString("utf8"), mappings, "pci", "pci-vendor-id", PCI_IDS_URL);
+  const usb = vendorIdRecords(usbBytes.toString("utf8"), mappings, "usb", "usb-vendor-id", USB_IDS_URL);
+  const gleif: OutputRecord[] = [];
+  const sec: OutputRecord[] = [];
+  const companiesHouse: OutputRecord[] = [];
+  for (const mapping of mappings) {
+    for (const identifier of mapping.gleif ?? []) {
+      const url = `${GLEIF_ORIGIN}/api/v1/lei-records/${identifier}`;
+      const body = JSON.parse((await download(url, [GLEIF_ORIGIN], "application/json")).toString("utf8")) as {
+        data?: { id?: string; attributes?: { entity?: { legalName?: { name?: string }; otherNames?: Array<{ name?: string }>;
+          legalAddress?: { country?: string }; registeredAs?: string }; registration?: { status?: string } } };
+      };
+      const data = body.data;
+      const legalName = clean(data?.attributes?.entity?.legalName?.name ?? "");
+      if (data?.id !== identifier || !legalName) throw new Error(`GLEIF LEI ${identifier} response is invalid`);
+      gleif.push(identityRecord(mapping, "lei", identifier, legalName,
+        (data.attributes?.entity?.otherNames ?? []).flatMap((item) => item.name ? [item.name] : []), url,
+        "public_domain_claim", { country: data.attributes?.entity?.legalAddress?.country ?? null,
+          registrationStatus: data.attributes?.registration?.status ?? null,
+          registeredAs: data.attributes?.entity?.registeredAs ?? null }));
+    }
+    for (const identifier of mapping.sec ?? []) {
+      const url = `${SEC_ORIGIN}/submissions/CIK${identifier}.json`;
+      const body = JSON.parse((await download(url, [SEC_ORIGIN], "application/json")).toString("utf8")) as {
+        cik?: number; name?: string; formerNames?: Array<{ name?: string; from?: string; to?: string }>;
+        tickers?: string[]; exchanges?: string[]; stateOfIncorporation?: string;
+      };
+      if (String(body.cik ?? "").padStart(10, "0") !== identifier || !body.name) throw new Error(`SEC CIK ${identifier} response is invalid`);
+      sec.push(identityRecord(mapping, "sec-cik", identifier, body.name,
+        (body.formerNames ?? []).flatMap((item) => item.name ? [item.name] : []), url, "public_domain_claim",
+        { tickers: body.tickers ?? [], exchanges: body.exchanges ?? [], stateOfIncorporation: body.stateOfIncorporation ?? null }));
+    }
+    for (const identifier of mapping.companiesHouse ?? []) {
+      const url = `${COMPANIES_HOUSE_ORIGIN}/doc/company/${identifier}.json`;
+      const body = JSON.parse((await download(url, [COMPANIES_HOUSE_ORIGIN], "application/json")).toString("utf8")) as {
+        primaryTopic?: { CompanyName?: string; CompanyNumber?: string; CompanyStatus?: string; PreviousCompanyName?: string[] };
+      };
+      const company = body.primaryTopic;
+      if (company?.CompanyNumber !== identifier || !company.CompanyName) throw new Error(`Companies House ${identifier} response is invalid`);
+      companiesHouse.push(identityRecord(mapping, "uk-company-number", identifier, company.CompanyName,
+        Array.isArray(company.PreviousCompanyName) ? company.PreviousCompanyName : [], url, "licensed",
+        { companyStatus: company.CompanyStatus ?? null }));
+    }
+  }
+  return { pen, pci, usb, gleif, sec, companiesHouse };
+}
+
+async function officialVirtualPlatformRecords(): Promise<{
+  wireshark: OutputRecord[]; hyperv: OutputRecord[]; vmware: OutputRecord[]; openstack: OutputRecord[];
+}> {
+  const [wka, hypervPage, vmwarePage, openstackSource, openstackDvrSource] = await Promise.all([
+    download(WIRESHARK_WKA_URL, [WIRESHARK_ORIGIN]), download(HYPERV_URL, [MICROSOFT_ORIGIN]),
+    download(VMWARE_URL, [BROADCOM_ORIGIN]), download(OPENSTACK_MAC_URL, [OPENSTACK_ORIGIN]),
+    download(OPENSTACK_DVR_URL, [OPENSTACK_ORIGIN]),
+  ]);
+  const hypervText = hypervPage.toString("utf8").toLowerCase();
+  const vmwareText = vmwarePage.toString("utf8").toLowerCase();
+  const openstackText = openstackSource.toString("utf8").toLowerCase();
+  const openstackDvrText = openstackDvrSource.toString("utf8").toLowerCase();
+  if (!hypervText.includes("00:15:5d") && !hypervText.includes("00-15-5d")) throw new Error("Hyper-V source no longer documents 00:15:5D");
+  if (!vmwareText.includes("00:0c:29") || !vmwareText.includes("00:50:56")) throw new Error("VMware source no longer documents expected prefixes");
+  if (!openstackText.includes("fa:16:3e") || !openstackDvrText.includes("fa:16:3f")) throw new Error("OpenStack source no longer documents expected base MACs");
+  return {
+    wireshark: wiresharkWkaRecords(wka.toString("utf8")),
+    hyperv: [reviewedHint("00155D", "Microsoft Hyper-V", HYPERV_URL, { allocation: "dynamic virtual NIC" })],
+    vmware: ["000C29", "005056"].map((prefix) => reviewedHint(prefix, "VMware", VMWARE_URL, { allocation: "virtual NIC" })),
+    openstack: [
+      reviewedHint("FA163E", "OpenStack Neutron", OPENSTACK_MAC_URL, { allocation: "tenant port default base" }),
+      reviewedHint("FA163F", "OpenStack Neutron", OPENSTACK_DVR_URL, { allocation: "distributed router default base" }),
+    ],
+  };
 }
 
 function runZeroHistoryRecords(input: Record<string, RunZeroEvent[]>): OutputRecord[] {
@@ -276,7 +445,8 @@ async function writeSource(definition: SourceDefinition, output: string, private
 }
 
 export interface PrepareEnrichmentOptions {
-  output?: string; ieeeDirectory: string; mappingPath?: string; privateKeyPath?: string; publicKeyPath?: string; now?: Date;
+  output?: string; ieeeDirectory: string; mappingPath?: string; identityMappingPath?: string;
+  privateKeyPath?: string; publicKeyPath?: string; now?: Date;
 }
 
 export async function prepareEnrichmentSources(options: PrepareEnrichmentOptions) {
@@ -286,11 +456,13 @@ export async function prepareEnrichmentSources(options: PrepareEnrichmentOptions
     ?? path.join(os.homedir(), ".config/macvendor/ieee-ingest-ed25519-private.pem"));
   const publicKeyPath = path.resolve(options.publicKeyPath ?? "config/keys/ieee-ingest-ed25519-public.pem");
   const mappingPath = path.resolve(options.mappingPath ?? "config/wikidata-alias-mappings.json");
+  const identityMappingPath = path.resolve(options.identityMappingPath ?? "config/organization-identity-mappings.json");
   await mkdir(output, { recursive: true, mode: 0o700 });
   const observedAt = now.toISOString();
-  const [iana, ieeeGroup, runZero, wikidata] = await Promise.all([
+  const [iana, ieeeGroup, runZero, wikidata, virtualPlatforms, identities] = await Promise.all([
     ianaRecords(), ieeeGroupRecords(), runZeroRecords(),
-    wikidataRecords(path.resolve(options.ieeeDirectory), mappingPath),
+    wikidataRecords(path.resolve(options.ieeeDirectory), mappingPath), officialVirtualPlatformRecords(),
+    organizationIdentityRecords(identityMappingPath),
   ]);
   const definitions: SourceDefinition[] = [
     { slug: "iana-ethernet-numbers", name: "IANA Ethernet Numbers", homepageUrl: `${IANA_ORIGIN}/assignments/ethernet-numbers/ethernet-numbers.xhtml`,
@@ -308,6 +480,46 @@ export async function prepareEnrichmentSources(options: PrepareEnrichmentOptions
     { slug: "wikidata-vendor-aliases", name: "Reviewed Wikidata vendor aliases", homepageUrl: "https://www.wikidata.org/",
       termsUrl: "https://www.wikidata.org/wiki/Wikidata:Licensing", rightsBasis: "public_domain_claim",
       reviewReference: "docs/rights/wikidata.md#decision-2026-07-12", records: wikidata,
+      maxAddedPercent: 50, maxRemovedPercent: 20 },
+    { slug: "wireshark-well-known-addresses", name: "Wireshark well-known MAC addresses", homepageUrl: WIRESHARK_WKA_URL,
+      termsUrl: "https://gitlab.com/wireshark/wireshark/-/blob/master/COPYING", rightsBasis: "licensed",
+      reviewReference: "docs/rights/wireshark-wka.md#decision-2026-07-12", records: virtualPlatforms.wireshark,
+      maxAddedPercent: 30, maxRemovedPercent: 15 },
+    { slug: "microsoft-hyperv-mac-hints", name: "Microsoft Hyper-V MAC allocation hints", homepageUrl: HYPERV_URL,
+      termsUrl: "https://learn.microsoft.com/legal/termsofuse", rightsBasis: "public_domain_claim",
+      reviewReference: "docs/rights/virtual-platform-mac-hints.md#decision-2026-07-12", records: virtualPlatforms.hyperv,
+      maxAddedPercent: 100, maxRemovedPercent: 100 },
+    { slug: "vmware-mac-hints", name: "VMware MAC allocation hints", homepageUrl: VMWARE_URL,
+      termsUrl: "https://www.broadcom.com/company/legal/terms-of-use", rightsBasis: "public_domain_claim",
+      reviewReference: "docs/rights/virtual-platform-mac-hints.md#decision-2026-07-12", records: virtualPlatforms.vmware,
+      maxAddedPercent: 100, maxRemovedPercent: 100 },
+    { slug: "openstack-neutron-mac-hints", name: "OpenStack Neutron default MAC hints", homepageUrl: OPENSTACK_MAC_URL,
+      termsUrl: "https://opendev.org/openstack/neutron/src/branch/master/LICENSE", rightsBasis: "licensed",
+      reviewReference: "docs/rights/virtual-platform-mac-hints.md#decision-2026-07-12", records: virtualPlatforms.openstack,
+      maxAddedPercent: 100, maxRemovedPercent: 100 },
+    { slug: "iana-private-enterprise-numbers", name: "IANA Private Enterprise Numbers", homepageUrl: IANA_PEN_URL,
+      termsUrl: `${IANA_ORIGIN}/help/licensing-terms`, rightsBasis: "public_domain_claim",
+      reviewReference: "docs/rights/organization-identity-sources.md#iana-pen", records: identities.pen,
+      maxAddedPercent: 50, maxRemovedPercent: 20 },
+    { slug: "pci-id-repository", name: "PCI ID Repository reviewed vendors", homepageUrl: PCI_IDS_URL,
+      termsUrl: "https://pci-ids.ucw.cz/", rightsBasis: "licensed",
+      reviewReference: "docs/rights/organization-identity-sources.md#pci-ids", records: identities.pci,
+      maxAddedPercent: 50, maxRemovedPercent: 20 },
+    { slug: "hwdata-usb-vendors", name: "hwdata USB vendor identifiers", homepageUrl: USB_IDS_URL,
+      termsUrl: "https://github.com/vcrhonek/hwdata/blob/master/LICENSE", rightsBasis: "licensed",
+      reviewReference: "docs/rights/organization-identity-sources.md#usb-ids", records: identities.usb,
+      maxAddedPercent: 50, maxRemovedPercent: 20 },
+    { slug: "gleif-lei-identities", name: "GLEIF reviewed legal entities", homepageUrl: `${GLEIF_ORIGIN}/api/v1/lei-records`,
+      termsUrl: "https://www.gleif.org/en/meta/lei-data-terms-of-use", rightsBasis: "public_domain_claim",
+      reviewReference: "docs/rights/organization-identity-sources.md#gleif", records: identities.gleif,
+      maxAddedPercent: 50, maxRemovedPercent: 20 },
+    { slug: "sec-edgar-identities", name: "SEC EDGAR reviewed filer identities", homepageUrl: `${SEC_ORIGIN}/submissions/`,
+      termsUrl: "https://www.sec.gov/about/developer-resources", rightsBasis: "public_domain_claim",
+      reviewReference: "docs/rights/organization-identity-sources.md#sec-edgar", records: identities.sec,
+      maxAddedPercent: 50, maxRemovedPercent: 20 },
+    { slug: "companies-house-identities", name: "Companies House reviewed legal entities", homepageUrl: COMPANIES_HOUSE_ORIGIN,
+      termsUrl: "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/", rightsBasis: "licensed",
+      reviewReference: "docs/rights/organization-identity-sources.md#companies-house", records: identities.companiesHouse,
       maxAddedPercent: 50, maxRemovedPercent: 20 },
   ];
   const sources = [];

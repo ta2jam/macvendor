@@ -1,0 +1,15 @@
+[Unit]
+Description=Guarded macvendor source update
+Requires=docker.service
+After=docker.service macvendor-backup.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/macvendor-source-update
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/srv/sites/macvendor/source-work /srv/sites/macvendor/releases

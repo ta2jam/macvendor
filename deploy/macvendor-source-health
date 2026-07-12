@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+ROOT=/srv/sites/macvendor
+exec docker run --rm \
+  --network macvendor_default \
+  --env-file "$ROOT/.env" \
+  --entrypoint sh macvendor-tooling:current -lc '
+    encoded="$(node -e "process.stdout.write(encodeURIComponent(process.env.POSTGRES_PASSWORD))")"
+    export DATABASE_URL="postgresql://macvendor:${encoded}@database:5432/macvendor"
+    npm run source:health
+  '

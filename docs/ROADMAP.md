@@ -3,12 +3,12 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.1.1 inspectable local release
+## Current — 0.3.0 governed multi-source release
 
-The 0.1.0 milestone means the real active dataset, provenance, rights state,
-config drift, and record counts can be inspected through the local web UI. It
-does not mean internet production readiness: shared rate limiting and an
-accountable correction backend still require deployment decisions.
+The 0.3.0 milestone publishes governed IEEE assignments, separately labelled
+MAC context, and reviewed organization identities. Production releases must be tagged from a
+commit reachable from `main` and pass the release gate. Shared rate limiting
+and accountable correction intake are PostgreSQL-backed.
 
 - [x] strict EUI-48 normalization;
 - [x] authoritative and curated layers kept separate;
@@ -69,10 +69,10 @@ accountable correction backend still require deployment decisions.
 
 - [x] provider-neutral surrogate-key headers, purge hook, and failure-injection
   tests; a real CDN adapter still requires provider validation — issue #18;
-- [ ] external/shared rate limiting based on measured traffic — blocked issue #19;
-- [ ] access-controlled external correction ticket backend, accountable owner,
-  and escalation rota; the public page must remain unavailable until configured
-  and proven — blocked issue #26;
+- [x] shared PostgreSQL fixed-window rate limiting with HMAC client keys, bounded
+  local fallback, and retention maintenance — issue #19;
+- [x] encrypted correction intake, append-only audit events, operator-only CLI,
+  and contact-data retention purge — issue #26;
 - [x] importer fuzz corpus and resource-limit enforcement — issue #17;
 - [x] source freshness and rights-expiry monitoring — issue #17;
 - [x] accessibility and cross-browser UI verification — issue #21;
@@ -83,7 +83,7 @@ accountable correction backend still require deployment decisions.
 
 ## After data readiness
 
-- [ ] contributor-maintained source adapters after rights review.
+- [x] synthetic contributor adapter kit with rights and provenance gates.
 
 Amateur/owner-curated database ingestion remains deferred until its provenance
 and review workflow is explicitly resumed.

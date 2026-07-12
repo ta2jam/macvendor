@@ -151,9 +151,9 @@ function normalizeClaimJson(value: unknown): unknown {
 function normalizeRecord(raw: RawRecord, row: number, manifest: SourceManifest): ParsedSourceRecord {
   const unknown = Object.keys(raw).filter((key) => !ALLOWED_FIELDS.has(key));
   if (unknown.length) throw new ImportValidationError("UNKNOWN_RECORD_FIELD", `row ${row} contains unknown field ${unknown[0]}`);
-  const prefix = prefixValue(raw.prefix, raw.prefixLength);
   const recordKind = enumValue<RecordKind>(raw.recordKind, manifest.defaults.recordKind,
-    ["assignment", "curated_vendor_claim", "vendor_alias", "device_hint", "usage_note", "tombstone"], "recordKind");
+    ["assignment", "curated_vendor_claim", "vendor_alias", "device_hint", "usage_note", "tombstone", "organization_identity"], "recordKind");
+  const prefix = recordKind === "organization_identity" ? null : prefixValue(raw.prefix, raw.prefixLength);
   const registry = enumValue<Registry | "">(raw.registry, manifest.defaults.registry ?? "",
     ["", "MA-L", "MA-M", "MA-S", "IAB", "CID"], "registry") || null;
   const originType = enumValue(raw.originType, manifest.defaults.originType,
@@ -165,7 +165,8 @@ function normalizeRecord(raw: RawRecord, row: number, manifest: SourceManifest):
   const verificationStatus = enumValue(raw.verificationStatus, manifest.defaults.verificationStatus,
     ["unverified", "single_observation", "corroborated", "reviewed"] as const, "verificationStatus");
   const isPrivate = booleanValue(raw.private, "private");
-  const organizationName = text(raw.organizationName, "organizationName", !isPrivate && (recordKind === "assignment" || recordKind === "curated_vendor_claim"));
+  const organizationName = text(raw.organizationName, "organizationName", !isPrivate
+    && (recordKind === "assignment" || recordKind === "curated_vendor_claim" || recordKind === "organization_identity"));
   const organizationAddress = text(raw.organizationAddress, "organizationAddress");
   const privacyReviewReference = text(raw.privacyReviewReference, "privacyReviewReference");
   const reviewedBy = text(raw.reviewedBy, "reviewedBy");
@@ -176,7 +177,7 @@ function normalizeRecord(raw: RawRecord, row: number, manifest: SourceManifest):
     if (manifest.source.class !== "authoritative") throw new ImportValidationError("ASSIGNMENT_SOURCE_CLASS", "only authoritative sources can import assignment records");
     if (!registry) throw new ImportValidationError("REGISTRY_REQUIRED", "assignment records require registry");
     const requiredLength = registry === "MA-M" ? 28 : registry === "MA-S" || registry === "IAB" ? 36 : 24;
-    if (prefix.length !== requiredLength) throw new ImportValidationError("REGISTRY_PREFIX_MISMATCH", `${registry} requires /${requiredLength}`);
+    if (prefix!.length !== requiredLength) throw new ImportValidationError("REGISTRY_PREFIX_MISMATCH", `${registry} requires /${requiredLength}`);
   } else if (registry) {
     throw new ImportValidationError("REGISTRY_NOT_ALLOWED", "non-assignment records cannot set registry");
   }
@@ -189,11 +190,18 @@ function normalizeRecord(raw: RawRecord, row: number, manifest: SourceManifest):
   if (isPrivate && (organizationName || organizationAddress)) {
     throw new ImportValidationError("PRIVATE_DATA_EXPOSED", "private records cannot include public organization name or address");
   }
+  if (recordKind === "organization_identity") {
+    for (const field of ["organizationKey", "scheme", "identifier"]) {
+      if (typeof normalizedClaimValue[field] !== "string" || !normalizedClaimValue[field]) {
+        throw new ImportValidationError("IDENTITY_FIELD_REQUIRED", `organization_identity claimValue requires ${field}`);
+      }
+    }
+  }
   if (manifest.source.publishMode === "production") {
     if (originType === "unknown" || rightsBasis === "unknown" || distributionScope !== "api_output") {
       throw new ImportValidationError("RECORD_RIGHTS_BLOCKED", `row ${row} lacks production origin/rights/api_output scope`);
     }
-    if (prefix.length >= 37 && !privacyReviewReference) {
+    if (prefix && prefix.length >= 37 && !privacyReviewReference) {
       throw new ImportValidationError("PRIVACY_REVIEW_REQUIRED", `row ${row} with /${prefix.length} requires privacyReviewReference`);
     }
   }
@@ -205,7 +213,7 @@ function normalizeRecord(raw: RawRecord, row: number, manifest: SourceManifest):
   }
 
   const normalizedForHash = {
-    recordKind, registry, prefix: formatPrefix(prefix.bits, prefix.length), prefixLength: prefix.length,
+    recordKind, registry, prefix: prefix ? formatPrefix(prefix.bits, prefix.length) : null, prefixLength: prefix?.length ?? null,
     organizationName, organizationAddress, isPrivate, originType, rightsBasis, distributionScope,
     verificationStatus, reviewedBy, claimValue: normalizedClaimValue, evidenceReference, privacyReviewReference,
     observedAt: timestamp(raw.observedAt, "observedAt"),
@@ -214,8 +222,8 @@ function normalizeRecord(raw: RawRecord, row: number, manifest: SourceManifest):
     recordKind,
     recordStatus: manifest.source.publishMode === "production" ? "eligible" : "qa_only",
     registry,
-    prefixBits: prefix.bits,
-    prefixLength: prefix.length,
+    prefixBits: prefix?.bits ?? null,
+    prefixLength: prefix?.length ?? null,
     organizationName,
     organizationAddress,
     isPrivate,

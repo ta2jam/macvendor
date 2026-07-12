@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { dataCorrectionsEmail } from "@/lib/public-config";
+import { CorrectionForm } from "@/components/correction-form";
 
 export const metadata: Metadata = {
   title: "Data correction and withdrawal",
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default function DataCorrectionsPage() {
   const email = dataCorrectionsEmail();
+  const databaseIntake = Boolean(process.env.CORRECTION_ENCRYPTION_KEY);
   const subject = encodeURIComponent("[macvendor.io] Data correction request");
 
   return (
@@ -22,12 +24,17 @@ export default function DataCorrectionsPage() {
         relevant source and evidence. A request does not automatically change the public result.
       </p>
 
-      {email ? (
+      {databaseIntake ? (
+        <div className="callout intake-ready" role="status">
+          <strong>The correction channel is available.</strong>
+          <p>Requests receive a private tracking reference. Submission does not automatically change public data.</p>
+          <CorrectionForm />
+        </div>
+      ) : email ? (
         <div className="callout intake-ready" role="status">
           <strong>The correction channel is available.</strong>
           <p>
-            Send the request to <code>{email}</code>. Contact details and evidence are not made public
-            or written to the macvendor PostgreSQL database.
+            Send the request to <code>{email}</code>. Contact details and evidence are not made public.
           </p>
           <a className="action-link" href={`mailto:${email}?subject=${subject}`}>
             Create correction email

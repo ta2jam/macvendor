@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly guarded macvendor source update
+
+[Timer]
+OnCalendar=Sun *-*-* 03:30:00 UTC
+RandomizedDelaySec=20m
+Persistent=true
+Unit=macvendor-source-update.service
+
+[Install]
+WantedBy=timers.target

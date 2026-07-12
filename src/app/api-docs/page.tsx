@@ -7,6 +7,9 @@ const examples = [
   ["Official layer only", "GET /v1/lookup/02AABBCC0001?mode=official"],
   ["Exact assignment", "GET /v1/assignments/ma-l/02AABB-24"],
   ["Active release", "GET /v1/data-release"],
+  ["Organization search", "GET /v1/organizations?q=Apple"],
+  ["Organization identity", "GET /v1/organizations/Q312"],
+  ["Correction intake", "POST /v1/corrections"],
 ];
 
 export default function ApiDocsPage() {

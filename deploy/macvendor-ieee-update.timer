@@ -1,0 +1,11 @@
+[Unit]
+Description=Update macvendor.io IEEE source snapshot daily
+
+[Timer]
+OnCalendar=*-*-* 02:10:00 UTC
+Persistent=true
+RandomizedDelaySec=20m
+Unit=macvendor-ieee-update.service
+
+[Install]
+WantedBy=timers.target

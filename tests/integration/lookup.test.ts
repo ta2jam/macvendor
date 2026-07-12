@@ -27,6 +27,8 @@ import { IEEE_ADAPTER_KEY, IEEE_DATASETS, IEEE_RA_ORIGIN, IEEE_RIGHTS_REVIEW } f
 import type { PreparedIeeeSnapshot } from "../../src/sources/prepare-ieee";
 import { migrate } from "../../src/db/migrate";
 import { applySourceGovernance, previewSourceGovernance } from "../../src/operations/source-governance";
+import { searchOrganizations } from "../../src/db/organizations";
+import { POST as correctionRoute } from "../../src/app/v1/corrections/route";
 
 config({ path: ".env.local", quiet: true });
 
@@ -47,6 +49,41 @@ afterAll(async () => {
     await globalThis.__macvendorPool.end();
     globalThis.__macvendorPool = undefined;
   }
+});
+
+describe("organization identity and correction intake", () => {
+  it("links reviewed identities only through exact registered names", async () => {
+    const release=await pool.query<{id:string}>(`SELECT sr.id FROM source_releases sr
+      JOIN data_sources ds ON ds.id=sr.source_id WHERE ds.slug='demo-curated' LIMIT 1`);
+    const id=crypto.randomUUID();
+    await pool.query(`INSERT INTO source_records(id,source_release_id,record_kind,record_status,prefix_bits,prefix_length,
+      organization_name_display,claim_value,origin_type,rights_basis,distribution_scope,verification_status,
+      evidence_reference,raw_record_hash,raw_locator)
+      VALUES($1,$2,'organization_identity','eligible',NULL,NULL,'Example Networks Legal',
+      '{"organizationKey":"test:example","scheme":"test","identifier":"EX-1","aliases":["Example"],"registeredNames":["Example Networks Lab"]}'::jsonb,
+      'imported','owner_created','api_output','reviewed','fixture',$3,'identity:1')`,[id,release.rows[0]!.id,sha256(`identity:${id}`)]);
+    try {
+      const result=await searchOrganizations(pool,"Example",10);
+      expect(result.results).toEqual([expect.objectContaining({organizationKey:"test:example",
+        assignments:[expect.objectContaining({organizationName:"Example Networks Lab"})]})]);
+      await pool.query("UPDATE source_records SET claim_value=jsonb_set(claim_value,'{registeredNames}','[\"Example Networks\"]'::jsonb) WHERE id=$1",[id]);
+      const exactOnly=await searchOrganizations(pool,"Example",10);
+      expect(exactOnly.results[0]!.assignments).toEqual([]);
+    } finally { await pool.query("DELETE FROM source_records WHERE id=$1",[id]); }
+  });
+
+  it("accepts correction JSON while storing no plaintext contact", async () => {
+    process.env.CORRECTION_ENCRYPTION_KEY=Buffer.alloc(32,7).toString("base64");
+    const email="reviewer@example.invalid";
+    const response=await correctionRoute(new NextRequest("http://localhost:3000/v1/corrections",{
+      method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({category:"incorrect_assignment",
+        target:"02AABB/24",requestedChange:"Replace the synthetic assignment after review.",
+        evidenceUrl:"https://example.invalid/evidence",contactEmail:email})}));
+    expect(response.status).toBe(202);
+    const accepted=await response.json() as {reference:string};
+    const stored=await pool.query<{contact_ciphertext:unknown}>("SELECT contact_ciphertext FROM correction_requests WHERE reference=$1",[accepted.reference]);
+    expect(JSON.stringify(stored.rows[0]!.contact_ciphertext)).not.toContain(email);
+  });
 });
 
 describe("database lookup", () => {

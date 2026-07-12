@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const id = requestId(request);
-  const rate = consumeRateLimit(request);
+  const rate = await consumeRateLimit(request);
   if (!rate.allowed) {
     return problemResponse({ status: 429, code: "RATE_LIMITED", title: "Rate limit exceeded", detail: "Too many requests.", requestId: id, retryAfter: rate.retryAfter });
   }
