@@ -65,7 +65,7 @@ export async function prepareIeeeSources(options: PrepareIeeeOptions = {}): Prom
   const download = options.download ?? downloadHttps;
   for (const dataset of IEEE_DATASETS) {
     const downloaded = await download(dataset.url, {
-      allowedOrigins: [IEEE_RA_ORIGIN], maxRedirects: 0, maxBytes: MAX_BYTES, timeoutMs: 30_000,
+      allowedOrigins: [IEEE_RA_ORIGIN], maxRedirects: 0, maxBytes: MAX_BYTES, timeoutMs: 90_000,
     }, options.networkOptions);
     const artifactPath = path.join(output, dataset.file);
     const signatureName = `${dataset.file}.sig`;
