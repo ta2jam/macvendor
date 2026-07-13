@@ -3,7 +3,7 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.5.0 bounded public operations
+## Current — 0.5.5 bounded public operations
 
 The current release publishes governed IEEE assignments, separately labelled
 MAC context, and reviewed organization identities. Production releases must be tagged from a
@@ -102,9 +102,11 @@ and accountable correction intake are PostgreSQL-backed.
 
 - [x] synthetic contributor adapter kit with rights and provenance gates.
 
-Amateur/owner-curated production publication remains deferred until real files
-and declarations are supplied. `owner:prepare` can only produce `qa_only`,
-`internal_only` quarantine artifacts and cannot remove or replace a source.
+Owner-created intake is complete and available on demand. `owner:prepare` can
+only produce `qa_only`, `internal_only` quarantine artifacts and cannot remove
+or replace a source. Production publication is not backlog work: it begins only
+when a real file and declaration are supplied and pass rights, privacy, conflict,
+correction, and rollback review.
 
 ## Explicitly not current scope
 

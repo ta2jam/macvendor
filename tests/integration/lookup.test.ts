@@ -413,6 +413,12 @@ describe("lookup route", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("surrogate-key")).toBeNull();
     assertPublicContract("AssignmentResponse", await response.json());
+
+    const publicResponse = await assignmentRoute(
+      new NextRequest("http://localhost:3000/v1/assignments/ma-l/02AABB-24"),
+      { params: Promise.resolve({ registry: "ma-l", prefix: "02AABB-24" }) },
+    );
+    expect(publicResponse.headers.get("cache-control")).toBe("public, max-age=300, s-maxage=300");
   });
 
   it("matches the active data-release response contract", async () => {

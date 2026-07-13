@@ -28,9 +28,10 @@ retention is bounded to 14 days and the newest 20 dumps because releases also
 create pre- and post-deploy backups. It must be paired with an off-host copy. A
 same-disk backup does not protect against VPS or disk loss.
 
-The temporary off-host control is the encrypted MacBook restic pull documented
-in `docs/recovery.md`. Replace it with independent versioned object storage and
-WAL/PITR when a provider is selected.
+The current off-host contract is the encrypted MacBook Restic pull documented
+in `docs/recovery.md`. `macvendor-restore-drill.timer` restores the latest real
+dump into an isolated 1 CPU/768 MiB PostgreSQL container quarterly and deletes
+the disposable container and volume after verification.
 
 ## Administrative SSH
 
@@ -43,8 +44,11 @@ agent forwarding, TCP forwarding, and tunnels remain disabled.
 previous three-failure, one-hour exponentially increasing ban caused avoidable
 operator lockout on a public-key-only host. Do not allowlist a dynamic home IP.
 
-The Mac launch agent checks public health, release metadata, SSH, failed units,
-disk, available memory, unhealthy containers, and timer count every 15 minutes.
+`macvendor-traffic-report.timer` builds a privacy-preserving 24-hour aggregate
+every 15 minutes in constant working memory. The Mac launch agent checks public
+health, release metadata, SSH, failed units, disk, available memory, unhealthy
+containers, backup age, traffic-report age, peak traffic, 429, 5xx, and timer
+count every 15 minutes.
 It sends only failure/recovery transitions to Slack `#team`; a sleeping Mac is
 not an independent monitoring system, so GitHub Production Monitor remains the
 external HTTP probe.

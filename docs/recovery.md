@@ -1,8 +1,10 @@
 # Backup, restore, and artifact rebuild
 
-These commands implement logical-backup and recovery drills. They do not create
-managed PostgreSQL PITR, object-storage versioning, encryption-at-rest, or an
-external correction-system backup. Those remain provider responsibilities.
+These commands implement the current production recovery contract: verified
+daily logical backup, encrypted/versioned MacBook Restic copy, and an isolated
+quarterly production-dump restore drill. Managed PITR is deliberately outside
+the current shared-VPS contract until a tighter RPO and independent provider are
+selected.
 
 Requirements:
 
@@ -110,9 +112,10 @@ durations but make no RTO claim from a synthetic database.
 
 A daily invocation can support the documented 24-hour logical-backup RPO only
 when an external scheduler, failure alert, encrypted/versioned destination, and
-retention policy are configured. The 15-minute configuration/audit RPO and
-seven-day PITR target require managed physical backup/WAL archiving and remain
-unimplemented without a selected provider.
+retention policy are configured. The published V1 RPO is 24 hours. A future
+sub-day RPO or seven-day PITR promise requires managed physical backup/WAL
+archiving and independent always-on storage; it is a capacity expansion gate
+rather than a hidden current guarantee.
 
 ## Temporary MacBook off-host copy
 
@@ -123,6 +126,6 @@ and SHA-256 sidecar over the `deploy` public key, verifies the digest and
 restic password lives in macOS Keychain; FileVault must remain enabled.
 
 This is off-host but not continuously available infrastructure. A sleeping,
-offline, damaged, or stolen Mac delays the backup, so it does not satisfy the
-future managed PITR target. Failures are sent to Slack `#team` when Hermes is
+offline, damaged, or stolen Mac delays the copy, which is why the published V1
+RPO remains 24 hours. Failures are sent to Slack `#team` when Hermes is
 configured. Retention is 14 daily, 8 weekly, and 6 monthly snapshots.

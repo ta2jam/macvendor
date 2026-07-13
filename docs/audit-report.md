@@ -1,4 +1,8 @@
-# macvendor.io — tasarım hata/bug denetimi
+# macvendor.io — tarihsel tasarım hata/bug denetimi
+
+Bu belge uygulama öncesi denetim anını kaydeder. "Henüz doğrulanamayacak
+alanlar" bölümü güncel production backlog'u değildir; güncel durum
+`ROADMAP.md`, `service-objectives.md` ve `recovery.md` belgelerindedir.
 
 Tarih: 11 Temmuz 2026
 

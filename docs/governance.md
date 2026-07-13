@@ -171,13 +171,12 @@ IEEE adı endorsement izlenimi yaratacak biçimde kullanılmaz.
 
 - Public `/data-corrections` süreç ve kanal durumu sayfası.
 - Yapılandırılabilir `DATA_CORRECTIONS_EMAIL`; adres kodda sabitlenmez.
-- Email veya gelecekteki form yalnız erişim kontrollü dış ticket sistemi gerçekten
-  yapılandırıldıktan sonra aktif gösterilir; backend yokken başvuru alınmış gibi
-  davranan form yayınlanmaz.
-- Dış sistemin kabul ettiği her başvuru opaque ticket ID alır. V1 PostgreSQL
-  kişisel iletişim veya kanıt eki tutmaz.
-- `DATA_CORRECTIONS_EMAIL` yoksa public sayfa kanalı açıkça unavailable gösterir
-  ve production açılış kapısı başarısız sayılır.
+- Production formu yalnız 32-byte correction encryption key yapılandırıldığında
+  aktif olur. Başvuru kişisel iletişimini şifreli saklar ve opaque reference döner.
+- `correction_requests` ve append-only `correction_events` mevcut hacimde sistem
+  kaydıdır; operator CLI dışında plaintext erişim yoktur.
+- `DATA_CORRECTIONS_EMAIL` yalnız form kapalıyken isteğe bağlı fallback'tir.
+  Form ve email yoksa kanal unavailable gösterilir ve production kapısı başarısızdır.
 
 ### Gerekli alanlar
 
@@ -189,7 +188,7 @@ IEEE adı endorsement izlenimi yaratacak biçimde kullanılmaz.
 
 ### Hedef süreler
 
-- Dış ticket backend yapılandırıldığında otomatik alındı bildirimi: hemen.
+- Production formu opaque tracking reference döner: hemen.
 - İlk insan incelemesi: 2 iş günü.
 - Normal karar hedefi: 10 iş günü.
 - Açık kişisel veri, güvenlik veya ağır yanlış atıf: 24 saat içinde geçici suppression review.

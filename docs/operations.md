@@ -195,12 +195,12 @@ Kabul edilen diğer biçimler normalize edilir ve `308 Permanent Redirect` ile c
 Pozitif ve curated sonuç:
 
 - `ETag: "rr-{activeVersion}-pv-{publicationVersion}-{responseHash}"`
-- `Cache-Control: public, max-age=300, s-maxage=86400, stale-while-revalidate=604800`
+- `Cache-Control: public, max-age=300, s-maxage=300`
 - `Surrogate-Key: data-release resolved-release-{resolutionRunId}`
 
 Geçerli fakat eşleşmeyen MAC:
 
-- `Cache-Control: public, max-age=60, s-maxage=3600`
+- `Cache-Control: public, max-age=60, s-maxage=300`
 
 Hata, rate-limit ve evidence içeren response shared cache'e girmez.
 
@@ -208,10 +208,13 @@ Hata, rate-limit ve evidence içeren response shared cache'e girmez.
 
 1. DB pointer transaction commit.
 2. Yeni active version uygulama tarafından okunabilir olur.
-3. Eski surrogate key purge edilir.
-4. Purge başarısızsa alarm; bounded TTL stale pencereyi sınırlar.
+3. Yapılandırılmışsa eski surrogate key purge edilir.
+4. Purge yoksa veya başarısızsa beş dakikalık shared TTL stale pencereyi sınırlar.
 
-Suppression ekleme/revoke/expire işlemi `publicationVersion` değerini atomik artırır ve aynı release surrogate key'ini purge eder. Origin yeni overlay'i transaction commit edildiği anda uygular; paylaşılan edge cache purge ile, istemci cache'i ise en geç beş dakikalık `max-age` sonunda temizlenir.
+Suppression ekleme/revoke/expire işlemi `publicationVersion` değerini atomik
+artırır ve yapılandırılmışsa aynı release surrogate key'ini purge eder. Origin
+yeni overlay'i transaction commit edildiği anda uygular; edge ve istemci cache'i
+purge olmasa da en geç beş dakikalık TTL sonunda yenilenir.
 
 Mutation CLI'ları commit sonrasında provider-bağımsız bir HTTPS adapter'ına şu
 sözleşmeyle çağrı yapar:
@@ -229,9 +232,10 @@ redirect izlenmez ve çağrı 5 saniyede kesilir. Cloudflare Free için generic
 endpoint yerine `CACHE_PURGE_PROVIDER=cloudflare`, `CLOUDFLARE_ZONE_ID` ve
 yalnız ilgili zone için Cache Purge yetkisi taşıyan yeni bir token kullanılır;
 doğrudan adapter `docs/cloudflare-free-cache.md` dosyasında açıklanır. Daha önce
-ifşa edilmiş token yeniden kullanılmaz. Yeni token staging'de doğrulandıktan
-sonra production'da `CACHE_PURGE_REQUIRED=true` yapılmalıdır. O zamana kadar
-bounded TTL güvenlik ağıdır. Purge hatası commit'i geri almış gibi sunulmaz:
+ifşa edilmiş token yeniden kullanılmaz. Mevcut production kısa TTL/ETag
+stratejisinde purge opsiyoneldir. Yeni token staging'de doğrulandıktan sonra
+istenirse `CACHE_PURGE_REQUIRED=true` yapılabilir. Purge hatası commit'i geri
+almış gibi sunulmaz:
 CLI non-zero çıkar ve commit edilmiş mutation bilgisini makine-okunur hata
 içinde döndürür.
 
@@ -266,7 +270,7 @@ sınırlandırılır.
 | Rejected resolution metadata/hash | 1 yıl |
 | Valid source releases | Son 8 release, minimum 90 gün |
 | Rejected source records | 30 gün; manifest/hash 1 yıl |
-| Production raw artifacts | 1 yıl, versioned object storage |
+| Production raw artifacts | Son 8 release, minimum 90 gün; immutable hash zinciri |
 | QA-only raw artifacts | 90 gün |
 | Audit events ve rights review refs | Minimum 2 yıl |
 | Expired/revoked publication suppression | 1 yıl; karar özeti audit'te 2 yıl |
@@ -275,24 +279,26 @@ sınırlandırılır.
 
 GC active pointer, retained bir `resolution_inputs` zinciri, henüz retention süresi dolmamış suppression FK'si, rollback seti, açık correction/ticket veya legal hold ile ilişkili hiçbir source release/artifact/resolved run'ı silemez. Orphan artifacts haftalık raporlanır, 7 günlük grace period sonrası temizlenir.
 
-Correction başvurusunun iletişim ve kanıt içeriği V1 PostgreSQL şemasında tutulmaz; erişim kontrollü dış ticket sistemindedir. DB yalnız opaque ticket reference ve karar audit olayını tutar. Retention satırı bu dış sistem için de uygulanır.
+Correction başvurusunun iletişim alanı PostgreSQL'de 32-byte production key ile
+şifreli tutulur. `correction_events` append-only audit kaydıdır; bakım işi kapanmış
+başvuruların hassas içeriğini retention süresi sonunda temizler.
 
 ## Backup, RPO ve RTO
 
-- PostgreSQL PITR: en az 7 gün.
-- Configuration, rights, suppression ve correction audit verisi RPO: en fazla 15 dakika.
-- Kaynak/resolved veri RPO: 24 saat; immutable artifact'ten yeniden üretilebilir.
+- PostgreSQL logical-backup RPO: 24 saat.
+- Kaynak/resolved veri RPO: 24 saat; immutable girdilerden yeniden üretilebilir.
 - Public servis RTO: 4 saat.
-- Dış correction ticket sistemi: RPO 24 saat, RTO 4 saat; günlük şifreli export veya sağlayıcı backup kanıtı.
-- Object storage versioning açık.
-- Günlük logical backup + managed physical backup/PITR.
+- VPS'te günlük doğrulanmış logical backup ve MacBook'ta şifreli/versioned Restic kopyası.
 - Quarterly restore drill.
 - Altı ayda bir artifact'ten sıfırdan rebuild drill.
 
 Logical backup, disposable restore ve sentetik artifact'tan sıfır kurulum
 komutları [`recovery.md`](recovery.md) içinde uygulanmıştır ve container CI'da
-çalışır. PITR/WAL arşivleme, şifreli/versioned uzak hedef, scheduler ve RPO alarmı
-sağlayıcı seçilmeden tamamlanmış sayılmaz.
+çalışır. VPS timer'ı en yeni production dump'ını üç ayda bir 1 CPU/768 MiB ile
+sınırlı geçici PostgreSQL konteynerine geri yükler, aktif pointer ve kayıt
+sayılarını doğrular, ardından konteyneri ve volume'u siler. Managed PITR/WAL
+archiving mevcut V1 garantisi değildir; bağımsız sağlayıcı ve daha sıkı RPO
+gereksinimi oluştuğunda yeniden açılan kapasite kapısıdır.
 
 Disaster durumunda öncelik son doğrulanmış resolved release'i read-only servis etmektir; importer kapalı kalabilir.
 
@@ -319,6 +325,7 @@ Bunlar ölçüm hedefidir; ölçülmeden garanti değildir.
 - Hak review expiry ve aktif build'in source-config version uyumu.
 - Curated verification/origin dağılımı.
 - Correction queue age.
+- Son 24 saatin istek, peak-minute, 429, 5xx, mean/max origin süreleri.
 
 Configured production-source freshness and rights state can be checked without
 changing the database:

@@ -1,0 +1,54 @@
+#!/bin/sh
+set -eu
+
+log=${MACVENDOR_CADDY_LOG:-/var/log/caddy/macvendor-access.log}
+output_dir=${MACVENDOR_METRICS_DIR:-/srv/sites/macvendor/metrics}
+output=$output_dir/traffic-latest.json
+cutoff=$(($(date +%s) - 86400))
+
+install -d -o root -g deploy -m 0750 "$output_dir"
+metrics=$(jq -r --argjson cutoff "$cutoff" '
+  select(.ts >= $cutoff)
+  | [(.ts / 60 | floor), (.status // 0), ((.duration // 0) * 1000)]
+  | @tsv
+' "$log" | awk -F '\t' '
+  {
+    total += 1
+    per_minute[$1] += 1
+    if ($2 >= 400 && $2 < 500) client_errors += 1
+    if ($2 == 429) rate_limited += 1
+    if ($2 >= 500) server_errors += 1
+    duration_sum += $3
+    if ($3 > duration_max) duration_max = $3
+  }
+  END {
+    peak = 0
+    for (minute in per_minute) if (per_minute[minute] > peak) peak = per_minute[minute]
+    mean = total ? duration_sum / total : 0
+    printf "%d %d %d %d %d %.3f %.3f\n", total, peak, client_errors, rate_limited, server_errors, mean, duration_max
+  }
+')
+
+# The awk output is seven bounded numeric fields; intentional field splitting.
+# shellcheck disable=SC2086
+set -- $metrics
+test "$#" -eq 7
+tmp=$output.$$
+jq -n \
+  --arg checkedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --argjson windowSeconds 86400 \
+  --argjson requests "$1" \
+  --argjson peakRequestsPerMinute "$2" \
+  --argjson clientErrors "$3" \
+  --argjson rateLimited "$4" \
+  --argjson serverErrors "$5" \
+  --argjson meanOriginMs "$6" \
+  --argjson maxOriginMs "$7" \
+  '{checkedAt:$checkedAt,windowSeconds:$windowSeconds,requests:$requests,
+    peakRequestsPerMinute:$peakRequestsPerMinute,clientErrors:$clientErrors,
+    rateLimited:$rateLimited,serverErrors:$serverErrors,
+    meanOriginMs:$meanOriginMs,maxOriginMs:$maxOriginMs}' > "$tmp"
+chown root:deploy "$tmp"
+chmod 0640 "$tmp"
+mv "$tmp" "$output"
+cat "$output"

@@ -127,7 +127,8 @@ Aktivasyon:
 2. `active_resolution` singleton satırını kilitler,
 3. adayın doğrulanmış durumunu ve output hash'ini kontrol eder,
 4. pointer ve artan `activeVersion` değerini tek transaction'da değiştirir,
-5. transaction sonrası yeni sürüm cache anahtarlarına geçer ve eski surrogate key purge edilir.
+5. transaction sonrası yeni sürüm cache anahtarlarına geçer; opsiyonel surrogate
+   purge veya en geç beş dakikalık TTL eski cevabı kaldırır.
 
 Rollback yeni veri yazmaz; pointer'ı önceki doğrulanmış sürüme aynı protokolle döndürür. Aynı input manifest ve politika aynı output hash'i üretmelidir.
 

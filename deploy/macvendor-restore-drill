@@ -1,0 +1,57 @@
+#!/bin/sh
+set -eu
+
+backup_dir=${MACVENDOR_BACKUP_DIR:-/srv/sites/macvendor/backups}
+latest=$(find "$backup_dir" -maxdepth 1 -type f -name 'macvendor-*.dump' -printf '%T@ %p\n' \
+  | sort -rn | head -1 | cut -d ' ' -f 2-)
+test -n "$latest"
+sha256sum -c "$latest.sha256"
+
+suffix=$(date -u +%Y%m%dT%H%M%SZ)-$$
+container=macvendor-restore-drill-$suffix
+volume=macvendor_restore_drill_$suffix
+password=$(openssl rand -hex 24)
+
+cleanup() {
+  docker rm -f "$container" >/dev/null 2>&1 || true
+  docker volume rm "$volume" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT HUP INT TERM
+
+docker volume create "$volume" >/dev/null
+docker run -d --name "$container" \
+  --cpus 1 --memory 768m --pids-limit 256 \
+  --security-opt no-new-privileges:true \
+  -e POSTGRES_PASSWORD="$password" \
+  -e POSTGRES_DB=macvendor_restore \
+  -v "$volume:/var/lib/postgresql" \
+  postgres:18-alpine >/dev/null
+
+ready=false
+for _ in $(seq 1 60); do
+  if docker exec "$container" psql -U postgres -d macvendor_restore -X -Atqc 'SELECT 1' >/dev/null 2>&1; then
+    ready=true
+    break
+  fi
+  sleep 1
+done
+test "$ready" = true
+
+started=$(date +%s)
+docker exec -i "$container" pg_restore -U postgres -d macvendor_restore --no-owner --no-acl < "$latest"
+state=$(docker exec "$container" psql -U postgres -d macvendor_restore -X -At -v ON_ERROR_STOP=1 -c "
+  SELECT count(*) FROM data_sources;
+  SELECT count(*) FROM active_resolution WHERE singleton_id = 1;
+  SELECT count(*) FROM resolved_assignments ra
+    JOIN active_resolution ar ON ar.resolution_run_id = ra.resolution_run_id
+    WHERE ar.singleton_id = 1;
+")
+sources=$(printf '%s\n' "$state" | sed -n '1p')
+active=$(printf '%s\n' "$state" | sed -n '2p')
+assignments=$(printf '%s\n' "$state" | sed -n '3p')
+test "$sources" -gt 0
+test "$active" -eq 1
+test "$assignments" -gt 0
+duration=$(($(date +%s) - started))
+printf '{"status":"verified","backup":"%s","sources":%s,"activePointers":%s,"assignments":%s,"durationSeconds":%s}\n' \
+  "$(basename "$latest")" "$sources" "$active" "$assignments" "$duration"

@@ -1,0 +1,19 @@
+[Unit]
+Description=Quarterly isolated macvendor production-backup restore drill
+After=docker.service macvendor-backup.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/flock -n /run/macvendor-restore-drill.lock /usr/local/sbin/macvendor-restore-drill
+User=root
+Nice=15
+IOSchedulingClass=idle
+CPUQuota=100%
+MemoryMax=1G
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadOnlyPaths=/srv/sites/macvendor/backups
+ReadWritePaths=/run
+TimeoutStartSec=1h

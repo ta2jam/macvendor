@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.5.5 — 2026-07-13
+
+- Added a resource-bounded quarterly restore drill that verifies the newest real
+  production dump in an isolated PostgreSQL container and removes all temporary
+  state after the check.
+- Added a privacy-preserving 24-hour Caddy traffic aggregate, 15-minute timer,
+  and Slack-backed operational gates for stale metrics, peak traffic, 429, and
+  5xx responses.
+- Replaced the unconfigured cache-purge dependency with a deliberate five-minute
+  shared TTL and release-scoped ETag policy; the scoped Cloudflare Free purge
+  adapter remains optional and no exposed token is reused.
+- Defined production, correction, and data-decision ownership; aligned recovery,
+  governance, roadmap, and historical audit documents with deployed behavior.
+- Updated compatible development dependencies and pinned GitHub Actions while
+  keeping production on Node 24 and TypeScript 5 until their next major lines
+  are supported by the complete toolchain.
+
 ## 0.5.4 — 2026-07-13
 
 - Reframed the README around the maintained macvendor.io web service and public

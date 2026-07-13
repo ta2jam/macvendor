@@ -47,7 +47,7 @@ export async function GET(
     }
     return jsonResponse(request, result, {
       requestId: id,
-      cacheControl: include === "evidence" ? "private, no-store" : "public, max-age=300, s-maxage=86400",
+      cacheControl: include === "evidence" ? "private, no-store" : "public, max-age=300, s-maxage=300",
       etagSeed: `${result.data.activeVersion}:${result.data.publicationVersion}:${registry.registry}:${prefix.canonical}:${include ?? "none"}`,
       surrogateKeys: [resolutionSurrogateKey(result.data.resolvedReleaseId), DATA_RELEASE_SURROGATE_KEY],
     });

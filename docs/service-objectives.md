@@ -14,10 +14,12 @@ performance. They must be reviewed against at least 30 days of traffic.
 | Source freshness/rights | zero failures | any failure |
 | Backup age | under 30 hours | 30 hours or failed verification |
 
-The current Mac monitor implements coarse health, disk, memory, container and
-timer gates. Latency, cache-hit ratio, request volume, 429, and 5xx objectives
-require privacy-preserving aggregate metrics at the edge/origin; they are not
-silently reported as achieved.
+`macvendor-traffic-report.timer` produces a bounded aggregate every 15 minutes
+from the seven-day Caddy log: 24-hour request count, peak requests per minute,
+4xx, 429, 5xx, and mean/max origin duration. It retains no IP or user agent.
+The Mac monitor alerts when the report is over one hour old, peak traffic reaches
+3,000 requests/minute, 429 reaches 50/day, or 5xx reaches 5/day. These are
+investigation gates, not capacity claims.
 
 Single lookup performs a bounded set of indexed prefix probes, approximately
 `O(log N)` for `N` resolved rows. Bulk official lookup deduplicates inputs and

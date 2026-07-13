@@ -23,26 +23,34 @@ Tarih: 11 Temmuz 2026
 | 15 | Kaynak gerçekliği, imza ve review | İmzalı commit/tag veya onaylı detached signature, hash zinciri ve hazırlayan-onaylayan ayrılığı zorunlu oldu. | Tasarım kapandı | [`governance.md` — kaynak özgünlüğü](./governance.md) |
 | 16 | İç yetkilendirme, roller, secret ve audit | Ayrı runtime DB rolleri, secret manager/kısa ömürlü kimlik ve değişmez audit olayları tanımlandı. | Tasarım kapandı | [`operations.md` — yetki ve DB rolleri](./operations.md) |
 | 17 | Retention ve garbage collection | Artifact, rejected import, audit, access log ve düzeltme kayıtları için süreler ve hash referansı koruma kuralı belirlendi. | Tasarım kapandı | [`operations.md` — retention](./operations.md) |
-| 18 | RPO/RTO | PITR, sınıfa göre RPO, 4 saat RTO, üç aylık restore ve altı aylık rebuild testi belirlendi. | Tasarım kapandı | [`operations.md` — backup](./operations.md) |
+| 18 | RPO/RTO | 24 saat logical-backup RPO, 4 saat RTO, günlük şifreli off-host kopya, üç aylık gerçek-dump restore ve altı aylık rebuild testi belirlendi. | Uygulandı (v0.5.5) | [`operations.md` — backup](./operations.md) |
 | 19 | Resource ve payload limitleri | Artifact, açılmış veri, satır, alan, JSON, kaynak, sonuç, evidence ve süre limitleri sayısal olarak sabitlendi. | Tasarım kapandı | [`operations.md` — kaynak limitleri](./operations.md) |
-| 20 | Fuzz, race, migration, cache ve failure testleri | Test matrisi ve trafik tahmini gelene kadar geçici 100 RPS/15 dk kabul tabanı tanımlandı. | Tasarım kapandı | [`operations.md` — test matrisi](./operations.md) |
-| 21 | UI'da resmî ve amatör verinin karışması | IEEE `official assignment`; curated kayıtlar doğrulama seviyeleriyle ayrı bölüm ve rozetlerde gösterilecek. | Tasarım kapandı | [`governance.md` — UI sunumu](./governance.md) |
-| 22 | Düzeltme ve takedown kanalı | Public süreç sayfası, yapılandırılmış e-posta durumu, zorunlu kanıt, hedef süre, acil suppression ve audit iş akışı uygulandı. Dış ticket backend ve sorumlu ataması hâlâ production girdisidir. | Kısmi uygulandı (v0.0.11) | [`governance.md` — düzeltme ve takedown](./governance.md), [`/data-corrections`](../src/app/data-corrections/page.tsx) |
+| 20 | Fuzz, race, migration, cache ve failure testleri | Test matrisi uygulandı; 15 dakikalık privacy-preserving trafik özeti peak, 429 ve 5xx investigation eşiklerini besliyor. | Uygulandı (v0.5.5) | [`operations.md` — test matrisi](./operations.md) |
+| 21 | UI'da resmî ve amatör verinin karışması | IEEE `official assignment`; curated kayıtlar doğrulama seviyeleriyle ayrı bölüm ve rozetlerde gösteriliyor. | Uygulandı | [`governance.md` — UI sunumu](./governance.md) |
+| 22 | Düzeltme ve takedown kanalı | Public form, şifreli iletişim, opaque reference, append-only event, operator CLI, SLA timer, suppression ve repository-owner sorumluluğu uygulandı. | Uygulandı (v0.5.5) | [`governance.md` — düzeltme ve takedown](./governance.md), [`incident-ownership.md`](./incident-ownership.md), [`/data-corrections`](../src/app/data-corrections/page.tsx) |
 | 23 | Attribution ve disclaimer | Zorunlu ürün metni ile public kaynak, metodoloji, veri şartları ve düzeltme sayfaları uygulandı. | Uygulandı (v0.0.11) | [`governance.md` — disclaimer ve attribution](./governance.md), [`/legal/data-terms`](../src/app/legal/data-terms/page.tsx) |
-| 24 | V1 fiziksel tablo kapsamı ile gelecek fikirlerin karışması | V1 için 12 fiziksel tablo listelendi; hesap, ödeme, org katalog ve vendor search ertelendi. | Tasarım kapandı | [`data-contract.md` — fiziksel V1 tabloları](./data-contract.md) |
+| 24 | V1 fiziksel tablo kapsamı ile gelecek fikirlerin karışması | Governed organization identity records ve exact identifier search eklendi; hesap ve ödeme kapsam dışında tutuldu. | Uygulandı | [`data-contract.md` — fiziksel V1 tabloları](./data-contract.md) |
 | 25 | Vendor alias geleceği | Alias V1'de yalnız claim; fuzzy auto-merge yok. Gelecek `organizations/aliases/claim_links` migration sınırı tanımlandı. | Tasarım kapandı | [`data-contract.md` — vendor alias](./data-contract.md) |
 
-## Uygulama öncesi dış girdiler
+## Dış girdiye bağlı genişleme kapıları
 
 Bu beş konu tasarımla uydurulamaz; gerçek karar veya kanıt gerekir:
 
 1. IEEE için 2026-07-11 owner risk acceptance kaydedildi; 2027-07-11'de veya
    çelişkili yeni şart çıktığında yeniden review zorunlu. IEEE dışındaki her
    production üçüncü taraf kaynak için ayrıca yazılı hak incelemesi gerekir.
-2. Amatör veritabanı işi kullanıcı yeniden başlatana kadar ertelendi; bu sırada
-   gerçek satır, manifest veya örnek veri sisteme alınmayacak.
-3. Production CDN/object storage sağlayıcısı; purge ve object-lock ayrıntıları buna göre uygulanacak.
-4. Gerçek trafik tahmini ve kötüye kullanım profili; başlangıç rate/load eşikleri buna göre ölçülecek.
-5. `DATA_CORRECTIONS_EMAIL`, veri sorumlusu ve nöbet/escalation sahipleri.
+2. Owner-created intake karantina hattı hazırdır; production değerlendirmesi
+   ancak gerçek dosya ve hak/gizlilik beyanı geldiğinde başlayan ayrı bir karardır.
+3. Mevcut trafik seviyesinde kısa TTL ve release-scoped ETag kullanılır; cache
+   purge kimliği production bağımlılığı değildir. Harici object storage/PITR,
+   bağımsız sağlayıcı seçildiğinde bir kapasite genişlemesidir.
+4. Caddy loglarından kişisel veri içermeyen 24 saatlik istek, peak-minute, 429,
+   5xx ve origin süre özeti 15 dakikada bir üretilir; eşikler gerçek veriyle
+   yeniden değerlendirilir.
+5. Şifreli correction kuyruğu sistem kaydıdır; repository-owner production,
+   correction ve data-decision rollerinden sorumludur. Slack `#team` yalnız
+   failure/recovery bildirim kanalıdır.
 
-Bu girdiler gelmeden şema ve normalizer geliştirilebilir. Ancak kaynak yayını, production kapasite iddiası ve düzeltme SLA'sının işletilmesi tamamlanmış sayılamaz.
+Bu girdiler mevcut V1'in tamamlanmamış işi değildir. Yeni veri, ekip üyesi,
+ölçülen kapasite baskısı veya harici sağlayıcı geldiğinde yeniden açılan
+genişleme kapılarıdır.

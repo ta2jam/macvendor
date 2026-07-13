@@ -1,0 +1,16 @@
+[Unit]
+Description=Build bounded macvendor traffic and error report
+After=caddy.service
+Requires=caddy.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/flock -n /run/macvendor-traffic-report.lock /usr/local/sbin/macvendor-traffic-report
+User=root
+Nice=15
+IOSchedulingClass=idle
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadOnlyPaths=/var/log/caddy
+ReadWritePaths=/srv/sites/macvendor/metrics /run

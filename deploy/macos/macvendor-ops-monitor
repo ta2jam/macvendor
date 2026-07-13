@@ -44,23 +44,36 @@ remote_report=$(ssh -o ControlMaster=no -o ControlPath=none -o IdentitiesOnly=ye
   timers=$(sudo -n systemctl list-timers --all --no-legend | grep -c macvendor || true)
   latest_backup=$(find /srv/sites/macvendor/backups -maxdepth 1 -type f -name "macvendor-*.dump" -printf "%T@\\n" | sort -n | tail -1 | cut -d. -f1)
   if [ -n "$latest_backup" ]; then backup_age=$(($(date +%s) - latest_backup)); else backup_age=999999999; fi
-  printf "%s %s %s %s %s %s\\n" "$failed" "$disk" "$available" "$containers" "$timers" "$backup_age"
+  traffic=/srv/sites/macvendor/metrics/traffic-latest.json
+  if [ -r "$traffic" ]; then
+    traffic_checked=$(date -d "$(jq -r .checkedAt "$traffic")" +%s 2>/dev/null || echo 0)
+    traffic_age=$(($(date +%s) - traffic_checked))
+    traffic_values=$(jq -r "[.requests,.peakRequestsPerMinute,.rateLimited,.serverErrors] | @tsv" "$traffic" | tr "\\t" " ")
+  else
+    traffic_age=999999999
+    traffic_values="0 0 0 0"
+  fi
+  printf "%s %s %s %s %s %s %s %s\\n" "$failed" "$disk" "$available" "$containers" "$timers" "$backup_age" "$traffic_age" "$traffic_values"
 ' 2>/dev/null || true)
 if [ -z "$remote_report" ]; then
   problems="$problems ssh"
 else
-  # The remote command emits six space-delimited integers; intentional field splitting.
+  # The remote command emits eleven space-delimited integers; intentional field splitting.
   # shellcheck disable=SC2086
   set -- $remote_report
-  if [ "$#" -ne 6 ] || printf '%s\n' "$@" | grep -Eqv '^[0-9]+$'; then
+  if [ "$#" -ne 11 ] || printf '%s\n' "$@" | grep -Eqv '^[0-9]+$'; then
     problems="$problems invalid-remote-report"
   else
     [ "$1" -eq 0 ] || problems="$problems systemd-failed:$1"
     [ "$2" -lt 80 ] || problems="$problems disk:$2%"
     [ "$3" -ge 1024 ] || problems="$problems memory:${3}MiB"
     [ "$4" -eq 0 ] || problems="$problems unhealthy-containers:$4"
-    [ "$5" -ge 5 ] || problems="$problems timers:$5"
+    [ "$5" -ge 7 ] || problems="$problems timers:$5"
     [ "$6" -lt 108000 ] || problems="$problems host-backup-age:${6}s"
+    [ "$7" -lt 3600 ] || problems="$problems traffic-report-age:${7}s"
+    [ "$9" -lt 3000 ] || problems="$problems traffic-peak:${9}/min"
+    [ "${10}" -lt 50 ] || problems="$problems rate-limited:${10}/day"
+    [ "${11}" -lt 5 ] || problems="$problems server-errors:${11}/day"
   fi
 fi
 
