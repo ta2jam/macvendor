@@ -45,6 +45,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               <div className="footer-links" aria-label="Data governance links">
                 <Link href="/legal/data-terms">Data terms</Link>
                 <Link href="/data-corrections">Report a correction</Link>
+                <a href={GITHUB_REPOSITORY_URL} target="_blank" rel="noopener noreferrer">
+                  Open-source project
+                </a>
               </div>
             </div>
             <a className="footer-version" href={GITHUB_REPOSITORY_URL} target="_blank" rel="noopener noreferrer"

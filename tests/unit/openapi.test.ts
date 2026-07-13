@@ -3,6 +3,12 @@ import openapi from "../../public/openapi.json";
 import { assertPublicContract } from "../helpers/contracts";
 
 describe("OpenAPI 3.1 publication", () => {
+  it("directs clients only to the maintained public service", () => {
+    expect(openapi.servers).toEqual([
+      { url: "https://macvendor.io", description: "Maintained public service" },
+    ]);
+  });
+
   it("documents every public v1 endpoint", () => {
     expect(openapi.openapi).toBe("3.1.1");
     expect(Object.keys(openapi.paths).sort()).toEqual([

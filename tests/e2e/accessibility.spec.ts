@@ -91,6 +91,23 @@ test.describe("public accessibility surface", () => {
     }
   });
 
+  test("footer identifies the project as open source without displacing service links", async ({ page }) => {
+    await page.goto("/");
+    const footer = page.locator("footer");
+    const sourceLink = footer.getByRole("link", { name: "Open-source project" });
+    await expect(sourceLink).toHaveAttribute("href", "https://github.com/ta2jam/macvendor");
+    await expect(sourceLink).toHaveAttribute("target", "_blank");
+    await expect(footer.getByRole("link", { name: "Data terms" })).toBeVisible();
+    await expect(footer.getByRole("link", { name: "Report a correction" })).toBeVisible();
+  });
+
+  test("API page directs clients to the maintained service and safe integration guidance", async ({ page }) => {
+    await page.goto("/api-docs");
+    await expect(page.getByText("https://macvendor.io/v1")).toBeVisible();
+    await expect(page.getByLabel("Safe API integration guidance")).toBeVisible();
+    await expect(page.getByText("localhost", { exact: false })).toHaveCount(0);
+  });
+
   test("correction page never claims intake is available without configuration", async ({ page }) => {
     await page.goto("/data-corrections");
     await expect(page.getByText("The correction intake channel is not configured for this deployment."))

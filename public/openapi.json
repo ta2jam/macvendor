@@ -6,8 +6,7 @@
     "description": "Source-aware MAC address block assignment lookup. Synthetic examples only; an assignment is not proof of a physical device manufacturer."
   },
   "servers": [
-    { "url": "https://macvendor.io" },
-    { "url": "http://localhost:3000", "description": "Local development" }
+    { "url": "https://macvendor.io", "description": "Maintained public service" }
   ],
   "paths": {
     "/v1/lookup/{mac}": {

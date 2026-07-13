@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.5.4 — 2026-07-13
+
+- Reframed the README around the maintained macvendor.io web service and public
+  API, removing local installation, database, container, ingest, maintenance,
+  recovery, staging, and release-operation instructions.
+- Added production API examples and explicit guidance for privacy-aware input,
+  redirects, no-match semantics, release metadata, ETag caching, rate limits,
+  retries, timeouts, and device-identity boundaries.
+- Added a small open-source link to the website footer, expanded the web API
+  page with safe integration guidance, and made the public OpenAPI document
+  advertise only the maintained HTTPS service.
+
 ## 0.5.3 — 2026-07-13
 
 - Made the local browser suite self-contained and deterministic: it now loads
