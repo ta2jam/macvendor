@@ -57,7 +57,9 @@ export function jsonResponse(
   headers.set("Cache-Control", args.cacheControl);
   headers.set("ETag", etag);
   if (args.surrogateKeys && args.cacheControl.startsWith("public,")) {
-    headers.set("Surrogate-Key", normalizeSurrogateKeys(args.surrogateKeys).join(" "));
+    const keys = normalizeSurrogateKeys(args.surrogateKeys);
+    headers.set("Surrogate-Key", keys.join(" "));
+    headers.set("Cache-Tag", keys.join(","));
   }
 
   if (request.headers.get("if-none-match") === etag) {

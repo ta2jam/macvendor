@@ -1,0 +1,91 @@
+#!/bin/sh
+set -eu
+umask 077
+
+PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin
+export PATH
+
+remote=${MACVENDOR_BACKUP_REMOTE:-deploy@166.1.94.109}
+identity=${MACVENDOR_BACKUP_IDENTITY:-$HOME/.ssh/macvendor_io_deploy_20260630_115242}
+root=${MACVENDOR_BACKUP_ROOT:-$HOME/Documents/macvendor-backups}
+repository=$root/restic
+staging=$root/staging
+lock=$root/.backup-lock
+state_dir=${MACVENDOR_BACKUP_STATE_DIR:-$HOME/Library/Application Support/macvendor-backup}
+success_file=$state_dir/last-success
+keychain_service=macvendor-restic
+keychain_account=${USER:-macvendor}
+
+alert() {
+  if command -v hermes >/dev/null 2>&1; then
+    hermes send --quiet --to slack:team --subject "[macvendor backup]" "$1" >/dev/null 2>&1 || true
+  fi
+}
+
+cleanup() {
+  rm -rf "$lock"
+}
+
+failure() {
+  code=$?
+  if [ "$code" -ne 0 ]; then
+    alert "Off-host backup failed on $(hostname -s); exit=$code. Check $HOME/Library/Logs/macvendor/offhost-backup.err.log."
+  fi
+  cleanup
+  exit "$code"
+}
+
+mkdir -p "$root" "$staging" "$state_dir"
+chmod 700 "$root" "$staging" "$state_dir"
+if ! mkdir "$lock" 2>/dev/null; then
+  exit 0
+fi
+trap failure HUP INT TERM EXIT
+
+test -f "$identity"
+latest=$(ssh -o ControlMaster=no -o ControlPath=none -o IdentitiesOnly=yes \
+  -o BatchMode=yes -o ConnectTimeout=15 -i "$identity" "$remote" \
+  "find /srv/sites/macvendor/backups -maxdepth 1 -type f -name 'macvendor-*.dump' -printf '%f\\n' | sort | tail -1")
+case "$latest" in
+  macvendor-*.dump) ;;
+  *) echo "remote did not return a safe backup basename" >&2; exit 1 ;;
+esac
+
+checksum="$latest.sha256"
+scp -o ControlMaster=no -o ControlPath=none -o IdentitiesOnly=yes \
+  -o BatchMode=yes -o ConnectTimeout=15 -i "$identity" \
+  "$remote:/srv/sites/macvendor/backups/$latest" "$staging/$latest.partial"
+scp -o ControlMaster=no -o ControlPath=none -o IdentitiesOnly=yes \
+  -o BatchMode=yes -o ConnectTimeout=15 -i "$identity" \
+  "$remote:/srv/sites/macvendor/backups/$checksum" "$staging/$checksum.partial"
+mv "$staging/$latest.partial" "$staging/$latest"
+mv "$staging/$checksum.partial" "$staging/$checksum"
+
+expected=$(awk 'NR == 1 { print $1 }' "$staging/$checksum")
+case "$expected" in
+  [0-9a-f][0-9a-f]*) ;;
+  *) echo "invalid SHA-256 sidecar" >&2; exit 1 ;;
+esac
+test "${#expected}" -eq 64
+actual=$(shasum -a 256 "$staging/$latest" | awk '{ print $1 }')
+test "$actual" = "$expected"
+pg_restore --list "$staging/$latest" >/dev/null 2>&1 || {
+  docker run --rm -i postgres:18-alpine pg_restore --list < "$staging/$latest" >/dev/null
+}
+
+export RESTIC_REPOSITORY="$repository"
+export RESTIC_PASSWORD_COMMAND="security find-generic-password -s $keychain_service -a $keychain_account -w"
+if ! restic snapshots >/dev/null 2>&1; then
+  restic init >/dev/null
+fi
+restic backup --tag macvendor-production "$staging/$latest" "$staging/$checksum"
+restic forget --tag macvendor-production --keep-daily 14 --keep-weekly 8 --keep-monthly 6 --prune
+restic check
+rm -f "$staging/$latest" "$staging/$checksum"
+success_tmp=$success_file.$$
+date +%s > "$success_tmp"
+chmod 600 "$success_tmp"
+mv "$success_tmp" "$success_file"
+
+trap - HUP INT TERM EXIT
+cleanup

@@ -9,7 +9,9 @@ describe("OpenAPI 3.1 publication", () => {
       "/v1/assignments/{registry}/{prefix}",
       "/v1/corrections",
       "/v1/data-release",
+      "/v1/data-release/changes",
       "/v1/lookup/{mac}",
+      "/v1/lookups",
       "/v1/organizations",
       "/v1/organizations/{key}",
     ]);
@@ -21,6 +23,8 @@ describe("OpenAPI 3.1 publication", () => {
     expect(JSON.stringify(openapi)).toContain("/schemas/public-api-v1.schema.json#/$defs/LookupResponse");
     expect(JSON.stringify(openapi)).toContain("/schemas/public-api-v1.schema.json#/$defs/AssignmentResponse");
     expect(JSON.stringify(openapi)).toContain("/schemas/public-api-v1.schema.json#/$defs/DataReleaseResponse");
+    expect(JSON.stringify(openapi)).toContain("/schemas/public-api-v1.schema.json#/$defs/BulkLookupResponse");
+    expect(JSON.stringify(openapi)).toContain("/schemas/public-api-v1.schema.json#/$defs/ReleaseChangesResponse");
     expect(JSON.stringify(openapi)).toContain("/schemas/public-api-v1.schema.json#/$defs/Problem");
   });
 

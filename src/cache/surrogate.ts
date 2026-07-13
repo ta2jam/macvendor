@@ -26,18 +26,32 @@ export function normalizeSurrogateKeys(values: string[]): string[] {
 
 type FetchImplementation = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
+type CachePurgeProvider = "generic" | "cloudflare";
+
 export async function purgeSurrogateKeys(
   values: string[],
   options: {
+    provider?: CachePurgeProvider;
     endpoint?: string;
     token?: string;
+    cloudflareZoneId?: string;
     required?: boolean;
     fetchImplementation?: FetchImplementation;
     timeoutMs?: number;
   } = {},
 ): Promise<{ status: "purged"; surrogateKeys: string[] } | { status: "skipped"; reason: "not_configured" }> {
   const surrogateKeys = normalizeSurrogateKeys(values);
-  const endpoint = options.endpoint ?? process.env.CACHE_PURGE_ENDPOINT;
+  const provider = options.provider ?? (process.env.CACHE_PURGE_PROVIDER as CachePurgeProvider | undefined) ?? "generic";
+  if (provider !== "generic" && provider !== "cloudflare") {
+    throw new CachePurgeError("INVALID_CACHE_PURGE_PROVIDER", "cache purge provider must be generic or cloudflare");
+  }
+  const cloudflareZoneId = options.cloudflareZoneId ?? process.env.CLOUDFLARE_ZONE_ID;
+  if (provider === "cloudflare" && cloudflareZoneId && !/^[0-9a-f]{32}$/i.test(cloudflareZoneId)) {
+    throw new CachePurgeError("INVALID_CLOUDFLARE_ZONE_ID", "Cloudflare zone ID must contain 32 hexadecimal characters");
+  }
+  const endpoint = provider === "cloudflare" && cloudflareZoneId
+    ? `https://api.cloudflare.com/client/v4/zones/${cloudflareZoneId.toLowerCase()}/purge_cache`
+    : options.endpoint ?? process.env.CACHE_PURGE_ENDPOINT;
   const token = options.token ?? process.env.CACHE_PURGE_TOKEN;
   const required = options.required ?? process.env.CACHE_PURGE_REQUIRED === "true";
   if (!endpoint) {
@@ -68,7 +82,7 @@ export async function purgeSurrogateKeys(
         "Content-Type": "application/json",
         "User-Agent": "macvendor-cache-purge/1",
       },
-      body: JSON.stringify({ surrogateKeys }),
+      body: JSON.stringify(provider === "cloudflare" ? { tags: surrogateKeys } : { surrogateKeys }),
       cache: "no-store",
       redirect: "error",
       signal: AbortSignal.timeout(timeoutMs),
@@ -76,9 +90,19 @@ export async function purgeSurrogateKeys(
   } catch {
     throw new CachePurgeError("CACHE_PURGE_FAILED", "cache purge request failed before an accepted response");
   }
-  await response.body?.cancel().catch(() => undefined);
   if (!response.ok) {
+    await response.body?.cancel().catch(() => undefined);
     throw new CachePurgeError("CACHE_PURGE_REJECTED", `cache purge endpoint returned HTTP ${response.status}`);
+  }
+  if (provider === "cloudflare") {
+    let accepted = false;
+    try {
+      const body = await response.json() as { success?: unknown };
+      accepted = body.success === true;
+    } catch { accepted = false; }
+    if (!accepted) throw new CachePurgeError("CACHE_PURGE_REJECTED", "Cloudflare did not accept the cache purge");
+  } else {
+    await response.body?.cancel().catch(() => undefined);
   }
   return { status: "purged", surrogateKeys };
 }

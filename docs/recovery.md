@@ -109,3 +109,16 @@ when an external scheduler, failure alert, encrypted/versioned destination, and
 retention policy are configured. The 15-minute configuration/audit RPO and
 seven-day PITR target require managed physical backup/WAL archiving and remain
 unimplemented without a selected provider.
+
+## Temporary MacBook off-host copy
+
+Until remote object storage is selected, `deploy/macos/install-operations.sh`
+installs a daily pull job on the operator Mac. It downloads the newest VPS dump
+and SHA-256 sidecar over the `deploy` public key, verifies the digest and
+`pg_restore --list`, then stores both in an encrypted restic repository. The
+restic password lives in macOS Keychain; FileVault must remain enabled.
+
+This is off-host but not continuously available infrastructure. A sleeping,
+offline, damaged, or stolen Mac delays the backup, so it does not satisfy the
+future managed PITR target. Failures are sent to Slack `#team` when Hermes is
+configured. Retention is 14 daily, 8 weekly, and 6 monthly snapshots.

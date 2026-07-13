@@ -1,0 +1,79 @@
+#!/bin/sh
+set -eu
+umask 077
+
+PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin
+export PATH
+
+remote=${MACVENDOR_MONITOR_REMOTE:-deploy@166.1.94.109}
+identity=${MACVENDOR_MONITOR_IDENTITY:-$HOME/.ssh/macvendor_io_deploy_20260630_115242}
+state_dir=${MACVENDOR_MONITOR_STATE_DIR:-$HOME/Library/Application Support/macvendor-monitor}
+state_file=$state_dir/state
+backup_success_file=${MACVENDOR_BACKUP_SUCCESS_FILE:-$HOME/Library/Application Support/macvendor-backup/last-success}
+mkdir -p "$state_dir"
+chmod 700 "$state_dir"
+
+notify() {
+  hermes send --quiet --to slack:team --subject "[macvendor production]" "$1"
+}
+
+problems=""
+health=$(curl --fail --silent --show-error --max-time 15 https://macvendor.io/healthz 2>/dev/null || true)
+printf '%s' "$health" | jq -e '.status == "ok" and (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))' >/dev/null 2>&1 \
+  || problems="$problems public-health"
+release=$(curl --fail --silent --show-error --max-time 15 https://macvendor.io/v1/data-release 2>/dev/null || true)
+printf '%s' "$release" | jq -e '.activeVersion > 0 and .publicationVersion > 0 and (.sources | length) > 0' >/dev/null 2>&1 \
+  || problems="$problems data-release"
+backup_success=$(cat "$backup_success_file" 2>/dev/null || true)
+case "$backup_success" in
+  ''|*[!0-9]*) problems="$problems offhost-backup:missing" ;;
+  *)
+    backup_age=$(($(date +%s) - backup_success))
+    [ "$backup_age" -ge 0 ] && [ "$backup_age" -lt 108000 ] \
+      || problems="$problems offhost-backup-age:${backup_age}s"
+    ;;
+esac
+
+remote_report=$(ssh -o ControlMaster=no -o ControlPath=none -o IdentitiesOnly=yes \
+  -o BatchMode=yes -o ConnectTimeout=10 -i "$identity" "$remote" '
+  set -eu
+  failed=$(sudo -n systemctl --failed --no-legend | wc -l | tr -d " ")
+  disk=$(df -P / | awk "NR==2 {gsub(/%/,\"\",\$5); print \$5}")
+  available=$(awk "/MemAvailable:/ {print int(\$2 / 1024)}" /proc/meminfo)
+  containers=$(sudo -n docker ps --filter health=unhealthy --format "{{.Names}}" | wc -l | tr -d " ")
+  timers=$(sudo -n systemctl list-timers --all --no-legend | grep -c macvendor || true)
+  latest_backup=$(find /srv/sites/macvendor/backups -maxdepth 1 -type f -name "macvendor-*.dump" -printf "%T@\\n" | sort -n | tail -1 | cut -d. -f1)
+  if [ -n "$latest_backup" ]; then backup_age=$(($(date +%s) - latest_backup)); else backup_age=999999999; fi
+  printf "%s %s %s %s %s %s\\n" "$failed" "$disk" "$available" "$containers" "$timers" "$backup_age"
+' 2>/dev/null || true)
+if [ -z "$remote_report" ]; then
+  problems="$problems ssh"
+else
+  # The remote command emits six space-delimited integers; intentional field splitting.
+  # shellcheck disable=SC2086
+  set -- $remote_report
+  if [ "$#" -ne 6 ] || printf '%s\n' "$@" | grep -Eqv '^[0-9]+$'; then
+    problems="$problems invalid-remote-report"
+  else
+    [ "$1" -eq 0 ] || problems="$problems systemd-failed:$1"
+    [ "$2" -lt 80 ] || problems="$problems disk:$2%"
+    [ "$3" -ge 1024 ] || problems="$problems memory:${3}MiB"
+    [ "$4" -eq 0 ] || problems="$problems unhealthy-containers:$4"
+    [ "$5" -ge 5 ] || problems="$problems timers:$5"
+    [ "$6" -lt 108000 ] || problems="$problems host-backup-age:${6}s"
+  fi
+fi
+
+current=healthy
+[ -z "$problems" ] || current="unhealthy:$problems"
+previous=$(cat "$state_file" 2>/dev/null || true)
+if [ "$current" != "$previous" ]; then
+  if [ "$current" = healthy ]; then
+    [ -z "$previous" ] || notify "RECOVERED: public checks and VPS operational checks are healthy."
+  else
+    notify "ALERT:$problems"
+  fi
+  printf '%s\n' "$current" > "$state_file"
+fi
+
+[ "$current" = healthy ]

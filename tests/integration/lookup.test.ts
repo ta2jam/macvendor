@@ -29,6 +29,11 @@ import { migrate } from "../../src/db/migrate";
 import { applySourceGovernance, previewSourceGovernance } from "../../src/operations/source-governance";
 import { searchOrganizations } from "../../src/db/organizations";
 import { POST as correctionRoute } from "../../src/app/v1/corrections/route";
+import { bulkLookupOfficial } from "../../src/db/bulk-lookup";
+import { getReleaseChanges } from "../../src/db/release-changes";
+import { sourceValueReport } from "../../src/operations/source-value";
+import { updateAllSources } from "../../src/operations/source-update";
+import { OPTIONS as bulkOptionsRoute, POST as bulkLookupRoute } from "../../src/app/v1/lookups/route";
 
 config({ path: ".env.local", quiet: true });
 
@@ -49,6 +54,53 @@ afterAll(async () => {
     await globalThis.__macvendorPool.end();
     globalThis.__macvendorPool = undefined;
   }
+});
+
+describe("bounded bulk and release operations", () => {
+  it("serves the public bulk route with bounded CORS preflight and no-store output", async () => {
+    const preflight=await bulkOptionsRoute();
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("access-control-allow-methods")).toBe("POST, OPTIONS");
+    const response=await bulkLookupRoute(new NextRequest("http://localhost:3000/v1/lookups",{
+      method:"POST",headers:{"content-type":"application/json","x-request-id":"test-bulk-route"},
+      body:JSON.stringify({macs:["02:AA:BB:CC:00:01","001122334455"]}),
+    }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.get("x-request-id")).toBe("test-bulk-route");
+    const body=await response.json() as {data:{results:unknown[]};meta:{count:number;uniqueCount:number}};
+    expect(body.data.results).toHaveLength(2);
+    expect(body.meta).toMatchObject({count:2,uniqueCount:2});
+  });
+
+  it("resolves duplicate bulk inputs with one deduplicated SQL input and a stable release", async () => {
+    const mac=normalizeMac("02AABBCC0001");
+    const result=await bulkLookupOfficial(pool,[mac,mac]);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual(result[1]);
+    expect(result[0]).toMatchObject({normalizedMac:"02AABBCC0001",assignment:{prefix:"02AABB",prefixLength:24}});
+  });
+
+  it("reports aggregate release changes and per-source value without mutating sources", async () => {
+    const before=await pool.query<{count:string}>("SELECT count(*) FROM data_sources");
+    const [changes,value]=await Promise.all([getReleaseChanges(pool),sourceValueReport(pool)]);
+    const after=await pool.query<{count:string}>("SELECT count(*) FROM data_sources");
+    expect(changes.current.activeVersion).toBeGreaterThan(0);
+    expect(changes.changes.assignmentsAdded).toBeGreaterThanOrEqual(0);
+    expect(value.sources.length).toBeGreaterThan(0);
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it("does not change the active pointer when atomic preparation fails", async () => {
+    const before=await pool.query("SELECT * FROM active_resolution WHERE singleton_id=1");
+    await expect(updateAllSources(pool,{ieeeOutput:"/tmp/unused-ieee",enrichmentOutput:"/tmp/unused-enrichment",
+      privateKeyPath:"/tmp/unused-key",policyVersion:"test",policyCommitSha:"test",containerImageDigest:"test",
+      actorId:"operator:integration",prepareIeee:async()=>{throw new Error("injected preparation failure");}}))
+      .rejects.toThrow("injected preparation failure");
+    const after=await pool.query("SELECT * FROM active_resolution WHERE singleton_id=1");
+    expect(after.rows).toEqual(before.rows);
+  });
 });
 
 describe("organization identity and correction intake", () => {

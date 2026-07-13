@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 const wcagTags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 const publicPages = [
   "/", "/methodology", "/data-sources", "/data-release", "/data-corrections",
-  "/legal/data-terms", "/api-docs", "/organizations",
+  "/legal/data-terms", "/api-docs", "/organizations", "/status",
 ];
 
 async function expectNoAxeViolations(page: Page): Promise<void> {

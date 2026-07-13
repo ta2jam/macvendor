@@ -159,10 +159,19 @@ Daha fazla sonuç varsa `curatedMatchesTruncated: true` olur. V1 public lookup, 
 `insights` en fazla 50 kayıt içerir. Bu alan protokol kullanımı, tarihsel ad
 ve olasılıksal cihaz/platform ipuçlarını taşır; `assignment` sonucunu değiştirmez.
 
+### `POST /v1/lookups`
+
+Bir JSON isteğinde 1–25 MAC için yalnız resmî assignment katmanını döndürür:
+`{"macs":["001122334455","02:AA:BB:CC:00:01"]}`. Tüm değerler geçerli
+olmalıdır; tek bir invalid değer bütün isteği `400 INVALID_MAC` ile reddeder.
+Tekrarlanan girişler SQL input'unda deduplicate edilir fakat çıktı sırası ve
+tekrarlar korunur. Rate-limit cost gönderilen MAC sayısıdır. Yanıt private,
+`no-store` olur ve curated claim içermez.
+
 ### Cache
 
-- Başarılı pozitif eşleşme: `Cache-Control: public, max-age=300, s-maxage=86400, stale-while-revalidate=604800`
-- Geçerli fakat eşleşmesiz sorgu: `Cache-Control: public, max-age=60, s-maxage=3600`
+- Başarılı pozitif eşleşme: `Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=60`
+- Geçerli fakat eşleşmesiz sorgu: `Cache-Control: public, max-age=30, s-maxage=60`
 - ETag: seçilen aktif sürüm, canonical sorgu ve yanıt varyantından deterministik üretilir.
 - `Vary` yalnızca gerçekten yanıtı değiştiren başlıkları içerir; `User-Agent` içermez.
 
@@ -242,6 +251,19 @@ Hassas artifact URL'leri, imza anahtarları, iç notlar ve ham kayıtlar döndü
 `sourceClass` kaynak katmanını, `recordCount` ise dahil edilen immutable source
 release içindeki normalize edilmiş kayıt sayısını gösterir; resolved assignment
 sayısı değildir.
+
+### `GET /v1/data-release/changes`
+
+Aktif ve bir önceki governed resolution arasındaki assignment ekleme, silme,
+değişiklik; claim ekleme/silme ve değişen source release sayılarını aggregate
+olarak döndürür. Ham kaynak satırı veya ticari database dump'ı döndürmez.
+
+### Organization endpoint'leri
+
+`GET /v1/organizations?q=...` reviewed exact-name/alias identity bağlantılarını
+arar. `limit=1..20`, `scheme` ve `registry=MA-L|MA-M|MA-S|IAB` filtreleri
+desteklenir. `GET /v1/organizations/{key}` tek reviewed identity kaydını getirir.
+Bu bağlantılar fuzzy merge yapmaz ve IEEE assignment sonucunu değiştirmez.
 
 Cache: `Cache-Control: public, max-age=60, s-maxage=300`. ETag; `activeVersion`,
 `publicationVersion`, dahil edilen kaynakların güncel `configVersion`, hak

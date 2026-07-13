@@ -5,8 +5,10 @@ export const metadata: Metadata = { title: "API" };
 const examples = [
   ["MAC lookup", "GET /v1/lookup/02AABBCC0001"],
   ["Official layer only", "GET /v1/lookup/02AABBCC0001?mode=official"],
+  ["Bulk official lookup (max 25)", "POST /v1/lookups"],
   ["Exact assignment", "GET /v1/assignments/ma-l/02AABB-24"],
   ["Active release", "GET /v1/data-release"],
+  ["Release changes", "GET /v1/data-release/changes"],
   ["Organization search", "GET /v1/organizations?q=Apple"],
   ["Organization identity", "GET /v1/organizations/Q312"],
   ["Correction intake", "POST /v1/corrections"],

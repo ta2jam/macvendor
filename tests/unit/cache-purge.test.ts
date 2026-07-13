@@ -51,6 +51,38 @@ describe("cache surrogate invalidation", () => {
     expect(new Headers(init?.headers).get("authorization")).toBe("Bearer test-secret");
   });
 
+  it("uses Cloudflare Free cache-tag purge without a paid Worker adapter", async () => {
+    const fetchImplementation = vi.fn<(input: string | URL, init?: RequestInit) => Promise<Response>>(
+      async () => Response.json({ success: true, result: { id: "zone" } }),
+    );
+    await expect(purgeSurrogateKeys([DATA_RELEASE_SURROGATE_KEY], {
+      provider: "cloudflare",
+      cloudflareZoneId: "0123456789abcdef0123456789abcdef",
+      token: "scoped-test-token",
+      required: true,
+      fetchImplementation,
+    })).resolves.toEqual({ status: "purged", surrogateKeys: [DATA_RELEASE_SURROGATE_KEY] });
+    const [url, init] = fetchImplementation.mock.calls[0]!;
+    expect(String(url)).toBe("https://api.cloudflare.com/client/v4/zones/0123456789abcdef0123456789abcdef/purge_cache");
+    expect(init?.body).toBe(JSON.stringify({ tags: [DATA_RELEASE_SURROGATE_KEY] }));
+  });
+
+  it("rejects malformed Cloudflare configuration before a request", async () => {
+    const fetchImplementation = vi.fn<(input: string | URL, init?: RequestInit) => Promise<Response>>();
+    await expect(purgeSurrogateKeys([DATA_RELEASE_SURROGATE_KEY], {
+      provider: "cloudflare", cloudflareZoneId: "not-a-zone", token: "secret", fetchImplementation,
+    })).rejects.toMatchObject({ code: "INVALID_CLOUDFLARE_ZONE_ID" });
+    expect(fetchImplementation).not.toHaveBeenCalled();
+  });
+
+  it("does not treat a Cloudflare HTTP 200 API rejection as a purge", async () => {
+    await expect(purgeSurrogateKeys([DATA_RELEASE_SURROGATE_KEY], {
+      provider: "cloudflare", cloudflareZoneId: "0123456789abcdef0123456789abcdef",
+      token: "scoped-test-token", required: true,
+      fetchImplementation: async () => Response.json({ success: false, errors: [{ code: 1000 }] }),
+    })).rejects.toMatchObject({ code: "CACHE_PURGE_REJECTED", message: "Cloudflare did not accept the cache purge" });
+  });
+
   it("contains network and HTTP failure injection without leaking the token", async () => {
     await expect(purgeSurrogateKeys([DATA_RELEASE_SURROGATE_KEY], {
       endpoint: "https://cache-adapter.example.test/purge",

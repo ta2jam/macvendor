@@ -19,8 +19,10 @@ docker run --rm \
     set -eu
     encoded=\"\$(node -e \"process.stdout.write(encodeURIComponent(process.env.POSTGRES_PASSWORD))\")\"
     export DATABASE_URL=\"postgresql://macvendor:\${encoded}@database:5432/macvendor\"
-    npm run source:update:ieee -- --output /work/$(basename "$WORK")/ieee --private-key /run/secrets/ingest-private.pem
-    npm run source:update:enrichments -- --ieee-dir /work/$(basename "$WORK")/ieee --output /work/$(basename "$WORK")/enrichments --private-key /run/secrets/ingest-private.pem
+    npm run source:update:all -- \
+      --ieee-output /work/$(basename "$WORK")/ieee \
+      --enrichment-output /work/$(basename "$WORK")/enrichments \
+      --private-key /run/secrets/ingest-private.pem
   "
 
 systemctl start macvendor-backup.service

@@ -51,9 +51,8 @@ identity. MAC addresses can be reassigned, spoofed, or randomized.
 
 ## Current capabilities
 
-v0.1.x is the first inspectable local release line: the English-only web UI reads the active
-resolution and source metadata from PostgreSQL instead of presenting a static
-demo inventory. It is not a claim of internet production readiness.
+v0.5.x is the bounded public-operations release line. The English-only web UI
+and API read governed active resolution and source metadata from PostgreSQL.
 
 - strict parsing for bare, colon, hyphen, and dotted EUI-48 forms;
 - canonical uppercase redirects and conditional requests with ETag/304;
@@ -73,8 +72,8 @@ demo inventory. It is not a claim of internet production readiness.
   and rights-expiry health reporting;
 - active source publish-mode failures and build/current config drift visibility,
   with rebuild closure proven in PostgreSQL integration coverage;
-- shared-cache surrogate keys and a bounded provider-neutral post-commit purge
-  hook; real CDN validation remains deployment-specific.
+- shared-cache surrogate keys, Cloudflare Free cache tags, and a bounded
+  post-commit purge adapter;
 - WCAG A/AA-oriented axe checks and lookup-flow tests across Chromium, Firefox,
   WebKit, and a 320 px mobile viewport;
 - allowlisted HTTPS fetch with DNS/IP SSRF defense, redirect revalidation,
@@ -88,6 +87,10 @@ demo inventory. It is not a claim of internet production readiness.
 - fixed-origin IEEE MA-L/MA-M/MA-S preparation with raw SHA-256 provenance,
   operator Ed25519 custody signatures, schema normalization, duplicate omission,
   immutable import, and deterministic activation;
+- one atomic scheduled publication across IEEE and enrichment sources;
+- bounded official bulk lookup, aggregate release changes, organization filters,
+  encrypted MacBook restic backup, Slack state-change alerts, SBOM, Git-history
+  secret scanning, and runtime-image vulnerability scanning.
 
 ## Quick start
 
@@ -130,15 +133,20 @@ TEST_DATABASE_URL=postgresql://macvendor:macvendor@localhost:5433/macvendor_test
 |---|---|
 | `GET /v1/lookup/{mac}` | Authoritative assignment plus separate curated claims |
 | `GET /v1/lookup/{mac}?mode=official` | Authoritative layer only |
+| `POST /v1/lookups` | Official lookup for 1–25 MAC addresses |
 | `GET /v1/assignments/{registry}/{prefix}` | Exact registry/prefix assignment |
 | `GET /v1/assignments/{registry}/{prefix}?include=evidence` | Exact assignment with bounded evidence |
 | `GET /v1/data-release` | Active release, source snapshots, rights state, and hashes |
+| `GET /v1/data-release/changes` | Aggregate difference from the preceding release |
+| `GET /v1/organizations` | Reviewed organization search with scheme/registry filters |
 
 ```bash
 curl -sS http://localhost:3000/v1/lookup/02AABBCC0001 | jq
 curl -sS 'http://localhost:3000/v1/lookup/02AABBCC0001?mode=official' | jq
 curl -sS 'http://localhost:3000/v1/assignments/ma-l/02AABB-24?include=evidence' | jq
 curl -sS http://localhost:3000/v1/data-release | jq
+curl -sS http://localhost:3000/v1/lookups -H 'content-type: application/json' -d '{"macs":["02AABBCC0001","001122334455"]}' | jq
+curl -sS http://localhost:3000/v1/data-release/changes | jq
 ```
 
 The complete public contract is in
@@ -190,8 +198,9 @@ Data availability and data rights are different facts.
   prefixes, and exact-mapped Wikidata aliases remain separate enrichment layers.
 - KIT NETVS and unreviewed community databases are reference/QA inputs, not
   automatically production sources.
-- Amateur database integration is deferred. No amateur records are admitted in
-  the current release.
+- Amateur production publication is deferred. `owner:prepare` creates only a
+  quarantined `qa_only`, `internal_only` artifact and cannot remove or replace
+  an existing source.
 - Exact `/48` claims are treated as device identifiers and are not public by
   default.
 - Third-party rows with unknown origin or rights cannot enter a production
@@ -203,27 +212,30 @@ fixture contract in [`docs/source-adapters.md`](docs/source-adapters.md).
 Existing source configuration changes use the preview-first, audited decision
 workflow in [`docs/governance.md`](docs/governance.md); direct SQL is unsupported.
 
-### Update the IEEE release
+### Update all scheduled sources atomically
 
 The private ingest key is never committed. The public trust anchor is versioned
 under `config/keys/`. After provisioning the matching private key at
 `~/.config/macvendor/ieee-ingest-ed25519-private.pem`:
 
 ```bash
-OPERATOR_ACTOR_ID=operator:ieee-scheduler npm run source:update:ieee
+OPERATOR_ACTOR_ID=operator:source-scheduler npm run source:update:all -- \
+  --ieee-output .local/source-update/ieee \
+  --enrichment-output .local/source-update/enrichments \
+  --private-key ~/.config/macvendor/ieee-ingest-ed25519-private.pem
 ```
 
-The guarded command prepares, verifies, imports, resolves, activates, and purges
-all five fixed IEEE registries. A database advisory lock rejects overlap. An
-unchanged download records a new immutable fetch observation without duplicating
-the source release or incrementing the active version.
+The guarded command prepares every IEEE and enrichment input before database
+writes, then performs one build and one activation. A database advisory lock
+rejects overlap. A failed origin cannot partially activate a publication.
 
 Generated raw files, signatures, and manifests stay under ignored `.local/` and
 are not redistributed through GitHub. See [`NOTICE`](NOTICE) and the importing
 runbook before rotating keys or changing URLs. The lower-level prepare/import/
 build/activate commands remain available for diagnosis and controlled recovery.
 
-Prepare the reviewed enrichment sources from the same signed IEEE snapshot with:
+The lower-level IEEE-only and enrichment commands remain available for
+controlled diagnosis. Prepare enrichments manually with:
 
 ```bash
 npm run source:prepare:enrichments -- --ieee-dir .local/ieee/YYYY-MM-DD
@@ -252,6 +264,7 @@ npm run browser:install
 npm run test:browser
 npm run benchmark:lookup -- --sizes 1000,10000,100000,250000
 npm audit --audit-level=low
+gitleaks git --redact .
 ```
 
 Run the complete local gate with:
@@ -276,6 +289,15 @@ Import the synthetic QA-only example with:
 
 ```bash
 npm run source:import -- --manifest examples/sources/synthetic-import/manifest.json
+```
+
+Prepare an owner-created dataset for quarantine review with:
+
+```bash
+npm run owner:prepare -- \
+  --declaration examples/owner-source/declaration.example.json \
+  --records examples/owner-source/records.jsonl \
+  --output .local/owner-source-review
 ```
 
 See [`docs/importing-sources.md`](docs/importing-sources.md). The importer reads

@@ -5,12 +5,21 @@ import { afterEach, describe, expect, it } from "vitest";
 import { sha256 } from "../../src/domain/canonical-json";
 import { parseArtifact } from "../../src/importer/artifact";
 import { ImportValidationError } from "../../src/importer/errors";
+import { semanticRecordHash } from "../../src/importer/import-source";
 import { parseManifest } from "../../src/importer/manifest";
 import type { SourceManifest } from "../../src/importer/types";
 import { writeSignedArtifact } from "../helpers/source-fixture";
 import { IEEE_ADAPTER_KEY, IEEE_RA_ORIGIN, IEEE_RIGHTS_REVIEW } from "../../src/sources/ieee";
 
 const temporaryDirectories: string[] = [];
+
+it("uses semantic source content rather than observation time for release diffs", () => {
+  const record = { recordKind:"usage_note",registry:null,prefixBits:"4386",prefixLength:24,
+    organizationName:null,organizationAddress:null,isPrivate:false,claimValue:{usage:"Synthetic"},
+    originType:"imported",rightsBasis:"public_domain_claim",distributionScope:"api_output",
+    verificationStatus:"reviewed",reviewedBy:"operator:test",evidenceReference:"fixture:test" };
+  expect(semanticRecordHash(record)).toBe(semanticRecordHash({...record}));
+});
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));

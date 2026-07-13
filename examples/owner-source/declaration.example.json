@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "owner-source-declaration/v1",
+  "source": {
+    "slug": "synthetic-owner-observations",
+    "name": "Synthetic owner observations",
+    "homepageUrl": "https://example.invalid/mac-observations",
+    "termsUrl": "https://example.invalid/mac-observations/terms"
+  },
+  "collection": {
+    "owner": "Synthetic example owner",
+    "method": "Manually recorded from devices controlled by the dataset owner; synthetic fixture only.",
+    "contactReference": "operator:synthetic-example",
+    "privacyReviewReference": "docs/privacy.md#owner-created-source-review"
+  },
+  "rights": {
+    "statement": "The dataset owner asserts that the fixture was created by them and may be reviewed internally.",
+    "permissionReference": "owner-declaration:synthetic-example-2026-07-13"
+  },
+  "release": {
+    "observedAt": "2026-07-13T00:00:00.000Z"
+  }
+}

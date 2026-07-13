@@ -17,6 +17,27 @@ interface DiffReport {
   status: "initial" | "passed" | "not_applicable";
 }
 
+interface SemanticRecord {
+  recordKind: string;
+  registry: string | null;
+  prefixBits: string | null;
+  prefixLength: number | null;
+  organizationName: string | null;
+  organizationAddress: string | null;
+  isPrivate: boolean;
+  claimValue: Record<string, unknown>;
+  originType: string;
+  rightsBasis: string;
+  distributionScope: string;
+  verificationStatus: string;
+  reviewedBy: string | null;
+  evidenceReference: string | null;
+}
+
+export function semanticRecordHash(record: SemanticRecord): string {
+  return sha256(canonicalJson(record));
+}
+
 function sourceConfig(manifest: SourceManifest) {
   return {
     slug: manifest.source.slug,
@@ -125,7 +146,17 @@ async function validateReleaseDiff(
   records: ParsedSourceRecord[],
   manifest: SourceManifest,
 ): Promise<DiffReport> {
-  const current = new Set(records.map((record) => record.rawRecordHash));
+  // Observation time and row location are provenance, not semantic content.
+  // Including them makes unchanged scheduled snapshots appear 100% replaced.
+  const current = new Set(records.map((record) => semanticRecordHash({
+    recordKind: record.recordKind, registry: record.registry,
+    prefixBits: record.prefixBits?.toString() ?? null, prefixLength: record.prefixLength,
+    organizationName: record.organizationName, organizationAddress: record.organizationAddress,
+    isPrivate: record.isPrivate, claimValue: record.claimValue, originType: record.originType,
+    rightsBasis: record.rightsBasis, distributionScope: record.distributionScope,
+    verificationStatus: record.verificationStatus, reviewedBy: record.reviewedBy,
+    evidenceReference: record.evidenceReference ?? record.privacyReviewReference,
+  })));
   if (manifest.release.snapshotKind === "delta") {
     return {
       baselineReleaseId: null, previousCount: 0, currentCount: current.size,
@@ -143,11 +174,26 @@ async function validateReleaseDiff(
       addedCount: current.size, removedCount: 0, addedPercent: 0, removedPercent: 0, status: "initial",
     };
   }
-  const previousRows = await client.query<{ raw_record_hash: string }>(
-    "SELECT raw_record_hash FROM source_records WHERE source_release_id = $1 AND record_status IN ('eligible', 'qa_only')",
+  const previousRows = await client.query<{
+    record_kind: string; registry: string | null; prefix_bits: string | null; prefix_length: number | null;
+    organization_name_display: string | null; organization_address_raw: string | null; is_private: boolean;
+    claim_value: Record<string, unknown>; origin_type: string; rights_basis: string; distribution_scope: string;
+    verification_status: string; reviewed_by: string | null; evidence_reference: string | null;
+  }>(
+    `SELECT record_kind,registry,prefix_bits::text,prefix_length,organization_name_display,
+       organization_address_raw,is_private,claim_value,origin_type,rights_basis,distribution_scope,
+       verification_status,reviewed_by,evidence_reference
+     FROM source_records WHERE source_release_id = $1 AND record_status IN ('eligible', 'qa_only')`,
     [previousRelease.rows[0].id],
   );
-  const previous = new Set(previousRows.rows.map((row) => row.raw_record_hash));
+  const previous = new Set(previousRows.rows.map((row) => semanticRecordHash({
+    recordKind: row.record_kind, registry: row.registry, prefixBits: row.prefix_bits,
+    prefixLength: row.prefix_length, organizationName: row.organization_name_display,
+    organizationAddress: row.organization_address_raw, isPrivate: row.is_private,
+    claimValue: row.claim_value, originType: row.origin_type, rightsBasis: row.rights_basis,
+    distributionScope: row.distribution_scope, verificationStatus: row.verification_status,
+    reviewedBy: row.reviewed_by, evidenceReference: row.evidence_reference,
+  })));
   const addedCount = [...current].filter((hash) => !previous.has(hash)).length;
   const removedCount = [...previous].filter((hash) => !current.has(hash)).length;
   const addedPercent = previous.size ? (addedCount / previous.size) * 100 : 0;

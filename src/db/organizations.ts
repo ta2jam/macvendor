@@ -15,7 +15,7 @@ function prefix(bits: string, length: number): string {
   return (BigInt(bits) << BigInt(unused)).toString(16).toUpperCase().padStart(width,"0");
 }
 
-async function assignments(pool: Pool, keys: string[]): Promise<Map<string,{ items: unknown[]; truncated: boolean }>> {
+async function assignments(pool: Pool, keys: string[], registry?: string): Promise<Map<string,{ items: unknown[]; truncated: boolean }>> {
   const result=await pool.query<AssignmentRow>(
     `WITH mappings AS (
        SELECT DISTINCT sr.claim_value->>'organizationKey' AS organization_key,
@@ -31,7 +31,8 @@ async function assignments(pool: Pool, keys: string[]): Promise<Map<string,{ ite
      FROM mappings m JOIN active_resolution ar ON ar.singleton_id=1
      JOIN resolved_assignments ra ON ra.resolution_run_id=ar.resolution_run_id
        AND lower(ra.organization_name)=lower(m.registered_name)
-     ORDER BY m.organization_key,ra.prefix_length DESC,ra.prefix_bits LIMIT 2001`, [keys],
+     WHERE ($2::text IS NULL OR ra.registry=$2)
+     ORDER BY m.organization_key,ra.prefix_length DESC,ra.prefix_bits LIMIT 2001`, [keys, registry ?? null],
   );
   const grouped=new Map<string,{items:unknown[];truncated:boolean}>();
   for (const row of result.rows) {
@@ -68,20 +69,24 @@ const IDENTITY_SQL=`SELECT sr.claim_value->>'organizationKey' AS organization_ke
  JOIN source_releases rel ON rel.id=sr.source_release_id JOIN data_sources ds ON ds.id=rel.source_id
  WHERE ar.singleton_id=1 AND sr.record_kind='organization_identity' AND sr.record_status='eligible'`;
 
-export async function searchOrganizations(pool: Pool, query: string, limit: number) {
+export async function searchOrganizations(pool: Pool, query: string, limit: number,
+  filters: { scheme?: string; registry?: string } = {}) {
   const pattern=`%${query.replaceAll("\\","\\\\").replaceAll("%","\\%").replaceAll("_","\\_")}%`;
   const rows=await pool.query<IdentityRow>(`${IDENTITY_SQL}
     AND (sr.organization_name_display ILIKE $1 ESCAPE '\\' OR EXISTS (
       SELECT 1 FROM jsonb_array_elements_text(COALESCE(sr.claim_value->'aliases','[]'::jsonb)) alias WHERE alias ILIKE $1 ESCAPE '\\'
     ) OR EXISTS (
       SELECT 1 FROM jsonb_array_elements_text(COALESCE(sr.claim_value->'registeredNames','[]'::jsonb)) name WHERE name ILIKE $1 ESCAPE '\\'
-    ))
+    )) AND ($3::text IS NULL OR sr.claim_value->>'scheme'=$3)
     ORDER BY CASE ds.slug WHEN 'gleif-lei-identities' THEN 1 WHEN 'sec-edgar-identities' THEN 2
       WHEN 'companies-house-identities' THEN 3 ELSE 4 END, sr.organization_name_display
-    LIMIT $2`,[pattern,limit*10]);
+    LIMIT $2`,[pattern,limit*10,filters.scheme ?? null]);
   const selectedKeys=[...new Set(rows.rows.map((row)=>row.organization_key))].slice(0,limit);
   const selected=rows.rows.filter((row)=>selectedKeys.includes(row.organization_key));
-  return { query,results:groupIdentities(selected,await assignments(pool,selectedKeys)),truncated:new Set(rows.rows.map((row)=>row.organization_key)).size>limit };
+  const results=groupIdentities(selected,await assignments(pool,selectedKeys,filters.registry))
+    .filter((organization)=>!filters.registry||organization.assignments.length>0);
+  return { query,filters:{scheme:filters.scheme??null,registry:filters.registry??null},results,
+    truncated:new Set(rows.rows.map((row)=>row.organization_key)).size>limit };
 }
 
 export async function getOrganization(pool: Pool, organizationKey: string) {

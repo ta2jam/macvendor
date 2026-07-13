@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+## 0.5.0 — 2026-07-13
+
+- Added one atomic public-source update path for all 19 governed IEEE and
+  enrichment inputs. Every network artifact is prepared before import, the
+  resolution is built and activated once, existing unlisted production inputs
+  are retained, and cache invalidation happens only after publication.
+- Fixed release-diff hashing so observation timestamps and raw artifact
+  locators cannot turn semantically unchanged records into false 100% churn.
+- Added bounded official-only bulk lookup (`POST /v1/lookups`, maximum 25),
+  aggregate release-change reporting, a public status page, registry/scheme
+  organization filters, and exact organization detail pages.
+- Added source-contribution reporting and a fail-closed owner/amateur-source
+  preparation path that can emit only `qa_only` and `internal_only` artifacts;
+  it cannot publish, replace, remove, or override a governed source.
+- Added Cloudflare Free-plan cache-tag purging without Workers, kept disabled
+  until a newly rotated scoped token is supplied, and documented the free-tier
+  limits and provider-neutral fallback.
+- Added MacBook-hosted encrypted restic backups, 15-minute operations checks,
+  Slack `#team` state-transition alerts, public-key-only SSH hardening, and
+  bounded fail2ban policy. Shared-VPS capacity changes remain deferred.
+- Added pinned GitHub Actions, full-history Gitleaks scanning, CycloneDX SBOM
+  generation, runtime-image Trivy scanning, and Docker Dependabot coverage.
+- Added provisional service objectives, recovery and product-gate runbooks,
+  plus cross-browser automated WCAG coverage for the new public status surface.
+
 ## 0.4.2 — 2026-07-12
 
 - Fixed the external production monitor's freshness parser for PostgreSQL ISO

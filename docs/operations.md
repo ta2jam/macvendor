@@ -225,26 +225,31 @@ Content-Type: application/json
 ```
 
 Endpoint credentials/query/fragment içeremez; key sayısı ve biçimi sınırlıdır,
-redirect izlenmez ve çağrı 5 saniyede kesilir. Production'da
-`CACHE_PURGE_REQUIRED=true` olmalıdır. Purge hatası commit'i geri almış gibi
-sunulmaz: CLI non-zero çıkar ve commit edilmiş mutation bilgisini makine-okunur
-hata içinde döndürür. Gerçek provider adapter'ı ve alarm teslimatı, CDN seçilip
-staging'de doğrulanana kadar dış bağımlılıktır.
+redirect izlenmez ve çağrı 5 saniyede kesilir. Cloudflare Free için generic
+endpoint yerine `CACHE_PURGE_PROVIDER=cloudflare`, `CLOUDFLARE_ZONE_ID` ve
+yalnız ilgili zone için Cache Purge yetkisi taşıyan yeni bir token kullanılır;
+doğrudan adapter `docs/cloudflare-free-cache.md` dosyasında açıklanır. Daha önce
+ifşa edilmiş token yeniden kullanılmaz. Yeni token staging'de doğrulandıktan
+sonra production'da `CACHE_PURGE_REQUIRED=true` yapılmalıdır. O zamana kadar
+bounded TTL güvenlik ağıdır. Purge hatası commit'i geri almış gibi sunulmaz:
+CLI non-zero çıkar ve commit edilmiş mutation bilgisini makine-okunur hata
+içinde döndürür.
 
 Aktif build'de kullanılan bir source'un hak/config değişikliği `/v1/data-release` surrogate key'ini purge eder. Lookup çıktısı suppression/rollback olmadan değiştirilmez.
-
-Provider custom cache-key destekliyorsa active pointer version CDN key'e eklenir. Desteklemiyorsa purge zorunludur.
 
 Rate-limit header'ları cache edilen origin body ile birleştirilmez; edge response aşamasında eklenir.
 
 ## Rate limiting ve DoS
 
-Mevcut token bucket process-local fallback'tir; yatay ölçekli ortak kota
-değildir. Edge sağlayıcısı, güvenilen IP sözleşmesi ve gerçek trafik/abuse
-ölçümleri olmadan Redis veya PostgreSQL hot-path yazısı eklenmeyecektir. Bu iş
-[#19](https://github.com/ta2jam/macvendor/issues/19) üzerinde blocked durumdadır.
+Production rate limiter PostgreSQL fixed-window sayaçlarını ve HMAC ile
+anonimleştirilmiş istemci anahtarlarını kullanır. PostgreSQL geçici olarak
+erişilemezse bounded process-local token bucket devreye girer; fallback yatay
+ölçekli ortak kota değildir. Sayaç retention'ı maintenance job tarafından
+sınırlandırılır.
 
-- İlk koruma edge token bucket: IP başına 5 req/s, burst 25; ölçümle değişir.
+- İlk koruma origin fixed window: varsayılan 10 saniyede 50 cost unit; ölçümle
+  değişir. Bulk lookup her MAC için bir cost unit tüketir ve istek başına en
+  fazla 25 MAC kabul eder.
 - Client IP yalnız güvenilen edge/load-balancer'ın overwrite ettiği header'dan alınır; public `X-Forwarded-For` zincirine doğrudan güvenilmez. Doğrudan origin erişimi firewall ile kapalıdır.
 - IPv6 limiti varsayılan `/64`, IPv4 limiti adres bazlıdır; NAT etkisi metriklerle izlenir.
 - Origin global concurrency limiti load test ile belirlenir.

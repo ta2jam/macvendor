@@ -28,9 +28,32 @@ retention is bounded to 14 days and the newest 20 dumps because releases also
 create pre- and post-deploy backups. It must be paired with an off-host copy. A
 same-disk backup does not protect against VPS or disk loss.
 
-`macvendor-ieee-update.timer` runs the guarded IEEE update daily.
-`macvendor-source-update.timer` refreshes IEEE and all enrichment sources weekly
-with verified backups before and after activation.
+The temporary off-host control is the encrypted MacBook restic pull documented
+in `docs/recovery.md`. Replace it with independent versioned object storage and
+WAL/PITR when a provider is selected.
+
+## Administrative SSH
+
+Install `sshd-hardening.conf` under `/etc/ssh/sshd_config.d/`, validate with
+`sshd -t`, and keep a provider-console session open during reload. Only the
+`deploy` public-key account is allowed; root, password, keyboard-interactive,
+agent forwarding, TCP forwarding, and tunnels remain disabled.
+
+`fail2ban-sshd.local` uses 10 failures per 10 minutes and a 15-minute ban. The
+previous three-failure, one-hour exponentially increasing ban caused avoidable
+operator lockout on a public-key-only host. Do not allowlist a dynamic home IP.
+
+The Mac launch agent checks public health, release metadata, SSH, failed units,
+disk, available memory, unhealthy containers, and timer count every 15 minutes.
+It sends only failure/recovery transitions to Slack `#team`; a sleeping Mac is
+not an independent monitoring system, so GitHub Production Monitor remains the
+external HTTP probe.
+
+The daily scheduled publication is `macvendor-source-update.timer`. It prepares
+all IEEE and enrichment inputs before import, then performs one build and one
+activation. Disable and mask the legacy `macvendor-ieee-update.timer`;
+retaining both schedules would reintroduce intermediate publications.
+
 `macvendor-source-health.timer` checks freshness, rights and active-config
 drift every six hours. `macvendor-maintenance.timer` removes expired limiter
 windows and correction contact data daily. `macvendor-correction-health.timer`

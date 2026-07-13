@@ -99,6 +99,38 @@
         "data": { "$ref": "#/$defs/ReleaseData" }
       }
     },
+    "BulkLookupItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["normalizedMac", "assignment", "release"],
+      "properties": {
+        "normalizedMac": { "type": "string", "pattern": "^[0-9A-F]{12}$" },
+        "assignment": { "oneOf": [{ "$ref": "#/$defs/Assignment" }, { "type": "null" }] },
+        "release": { "$ref": "#/$defs/ReleaseData" }
+      }
+    },
+    "BulkLookupResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data", "meta"],
+      "properties": {
+        "data": {
+          "type": "object", "additionalProperties": false, "required": ["type", "mode", "results"],
+          "properties": {
+            "type": { "const": "bulk_lookup" }, "mode": { "const": "official" },
+            "results": { "type": "array", "minItems": 1, "maxItems": 25, "items": { "$ref": "#/$defs/BulkLookupItem" } }
+          }
+        },
+        "meta": {
+          "type": "object", "additionalProperties": false, "required": ["requestId", "count", "uniqueCount"],
+          "properties": {
+            "requestId": { "type": "string", "minLength": 1 },
+            "count": { "type": "integer", "minimum": 1, "maximum": 25 },
+            "uniqueCount": { "type": "integer", "minimum": 1, "maximum": 25 }
+          }
+        }
+      }
+    },
     "Evidence": {
       "type": "object",
       "additionalProperties": false,
@@ -162,6 +194,34 @@
         }
       }
     },
+    "ReleaseChangesResponse": {
+      "type": "object", "additionalProperties": false, "required": ["current", "previous", "changes"],
+      "properties": {
+        "current": {
+          "type": "object", "additionalProperties": false,
+          "required": ["resolvedReleaseId", "activeVersion", "publicationVersion", "generatedAt"],
+          "properties": {
+            "resolvedReleaseId": { "type": "string", "pattern": "^rr_[0-9a-f-]+$" },
+            "activeVersion": { "type": "integer", "minimum": 1 },
+            "publicationVersion": { "type": "integer", "minimum": 1 },
+            "generatedAt": { "type": "string", "format": "date-time" }
+          }
+        },
+        "previous": { "oneOf": [{
+          "type": "object", "additionalProperties": false, "required": ["resolvedReleaseId", "generatedAt"],
+          "properties": { "resolvedReleaseId": { "type": "string", "pattern": "^rr_[0-9a-f-]+$" }, "generatedAt": { "type": "string", "format": "date-time" } }
+        }, { "type": "null" }] },
+        "changes": {
+          "type": "object", "additionalProperties": false,
+          "required": ["assignmentsAdded", "assignmentsRemoved", "assignmentsChanged", "claimsAdded", "claimsRemoved", "sourceReleasesChanged"],
+          "properties": {
+            "assignmentsAdded": { "type": "integer", "minimum": 0 }, "assignmentsRemoved": { "type": "integer", "minimum": 0 },
+            "assignmentsChanged": { "type": "integer", "minimum": 0 }, "claimsAdded": { "type": "integer", "minimum": 0 },
+            "claimsRemoved": { "type": "integer", "minimum": 0 }, "sourceReleasesChanged": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
     "Organization": {
       "type": "object",
       "additionalProperties": false,
@@ -201,9 +261,16 @@
     "OrganizationSearchResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["query", "results", "truncated"],
+      "required": ["query", "filters", "results", "truncated"],
       "properties": {
         "query": { "type": "string" },
+        "filters": {
+          "type": "object", "additionalProperties": false, "required": ["scheme", "registry"],
+          "properties": {
+            "scheme": { "type": ["string", "null"] },
+            "registry": { "oneOf": [{ "type": "string", "enum": ["MA-L", "MA-M", "MA-S", "IAB"] }, { "type": "null" }] }
+          }
+        },
         "results": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/Organization" } },
         "truncated": { "type": "boolean" }
       }
@@ -238,7 +305,7 @@
         "type": { "type": "string", "format": "uri", "pattern": "^https://macvendor\\.io/problems/" },
         "title": { "type": "string", "minLength": 1 },
         "status": { "type": "integer", "enum": [400, 404, 413, 415, 429, 503] },
-        "code": { "type": "string", "enum": ["INVALID_MAC", "INVALID_PREFIX", "INVALID_REGISTRY", "UNSUPPORTED_PARAMETER", "ASSIGNMENT_NOT_FOUND", "INVALID_ORGANIZATION_QUERY", "INVALID_ORGANIZATION_KEY", "ORGANIZATION_NOT_FOUND", "INVALID_CORRECTION_REQUEST", "PAYLOAD_TOO_LARGE", "UNSUPPORTED_MEDIA_TYPE", "CORRECTION_INTAKE_UNAVAILABLE", "RATE_LIMITED", "DATA_RELEASE_UNAVAILABLE", "SERVICE_UNAVAILABLE"] },
+        "code": { "type": "string", "enum": ["INVALID_MAC", "INVALID_PREFIX", "INVALID_REGISTRY", "UNSUPPORTED_PARAMETER", "INVALID_JSON", "INVALID_BULK_REQUEST", "BULK_BODY_TOO_LARGE", "ASSIGNMENT_NOT_FOUND", "INVALID_ORGANIZATION_QUERY", "INVALID_ORGANIZATION_KEY", "ORGANIZATION_NOT_FOUND", "INVALID_CORRECTION_REQUEST", "PAYLOAD_TOO_LARGE", "UNSUPPORTED_MEDIA_TYPE", "CORRECTION_INTAKE_UNAVAILABLE", "RATE_LIMITED", "DATA_RELEASE_UNAVAILABLE", "SERVICE_UNAVAILABLE"] },
         "detail": { "type": "string", "minLength": 1 },
         "requestId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$" }
       },

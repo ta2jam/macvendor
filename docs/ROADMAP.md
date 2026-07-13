@@ -3,7 +3,7 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.4.0 governed multi-source operations
+## Current — 0.5.0 bounded public operations
 
 The current release publishes governed IEEE assignments, separately labelled
 MAC context, and reviewed organization identities. Production releases must be tagged from a
@@ -67,8 +67,9 @@ and accountable correction intake are PostgreSQL-backed.
 
 ## Independent hardening while data rights are blocked
 
-- [x] provider-neutral surrogate-key headers, purge hook, and failure-injection
-  tests; a real CDN adapter still requires provider validation — issue #18;
+- [x] provider-neutral surrogate-key headers, purge hook, failure-injection
+  tests, and a direct Cloudflare Free cache-tag adapter; production activation
+  waits for a newly rotated scoped token — issue #18;
 - [x] shared PostgreSQL fixed-window rate limiting with HMAC client keys, bounded
   local fallback, and retention maintenance — issue #19;
 - [x] encrypted correction intake, append-only audit events, operator-only CLI,
@@ -87,13 +88,23 @@ and accountable correction intake are PostgreSQL-backed.
   external production probes, and CodeQL scanning;
 - [x] release synchronization verification across local, GitHub, release tag,
   public health metadata, and the active VPS release marker.
+- [x] one prepare/import/build/activate transaction boundary for the scheduled
+  IEEE and enrichment publication; a failed fetch cannot partially activate;
+- [x] Cloudflare Free cache-tag purge adapter with scoped-token configuration;
+- [x] encrypted MacBook restic copy, Slack `#team` state-change monitor, and
+  public aggregate release-change status;
+- [x] source contribution reporting and a non-publishing owner-created source
+  quarantine workflow;
+- [x] bounded official bulk lookup, organization filters/detail pages, SBOM,
+  Git-history secret scanning, and runtime-image vulnerability scanning.
 
 ## After data readiness
 
 - [x] synthetic contributor adapter kit with rights and provenance gates.
 
-Amateur/owner-curated database ingestion remains deferred until its provenance
-and review workflow is explicitly resumed.
+Amateur/owner-curated production publication remains deferred until real files
+and declarations are supplied. `owner:prepare` can only produce `qa_only`,
+`internal_only` quarantine artifacts and cannot remove or replace a source.
 
 ## Explicitly not current scope
 
