@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:24-alpine AS dependencies
+FROM node:26-alpine AS dependencies
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY package.json package-lock.json ./
@@ -13,7 +13,7 @@ FROM dependencies AS builder
 COPY . .
 RUN npm run build
 
-FROM node:24-alpine AS runtime
+FROM node:26-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
