@@ -82,7 +82,10 @@ async function ensureSource(client: PoolClient, manifest: SourceManifest): Promi
   );
   if (existing.rows[0]) {
     if (canonicalJson(existing.rows[0].config) !== canonicalJson(config)) {
-      throw new ImportValidationError("SOURCE_CONFIG_MISMATCH", "existing source configuration differs; governance update is required before import");
+      const differingFields = Object.keys(config).filter((key) =>
+        canonicalJson(existing.rows[0]!.config[key]) !== canonicalJson(config[key as keyof typeof config]));
+      throw new ImportValidationError("SOURCE_CONFIG_MISMATCH",
+        `existing source ${manifest.source.slug} differs in ${differingFields.join(", ")}; governance update is required before import`);
     }
     return existing.rows[0].id;
   }

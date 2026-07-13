@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.5.1 — 2026-07-13
+
+- Added source slug and field-level differences to fail-closed source-config
+  mismatch errors so an atomic update can be repaired without weakening or
+  blindly rewriting production governance.
+
 ## 0.5.0 — 2026-07-13
 
 - Added one atomic public-source update path for all 19 governed IEEE and
