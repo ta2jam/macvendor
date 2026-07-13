@@ -40,6 +40,12 @@ const PCI_IDS_URL = `${PCI_ORIGIN}/v2.2/pci.ids`;
 const USB_IDS_URL = `${RUNZERO_ORIGIN}/vcrhonek/hwdata/master/usb.ids`;
 const MAX_BYTES = 20 * 1024 * 1024;
 
+export const VIRTUAL_PLATFORM_RIGHTS_BASIS = {
+  hyperv: "public_domain_claim",
+  vmware: "public_domain_claim",
+  openstack: "licensed",
+} as const satisfies Record<"hyperv" | "vmware" | "openstack", RightsBasis>;
+
 interface OutputRecord {
   prefix?: string;
   prefixLength?: string;
@@ -486,15 +492,16 @@ export async function prepareEnrichmentSources(options: PrepareEnrichmentOptions
       reviewReference: "docs/rights/wireshark-wka.md#decision-2026-07-12", records: virtualPlatforms.wireshark,
       maxAddedPercent: 30, maxRemovedPercent: 15 },
     { slug: "microsoft-hyperv-mac-hints", name: "Microsoft Hyper-V MAC allocation hints", homepageUrl: HYPERV_URL,
-      termsUrl: "https://learn.microsoft.com/legal/termsofuse", rightsBasis: "permission_granted",
+      termsUrl: "https://learn.microsoft.com/legal/termsofuse", rightsBasis: VIRTUAL_PLATFORM_RIGHTS_BASIS.hyperv,
       reviewReference: "docs/rights/virtual-platform-mac-hints.md#decision-2026-07-12", records: virtualPlatforms.hyperv,
       maxAddedPercent: 100, maxRemovedPercent: 100 },
     { slug: "vmware-mac-hints", name: "VMware MAC allocation hints", homepageUrl: VMWARE_URL,
-      termsUrl: "https://www.broadcom.com/company/legal/terms-of-use", rightsBasis: "permission_granted",
+      termsUrl: "https://www.broadcom.com/company/legal/terms-of-use", rightsBasis: VIRTUAL_PLATFORM_RIGHTS_BASIS.vmware,
       reviewReference: "docs/rights/virtual-platform-mac-hints.md#decision-2026-07-12", records: virtualPlatforms.vmware,
       maxAddedPercent: 100, maxRemovedPercent: 100 },
     { slug: "openstack-neutron-mac-hints", name: "OpenStack Neutron default MAC hints", homepageUrl: OPENSTACK_MAC_URL,
-      termsUrl: "https://opendev.org/openstack/neutron/src/branch/master/LICENSE", rightsBasis: "licensed",
+      termsUrl: "https://opendev.org/openstack/neutron/src/branch/master/LICENSE",
+      rightsBasis: VIRTUAL_PLATFORM_RIGHTS_BASIS.openstack,
       reviewReference: "docs/rights/virtual-platform-mac-hints.md#decision-2026-07-12", records: virtualPlatforms.openstack,
       maxAddedPercent: 100, maxRemovedPercent: 100 },
     { slug: "iana-private-enterprise-numbers", name: "IANA Private Enterprise Numbers", homepageUrl: IANA_PEN_URL,

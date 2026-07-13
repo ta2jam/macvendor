@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.5.2 — 2026-07-13
+
+- Aligned the Hyper-V and VMware enrichment manifests with the approved
+  production rights basis and added a regression test that prevents this
+  fail-closed governance drift from recurring.
+
 ## 0.5.1 — 2026-07-13
 
 - Added source slug and field-level differences to fail-closed source-config
