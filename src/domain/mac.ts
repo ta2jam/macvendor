@@ -60,14 +60,16 @@ export function normalizeMac(input: string): NormalizedMac {
 }
 
 export function prefixBits(mac: bigint, prefixLength: number): bigint {
-  if (!Number.isInteger(prefixLength) || prefixLength < 1 || prefixLength > 48) {
+  if (!Number.isInteger(prefixLength) || prefixLength < 1 || prefixLength > 48
+    || mac < 0n || mac > 0xffffffffffffn) {
     throw new InvalidPrefixError();
   }
   return mac >> BigInt(48 - prefixLength);
 }
 
 export function formatPrefix(bits: bigint, prefixLength: number): string {
-  if (!Number.isInteger(prefixLength) || prefixLength < 1 || prefixLength > 48 || bits < 0n) {
+  if (!Number.isInteger(prefixLength) || prefixLength < 1 || prefixLength > 48
+    || bits < 0n || bits >= (1n << BigInt(prefixLength))) {
     throw new InvalidPrefixError();
   }
 

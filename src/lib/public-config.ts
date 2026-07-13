@@ -21,3 +21,15 @@ export function validateContactEmail(value: unknown): string {
   }
   return candidate;
 }
+
+export function correctionDatabaseIntakeReady(
+  key = process.env.CORRECTION_ENCRYPTION_KEY,
+  keyId = process.env.CORRECTION_ENCRYPTION_KEY_ID ?? "primary",
+): boolean {
+  if (!key || !/^[A-Za-z0-9._-]{1,40}$/.test(keyId)) return false;
+  try {
+    return Buffer.from(key, "base64").length === 32;
+  } catch {
+    return false;
+  }
+}

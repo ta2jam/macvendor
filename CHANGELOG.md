@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.5.3 — 2026-07-13
+
+- Made the local browser suite self-contained and deterministic: it now loads
+  the disposable test database configuration, refuses remote destructive reset
+  targets by default, resets the database before Playwright, and exposes one
+  complete `verify:full` release gate.
+- Hardened correction intake with a streaming 16 KiB limit for chunked bodies,
+  case-insensitive JSON media types, exact public-schema fields, and UI
+  availability checks against a usable encryption-key configuration.
+- Bounded the in-process rate-limit fallback, avoided database initialization
+  when limiting is disabled, and made the quick-start environment safe without
+  production-only rate-limit secrets.
+- Added standards-compliant weak/list/wildcard ETag matching and defensive MAC
+  prefix-range validation.
+- Added `macvendor-backup/v2`, which verifies correction request/event counts
+  and the correction-event append-only trigger while retaining v1 restore
+  compatibility.
+
 ## 0.5.2 — 2026-07-13
 
 - Aligned the Hyper-V and VMware enrichment manifests with the approved

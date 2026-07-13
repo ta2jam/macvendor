@@ -267,10 +267,17 @@ npm audit --audit-level=low
 gitleaks git --redact .
 ```
 
-Run the complete local gate with:
+Run the complete non-browser gate with:
 
 ```bash
 npm run verify
+```
+
+Run the complete local release gate, including the disposable test-database
+reset and all browser projects, with:
+
+```bash
+npm run verify:full
 ```
 
 Browser setup, CI behavior, and the manual checks that automation cannot prove
@@ -278,7 +285,9 @@ are documented in
 [`docs/accessibility-testing.md`](docs/accessibility-testing.md).
 
 The integration suite resets only the database named by `TEST_DATABASE_URL` and
-refuses any name that does not end with `_test`.
+refuses any name that does not end with `_test`. It also refuses remote hosts by
+default; an isolated remote test database requires explicit
+`TEST_DATABASE_ALLOW_REMOTE=true` authorization.
 
 The benchmark likewise destroys and recreates only the database named by
 `BENCHMARK_DATABASE_URL`, and refuses a name that does not end with `_bench`.

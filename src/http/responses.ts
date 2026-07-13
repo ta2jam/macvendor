@@ -18,6 +18,14 @@ function commonHeaders(id: string): HeadersInit {
   };
 }
 
+function matchesIfNoneMatch(header: string | null, etag: string): boolean {
+  if (!header) return false;
+  return header.split(",").some((candidate) => {
+    const value = candidate.trim();
+    return value === "*" || value === etag || value.replace(/^W\//u, "") === etag;
+  });
+}
+
 export function problemResponse(args: {
   status: number;
   code: string;
@@ -62,7 +70,7 @@ export function jsonResponse(
     headers.set("Cache-Tag", keys.join(","));
   }
 
-  if (request.headers.get("if-none-match") === etag) {
+  if (matchesIfNoneMatch(request.headers.get("if-none-match"), etag)) {
     headers.delete("Content-Type");
     return new Response(null, { status: 304, headers });
   }

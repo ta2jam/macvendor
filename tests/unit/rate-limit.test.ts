@@ -8,6 +8,7 @@ function request(ip = "203.0.113.10"): NextRequest {
 }
 
 afterEach(() => {
+  globalThis.__macvendorRateBuckets?.clear();
   vi.unstubAllEnvs();
   delete process.env.RATE_LIMIT_BACKEND;
   delete process.env.RATE_LIMIT_SALT;
@@ -18,6 +19,30 @@ afterEach(() => {
 });
 
 describe("shared rate limiting", () => {
+  it("bounds local fallback memory under many client addresses", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    process.env.RATE_LIMIT_ENABLED = "true";
+    process.env.TRUST_PROXY = "true";
+
+    for (let index = 0; index < 10_050; index += 1) {
+      await consumeRateLimit(request(`2001:db8::${index.toString(16)}`));
+    }
+
+    expect(globalThis.__macvendorRateBuckets!.size).toBeLessThanOrEqual(10_000);
+  });
+
+  it("does not initialize PostgreSQL when rate limiting is disabled", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    process.env.RATE_LIMIT_ENABLED = "false";
+    delete process.env.DATABASE_URL;
+
+    await expect(consumeRateLimit(request())).resolves.toEqual({
+      allowed: true,
+      retryAfter: 0,
+      backend: "disabled",
+    });
+  });
+
   it("uses a HMAC key and returns the PostgreSQL decision", async () => {
     vi.stubEnv("NODE_ENV", "production");
     process.env.RATE_LIMIT_ENABLED = "true";

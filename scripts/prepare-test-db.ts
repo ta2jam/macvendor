@@ -2,11 +2,11 @@ import "./env";
 import { createPool } from "../src/db/pool";
 import { migrate } from "../src/db/migrate";
 import { seedDemo } from "../src/db/seed";
+import { assertTestDatabaseUrl } from "./test-database";
 
 const url = process.env.TEST_DATABASE_URL;
-if (!url || !new URL(url).pathname.endsWith("_test")) {
-  throw new Error("TEST_DATABASE_URL must point to a database whose name ends with _test");
-}
+if (!url) throw new Error("TEST_DATABASE_URL is required");
+assertTestDatabaseUrl(url, process.env.TEST_DATABASE_ALLOW_REMOTE === "true");
 
 const pool = createPool(url);
 try {

@@ -16,6 +16,8 @@ declare global {
 
 const RATE = 5;
 const BURST = 25;
+const MAX_LOCAL_BUCKETS = 10_000;
+const LOCAL_BUCKET_PRUNE_TARGET = 9_000;
 const buckets = globalThis.__macvendorRateBuckets ?? new Map<string, Bucket>();
 globalThis.__macvendorRateBuckets = buckets;
 
@@ -41,9 +43,15 @@ function consumeLocalRateLimit(request: NextRequest, cost: number): RateLimitRes
     lastSeen: now,
   });
 
-  if (buckets.size > 10_000) {
+  if (buckets.size > MAX_LOCAL_BUCKETS) {
     for (const [bucketKey, bucket] of buckets) {
       if (now - bucket.lastSeen > 10 * 60_000) buckets.delete(bucketKey);
+    }
+    if (buckets.size > MAX_LOCAL_BUCKETS) {
+      for (const bucketKey of buckets.keys()) {
+        buckets.delete(bucketKey);
+        if (buckets.size <= LOCAL_BUCKET_PRUNE_TARGET) break;
+      }
     }
   }
 
@@ -60,7 +68,7 @@ function integerSetting(name: string, fallback: number, minimum: number, maximum
   return value;
 }
 
-export async function consumeRateLimit(request: NextRequest, cost = 1, pool: Pool = getPool()): Promise<RateLimitResult> {
+export async function consumeRateLimit(request: NextRequest, cost = 1, pool?: Pool): Promise<RateLimitResult> {
   if (process.env.RATE_LIMIT_ENABLED === "false" || process.env.NODE_ENV === "test") {
     return { allowed: true, retryAfter: 0, backend: "disabled" };
   }
@@ -73,7 +81,7 @@ export async function consumeRateLimit(request: NextRequest, cost = 1, pool: Poo
   const maxCost = integerSetting("RATE_LIMIT_MAX_COST", 50, 1, 10_000);
   const keyHash = `sha256:${createHmac("sha256", salt).update(clientKey(request)).digest("hex")}`;
   try {
-    const result = await pool.query<{ allowed: boolean; retry_after: number }>(
+    const result = await (pool ?? getPool()).query<{ allowed: boolean; retry_after: number }>(
       `WITH timing AS (
          SELECT to_timestamp(floor(extract(epoch FROM clock_timestamp()) / $2) * $2) AS window_start
        ), attempted AS (

@@ -59,6 +59,12 @@ describe("prefix representation", () => {
     expect(() => prefixBits(1n, 0)).toThrow(InvalidPrefixError);
     expect(() => formatPrefix(1n, 49)).toThrow(InvalidPrefixError);
   });
+
+  it("rejects values that cannot fit the declared EUI-48 or prefix width", () => {
+    expect(() => prefixBits(1n << 48n, 24)).toThrow(InvalidPrefixError);
+    expect(() => prefixBits(-1n, 24)).toThrow(InvalidPrefixError);
+    expect(() => formatPrefix(1n << 24n, 24)).toThrow(InvalidPrefixError);
+  });
 });
 
 describe("assignment path parsing", () => {

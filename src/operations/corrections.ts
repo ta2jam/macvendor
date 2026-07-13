@@ -4,6 +4,7 @@ import { validateContactEmail } from "@/lib/public-config";
 
 const CATEGORIES = ["incorrect_assignment", "incorrect_context", "privacy", "rights", "withdrawal"] as const;
 const STATUSES = ["received", "triaged", "accepted", "rejected", "closed"] as const;
+const REQUEST_FIELDS = new Set(["category", "target", "requestedChange", "evidenceUrl", "contactEmail"]);
 export type CorrectionCategory = typeof CATEGORIES[number];
 export type CorrectionStatus = typeof STATUSES[number];
 export class CorrectionValidationError extends Error {}
@@ -69,6 +70,7 @@ function evidenceUrl(value: unknown): string {
 }
 
 export async function createCorrectionRequest(pool: Pool, input: Record<string, unknown>) {
+  if (Object.keys(input).some((field) => !REQUEST_FIELDS.has(field))) invalid("request contains an unsupported field");
   if (!CATEGORIES.includes(input.category as CorrectionCategory)) invalid("category is invalid");
   let contactEmail: string;
   try { contactEmail = validateContactEmail(input.contactEmail); } catch { invalid("contactEmail must be a valid email address"); }

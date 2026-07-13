@@ -45,7 +45,7 @@ async function gitCommitSha(): Promise<string> {
 }
 
 export interface BackupManifest {
-  schemaVersion: "macvendor-backup/v1";
+  schemaVersion: "macvendor-backup/v1" | "macvendor-backup/v2";
   createdAt: string;
   sourceDatabase: string;
   applicationVersion: string;
@@ -111,7 +111,7 @@ export async function createLogicalBackup(
     }
     const digest = await sha256File(temporaryDump);
     const manifest: BackupManifest = {
-      schemaVersion: "macvendor-backup/v1",
+      schemaVersion: "macvendor-backup/v2",
       createdAt: new Date().toISOString(),
       sourceDatabase: sourceName,
       applicationVersion: APP_VERSION,

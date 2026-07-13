@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { dataCorrectionsEmail } from "@/lib/public-config";
+import { correctionDatabaseIntakeReady, dataCorrectionsEmail } from "@/lib/public-config";
 import { CorrectionForm } from "@/components/correction-form";
 
 export const metadata: Metadata = {
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default function DataCorrectionsPage() {
   const email = dataCorrectionsEmail();
-  const databaseIntake = Boolean(process.env.CORRECTION_ENCRYPTION_KEY);
+  const databaseIntake = correctionDatabaseIntakeReady();
   const subject = encodeURIComponent("[macvendor.io] Data correction request");
 
   return (

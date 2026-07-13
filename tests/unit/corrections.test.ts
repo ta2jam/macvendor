@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { decryptCorrectionContact, encryptCorrectionContact } from "../../src/operations/corrections";
+import { NextRequest } from "next/server";
+import type { Pool } from "pg";
+import {
+  createCorrectionRequest,
+  decryptCorrectionContact,
+  encryptCorrectionContact,
+} from "../../src/operations/corrections";
+import { POST } from "../../src/app/v1/corrections/route";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -24,5 +31,44 @@ describe("correction contact encryption", () => {
   it("rejects an invalid key", () => {
     vi.stubEnv("CORRECTION_ENCRYPTION_KEY", "short");
     expect(() => encryptCorrectionContact("reporter@example.org")).toThrow("32-byte key");
+  });
+});
+
+describe("correction intake HTTP boundary", () => {
+  it("rejects fields excluded by the public correction schema", async () => {
+    await expect(createCorrectionRequest({} as Pool, {
+      category: "privacy",
+      target: "example",
+      requestedChange: "Remove the incorrect public record.",
+      evidenceUrl: "https://example.org/evidence",
+      contactEmail: "reporter@example.org",
+      internalStatus: "accepted",
+    })).rejects.toThrow("unsupported field");
+  });
+
+  it("rejects a chunked body that exceeds the 16 KiB limit", async () => {
+    const request = new NextRequest("http://localhost/v1/corrections", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ padding: "x".repeat(17 * 1024) }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+  });
+
+  it("accepts case-insensitive JSON media types before validating the payload", async () => {
+    const request = new NextRequest("http://localhost/v1/corrections", {
+      method: "POST",
+      headers: { "content-type": "Application/JSON; Charset=UTF-8" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: "INVALID_CORRECTION_REQUEST" });
   });
 });

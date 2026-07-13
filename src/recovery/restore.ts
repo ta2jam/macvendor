@@ -7,7 +7,7 @@ import { getDataRelease } from "@/db/lookup";
 import {
   assertDatabaseIntegrity, BACKUP_TABLES, createDisposableDatabase, databaseName,
   dropDisposableDatabase, inspectDatabaseIntegrity, RecoveryError, runPostgresTool,
-  validateDisposableTarget, type DatabaseIntegrity,
+  validateDisposableTarget, LEGACY_BACKUP_TABLES, type DatabaseIntegrity,
 } from "./database";
 import type { BackupManifest } from "./backup";
 
@@ -21,7 +21,7 @@ function object(value: unknown, label: string): Record<string, unknown> {
 function exactKeys(value: Record<string, unknown>, expected: string[], label: string): void {
   const actual = Object.keys(value).sort();
   if (actual.length !== expected.length || actual.some((key, index) => key !== [...expected].sort()[index])) {
-    throw new RecoveryError("INVALID_BACKUP_MANIFEST", `${label} fields do not match recovery/v1`);
+    throw new RecoveryError("INVALID_BACKUP_MANIFEST", `${label} fields do not match the declared backup schema`);
   }
 }
 
@@ -62,24 +62,31 @@ export async function loadBackupManifest(manifestPath: string): Promise<{ manife
   catch { throw new RecoveryError("INVALID_BACKUP_MANIFEST", "backup manifest must be valid JSON"); }
   const root = object(raw, "manifest");
   exactKeys(root, ["schemaVersion", "createdAt", "sourceDatabase", "applicationVersion", "gitCommitSha", "pgDumpVersion", "durationMs", "dump", "integrity"], "manifest");
-  if (root.schemaVersion !== "macvendor-backup/v1") throw new RecoveryError("INVALID_BACKUP_MANIFEST", "unsupported backup manifest version");
+  if (root.schemaVersion !== "macvendor-backup/v1" && root.schemaVersion !== "macvendor-backup/v2") {
+    throw new RecoveryError("INVALID_BACKUP_MANIFEST", "unsupported backup manifest version");
+  }
+  const schemaVersion = root.schemaVersion;
   const dump = object(root.dump, "dump");
   exactKeys(dump, ["file", "format", "byteSize", "sha256"], "dump");
   if (dump.format !== "postgres-custom") throw new RecoveryError("INVALID_BACKUP_MANIFEST", "dump format must be postgres-custom");
   const dumpFile = text(dump.file, "dump.file", /^[A-Za-z0-9_.-]+\.dump$/);
   if (path.basename(dumpFile) !== dumpFile) throw new RecoveryError("UNSAFE_BACKUP_PATH", "dump.file must be a basename");
   const integrityRaw = object(root.integrity, "integrity");
-  exactKeys(integrityRaw, ["schemaMigrations", "tableCounts", "activeResolutionRunId", "activeVersion", "publicationVersion", "auditAppendOnlyTrigger", "unvalidatedConstraintCount"], "integrity");
+  const integrityFields = ["schemaMigrations", "tableCounts", "activeResolutionRunId", "activeVersion",
+    "publicationVersion", "auditAppendOnlyTrigger", "unvalidatedConstraintCount"];
+  if (schemaVersion === "macvendor-backup/v2") integrityFields.push("correctionEventsAppendOnlyTrigger");
+  exactKeys(integrityRaw, integrityFields, "integrity");
   if (!Array.isArray(integrityRaw.schemaMigrations) || !integrityRaw.schemaMigrations.length
     || integrityRaw.schemaMigrations.some((item) => typeof item !== "string" || !/^\d{4}_[a-z0-9_]+\.sql$/.test(item))) {
     throw new RecoveryError("INVALID_BACKUP_MANIFEST", "integrity.schemaMigrations is invalid");
   }
   const countsRaw = object(integrityRaw.tableCounts, "integrity.tableCounts");
-  exactKeys(countsRaw, [...BACKUP_TABLES], "integrity.tableCounts");
+  const trackedTables = schemaVersion === "macvendor-backup/v2" ? BACKUP_TABLES : LEGACY_BACKUP_TABLES;
+  exactKeys(countsRaw, [...trackedTables], "integrity.tableCounts");
   const tableCounts: Record<string, string> = {};
-  for (const table of BACKUP_TABLES) tableCounts[table] = text(countsRaw[table], `tableCounts.${table}`, /^\d+$/);
+  for (const table of trackedTables) tableCounts[table] = text(countsRaw[table], `tableCounts.${table}`, /^\d+$/);
   const manifest: BackupManifest = {
-    schemaVersion: "macvendor-backup/v1",
+    schemaVersion,
     createdAt: timestamp(root.createdAt, "createdAt"),
     sourceDatabase: text(root.sourceDatabase, "sourceDatabase", /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,62}$/),
     applicationVersion: text(root.applicationVersion, "applicationVersion"),
@@ -99,10 +106,13 @@ export async function loadBackupManifest(manifestPath: string): Promise<{ manife
       activeVersion: integer(integrityRaw.activeVersion, "activeVersion", 1),
       publicationVersion: integer(integrityRaw.publicationVersion, "publicationVersion", 1),
       auditAppendOnlyTrigger: integrityRaw.auditAppendOnlyTrigger === true,
+      correctionEventsAppendOnlyTrigger: schemaVersion === "macvendor-backup/v2"
+        && integrityRaw.correctionEventsAppendOnlyTrigger === true,
       unvalidatedConstraintCount: integer(integrityRaw.unvalidatedConstraintCount, "unvalidatedConstraintCount"),
     },
   };
-  if (!manifest.integrity.auditAppendOnlyTrigger || manifest.integrity.unvalidatedConstraintCount !== 0) {
+  if (!manifest.integrity.auditAppendOnlyTrigger || manifest.integrity.unvalidatedConstraintCount !== 0
+    || (schemaVersion === "macvendor-backup/v2" && !manifest.integrity.correctionEventsAppendOnlyTrigger)) {
     throw new RecoveryError("INVALID_BACKUP_INTEGRITY", "backup manifest does not describe an integrity-valid source database");
   }
   const manifestDirectory = await realpath(path.dirname(absoluteManifest));
@@ -121,10 +131,13 @@ function compareIntegrity(expected: DatabaseIntegrity, actual: DatabaseIntegrity
   if (JSON.stringify(actual.schemaMigrations) !== JSON.stringify(expected.schemaMigrations)) {
     throw new RecoveryError("RESTORE_MIGRATION_MISMATCH", "restored migration history differs from the backup snapshot");
   }
-  for (const table of BACKUP_TABLES) {
+  for (const table of Object.keys(expected.tableCounts)) {
     if (actual.tableCounts[table] !== expected.tableCounts[table]) {
       throw new RecoveryError("RESTORE_COUNT_MISMATCH", `restored ${table} count differs from the backup snapshot`);
     }
+  }
+  if (expected.correctionEventsAppendOnlyTrigger && !actual.correctionEventsAppendOnlyTrigger) {
+    throw new RecoveryError("RESTORE_TRIGGER_MISMATCH", "restored correction event trigger differs from the backup snapshot");
   }
   if (actual.activeResolutionRunId !== expected.activeResolutionRunId
     || actual.activeVersion !== expected.activeVersion

@@ -28,19 +28,23 @@ snapshot, records table counts and active-pointer integrity inside that snapshot
 and gives the same snapshot to `pg_dump`. Live writes therefore cannot make the
 manifest and dump describe different instants.
 
-Output is a compressed PostgreSQL custom dump plus a `macvendor-backup/v1` JSON
+Output is a compressed PostgreSQL custom dump plus a `macvendor-backup/v2` JSON
 manifest containing:
 
 - application, Git, migration, and `pg_dump` versions;
 - dump byte size and SHA-256;
-- counts for every source/resolution/suppression/audit table;
+- counts for every source/resolution/suppression/audit/correction table;
 - active resolution, active version, and publication version;
-- audit-trigger and constraint-validation state;
+- audit/correction append-only trigger and constraint-validation state;
 - measured duration.
 
 Files are created with mode `0600` and atomic final names. A database without one
 consistent active release, migration history, append-only audit trigger, or fully
 validated constraints is not backed up as a successful recovery point.
+
+Restore remains backward compatible with `macvendor-backup/v1` manifests. New
+`v2` manifests additionally make correction-request/event loss and a missing or
+disabled correction-event append-only trigger detectable during restore.
 
 ## Restore drill
 
@@ -59,8 +63,8 @@ pre-existing database.
 Before database creation it validates manifest shape, dump basename, regular-file
 status, byte size, SHA-256, and `pg_restore --list`. Restore uses
 `--single-transaction --exit-on-error --no-owner --no-acl`. It then compares all
-table counts, migrations, the active pointer and versions, checks the audit
-trigger and constraints, and executes the active data-release query.
+table counts, migrations, the active pointer and versions, checks the applicable
+append-only triggers and constraints, and executes the active data-release query.
 
 By default the verified disposable database remains for inspection. Automated
 drills may add `--drop-after-check`; only the database created by that invocation

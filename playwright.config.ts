@@ -1,7 +1,14 @@
 import { defineConfig, devices } from "@playwright/test";
+import { loadLocalEnvironment } from "./scripts/local-env";
+
+loadLocalEnvironment();
 
 const port = 3_200;
 const baseURL = `http://127.0.0.1:${port}`;
+const databaseUrl = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error("TEST_DATABASE_URL or DATABASE_URL is required for browser tests");
+}
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -29,6 +36,7 @@ export default defineConfig({
       HOSTNAME: "127.0.0.1",
       PORT: String(port),
       PUBLIC_ORIGIN: baseURL,
+      DATABASE_URL: databaseUrl,
       RATE_LIMIT_ENABLED: "false",
     },
   },

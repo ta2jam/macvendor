@@ -6,7 +6,7 @@ import { createPool } from "@/db/pool";
 const runFile = promisify(execFile);
 const TARGET_PATTERN = /^[a-z][a-z0-9_]{1,39}_(restore|rebuild)_[a-z0-9]{4,12}$/;
 
-export const BACKUP_TABLES = [
+export const LEGACY_BACKUP_TABLES = [
   "schema_migrations",
   "data_sources",
   "source_releases",
@@ -21,6 +21,12 @@ export const BACKUP_TABLES = [
   "active_resolution",
   "publication_suppressions",
   "audit_events",
+] as const;
+
+export const BACKUP_TABLES = [
+  ...LEGACY_BACKUP_TABLES,
+  "correction_requests",
+  "correction_events",
 ] as const;
 
 export class RecoveryError extends Error {
@@ -137,6 +143,7 @@ export interface DatabaseIntegrity {
   activeVersion: number;
   publicationVersion: number;
   auditAppendOnlyTrigger: boolean;
+  correctionEventsAppendOnlyTrigger: boolean;
   unvalidatedConstraintCount: number;
 }
 
@@ -168,6 +175,13 @@ export async function inspectDatabaseIntegrity(pool: Pool | PoolClient): Promise
         AND t.tgenabled <> 'D' AND NOT t.tgisinternal
     ) AS exists`,
   );
+  const correctionTrigger = await pool.query<{ exists: boolean }>(
+    `SELECT EXISTS (
+      SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
+      WHERE c.relname = 'correction_events' AND t.tgname = 'correction_events_append_only'
+        AND t.tgenabled <> 'D' AND NOT t.tgisinternal
+    ) AS exists`,
+  );
   const constraints = await pool.query<{ count: string }>(
     "SELECT count(*) AS count FROM pg_constraint WHERE connamespace = 'public'::regnamespace AND NOT convalidated",
   );
@@ -178,6 +192,7 @@ export async function inspectDatabaseIntegrity(pool: Pool | PoolClient): Promise
     activeVersion: Number(active.rows[0].version),
     publicationVersion: Number(active.rows[0].publication_version),
     auditAppendOnlyTrigger: Boolean(trigger.rows[0]?.exists),
+    correctionEventsAppendOnlyTrigger: Boolean(correctionTrigger.rows[0]?.exists),
     unvalidatedConstraintCount: Number(constraints.rows[0]!.count),
   };
 }
@@ -185,5 +200,9 @@ export async function inspectDatabaseIntegrity(pool: Pool | PoolClient): Promise
 export function assertDatabaseIntegrity(integrity: DatabaseIntegrity): void {
   if (!integrity.schemaMigrations.length) throw new RecoveryError("MIGRATIONS_MISSING", "restored database has no migration history");
   if (!integrity.auditAppendOnlyTrigger) throw new RecoveryError("AUDIT_TRIGGER_MISSING", "audit append-only trigger is missing or disabled");
+  if (integrity.schemaMigrations.includes("0010_correction_intake.sql")
+    && !integrity.correctionEventsAppendOnlyTrigger) {
+    throw new RecoveryError("CORRECTION_TRIGGER_MISSING", "correction event append-only trigger is missing or disabled");
+  }
   if (integrity.unvalidatedConstraintCount !== 0) throw new RecoveryError("CONSTRAINTS_UNVALIDATED", "database contains unvalidated constraints");
 }

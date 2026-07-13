@@ -3,7 +3,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
-  BACKUP_TABLES, connectionUrlForDatabase, databaseName, postgresEnvironment, validateDisposableTarget,
+  BACKUP_TABLES, connectionUrlForDatabase, databaseName, LEGACY_BACKUP_TABLES,
+  postgresEnvironment, validateDisposableTarget,
 } from "../../src/recovery/database";
 import { loadBackupManifest } from "../../src/recovery/restore";
 
@@ -14,6 +15,10 @@ describe("recovery database guards", () => {
     expect(() => validateDisposableTarget("macvendor", "restore")).toThrow(/target database must match/);
     expect(() => validateDisposableTarget("postgres_restore_a1b2", "rebuild")).toThrow(/target database must match/);
     expect(() => validateDisposableTarget("macvendor_restore_x", "restore")).toThrow(/target database must match/);
+  });
+
+  it("tracks correction intake tables in current backup manifests", () => {
+    expect(BACKUP_TABLES).toEqual(expect.arrayContaining(["correction_requests", "correction_events"]));
   });
 
   it("derives PostgreSQL tool settings from the connection URL", () => {
@@ -48,7 +53,7 @@ describe("recovery database guards", () => {
         dump: { file: "backup.dump", format: "postgres-custom", byteSize: dump.byteLength, sha256: `sha256:${"0".repeat(64)}` },
         integrity: {
           schemaMigrations: ["0001_initial.sql"],
-          tableCounts: Object.fromEntries(BACKUP_TABLES.map((table) => [table, "0"])),
+          tableCounts: Object.fromEntries(LEGACY_BACKUP_TABLES.map((table) => [table, "0"])),
           activeResolutionRunId: "00000000-0000-4000-8000-000000000000",
           activeVersion: 1,
           publicationVersion: 1,

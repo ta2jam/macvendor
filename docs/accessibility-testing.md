@@ -18,18 +18,18 @@ focus, labelled form controls, success/no-match/error states, mobile navigation,
 and document-level horizontal overflow. Screenshots, traces, video, and an HTML
 report are retained only on CI failure.
 
-Prepare a synthetic test database, build, install the pinned browser binaries,
-and run:
+Build, install the pinned browser binaries, and run:
 
 ```bash
-npm run db:test:prepare
 npm run build
 npm run browser:install
-DATABASE_URL="$TEST_DATABASE_URL" npm run test:browser
+npm run test:browser
 ```
 
-`DATABASE_URL` must point to the disposable test database. Browser tests never
-authorize or import IEEE or amateur data.
+The browser command loads `.env.local`, prefers `TEST_DATABASE_URL`, and resets
+that disposable database before starting Playwright. The reset command refuses
+a database whose name does not end with `_test`. Browser tests never authorize
+or import IEEE or amateur data.
 
 ## Manual release checklist
 
