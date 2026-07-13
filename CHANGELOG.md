@@ -23,7 +23,8 @@
   Slack `#team` state-transition alerts, public-key-only SSH hardening, and
   bounded fail2ban policy. Shared-VPS capacity changes remain deferred.
 - Added pinned GitHub Actions, full-history Gitleaks scanning, CycloneDX SBOM
-  generation, runtime-image Trivy scanning, and Docker Dependabot coverage.
+  generation, runtime-image Trivy scanning, Docker Dependabot coverage, and a
+  Node-only runtime image without the unnecessary global npm toolchain.
 - Added provisional service objectives, recovery and product-gate runbooks,
   plus cross-browser automated WCAG coverage for the new public status surface.
 
