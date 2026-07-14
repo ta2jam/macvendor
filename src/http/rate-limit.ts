@@ -83,20 +83,21 @@ export async function consumeRateLimit(request: NextRequest, cost = 1, pool?: Po
   try {
     const result = await (pool ?? getPool()).query<{ allowed: boolean; retry_after: number }>(
       `WITH timing AS (
-         SELECT to_timestamp(floor(extract(epoch FROM clock_timestamp()) / $2) * $2) AS window_start
+         SELECT to_timestamp(floor(extract(epoch FROM clock_timestamp()) / $2::integer) * $2::integer) AS window_start
        ), attempted AS (
          INSERT INTO rate_limit_windows (key_hash, window_start, request_cost, expires_at)
-         SELECT $1, window_start, $3, window_start + make_interval(secs => $2 * 2) FROM timing
-         WHERE $3 <= $4
+         SELECT $1::text, window_start, $3::integer,
+           window_start + make_interval(secs => $2::integer * 2) FROM timing
+         WHERE $3::integer <= $4::integer
          ON CONFLICT (key_hash, window_start) DO UPDATE
          SET request_cost = rate_limit_windows.request_cost + EXCLUDED.request_cost,
              expires_at = EXCLUDED.expires_at
-         WHERE rate_limit_windows.request_cost + EXCLUDED.request_cost <= $4
+         WHERE rate_limit_windows.request_cost + EXCLUDED.request_cost <= $4::integer
          RETURNING 1
        )
        SELECT EXISTS (SELECT 1 FROM attempted) AS allowed,
          greatest(1, ceil(extract(epoch FROM ((SELECT window_start FROM timing)
-           + make_interval(secs => $2) - clock_timestamp()))))::integer AS retry_after`,
+           + make_interval(secs => $2::integer) - clock_timestamp()))))::integer AS retry_after`,
       [keyHash, windowSeconds, cost, maxCost],
     );
     const row = result.rows[0]!;

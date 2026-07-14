@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.5.8 — 2026-07-14
+
+- Fixed ambiguous PostgreSQL parameter inference in the shared fixed-window
+  rate limiter. Production requests no longer degrade to the per-process local
+  fallback with PostgreSQL `42P08` errors.
+- Added a real PostgreSQL integration test that proves two requests are allowed
+  up to the configured shared cost and the next request is rejected without a
+  fallback.
+
 ## 0.5.7 — 2026-07-14
 
 - Fixed a lost-update race where overlapping IEEE, enrichment, and atomic

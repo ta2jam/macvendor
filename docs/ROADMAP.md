@@ -3,7 +3,7 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.5.7 concurrency-safe publication
+## Current — 0.5.8 concurrency-safe publication
 
 The current release publishes governed IEEE assignments, separately labelled
 MAC context, and reviewed organization identities. Production releases must be tagged from a

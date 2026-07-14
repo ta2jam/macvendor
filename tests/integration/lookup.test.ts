@@ -36,6 +36,7 @@ import { updateAllSources } from "../../src/operations/source-update";
 import { OPTIONS as bulkOptionsRoute, POST as bulkLookupRoute } from "../../src/app/v1/lookups/route";
 import { pruneRetiredResolutions } from "../../src/operations/resolution-retention";
 import { SOURCE_PUBLICATION_LOCK } from "../../src/operations/source-publication";
+import { consumeRateLimit } from "../../src/http/rate-limit";
 
 config({ path: ".env.local", quiet: true });
 
@@ -59,6 +60,51 @@ afterAll(async () => {
 });
 
 describe("bounded bulk and release operations", () => {
+  it("uses the shared PostgreSQL rate limiter without falling back", async () => {
+    const previous = {
+      enabled: process.env.RATE_LIMIT_ENABLED,
+      backend: process.env.RATE_LIMIT_BACKEND,
+      salt: process.env.RATE_LIMIT_SALT,
+      window: process.env.RATE_LIMIT_WINDOW_SECONDS,
+      maximum: process.env.RATE_LIMIT_MAX_COST,
+      proxy: process.env.TRUST_PROXY,
+      nodeEnv: process.env.NODE_ENV,
+    };
+    Object.defineProperty(process.env, "NODE_ENV", {
+      value: "production", configurable: true, writable: true, enumerable: true,
+    });
+    process.env.RATE_LIMIT_ENABLED = "true";
+    process.env.RATE_LIMIT_BACKEND = "postgres";
+    process.env.RATE_LIMIT_SALT = "integration-rate-limit-salt-value";
+    process.env.RATE_LIMIT_WINDOW_SECONDS = "10";
+    process.env.RATE_LIMIT_MAX_COST = "2";
+    process.env.TRUST_PROXY = "true";
+    const rateRequest = new NextRequest("http://localhost:3000/v1/data-release", {
+      headers: { "x-real-ip": "203.0.113.77" },
+    });
+    try {
+      await pool.query("TRUNCATE rate_limit_windows");
+      await expect(consumeRateLimit(rateRequest, 1, pool))
+        .resolves.toMatchObject({ allowed: true, backend: "postgres" });
+      await expect(consumeRateLimit(rateRequest, 1, pool))
+        .resolves.toMatchObject({ allowed: true, backend: "postgres" });
+      await expect(consumeRateLimit(rateRequest, 1, pool))
+        .resolves.toMatchObject({ allowed: false, backend: "postgres" });
+    } finally {
+      const restore = (name: string, value: string | undefined) => {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      };
+      restore("RATE_LIMIT_ENABLED", previous.enabled);
+      restore("RATE_LIMIT_BACKEND", previous.backend);
+      restore("RATE_LIMIT_SALT", previous.salt);
+      restore("RATE_LIMIT_WINDOW_SECONDS", previous.window);
+      restore("RATE_LIMIT_MAX_COST", previous.maximum);
+      restore("TRUST_PROXY", previous.proxy);
+      restore("NODE_ENV", previous.nodeEnv);
+    }
+  });
+
   it("serves the public bulk route with bounded CORS preflight and no-store output", async () => {
     const preflight=await bulkOptionsRoute();
     expect(preflight.status).toBe(204);
