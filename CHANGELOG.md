@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.5.6 — 2026-07-14
+
+- Added bounded retired-resolution garbage collection after a production audit
+  found 939,336 materialized assignment rows for only 58,072 active rows and no
+  implemented cleanup path for expired derived snapshots.
+- The daily maintenance job now keeps at least eight retired rollback runs and
+  90 days of history, skips every resolution referenced by a publication
+  suppression, deletes at most two runs per invocation, and records row counts
+  in the append-only audit log.
+- Added a partial retention index and PostgreSQL regression coverage proving
+  that active data, rollback history, suppression references, source releases,
+  source records, and source definitions remain untouched.
+
 ## 0.5.5 — 2026-07-13
 
 - Added a resource-bounded quarterly restore drill that verifies the newest real

@@ -34,6 +34,7 @@ import { getReleaseChanges } from "../../src/db/release-changes";
 import { sourceValueReport } from "../../src/operations/source-value";
 import { updateAllSources } from "../../src/operations/source-update";
 import { OPTIONS as bulkOptionsRoute, POST as bulkLookupRoute } from "../../src/app/v1/lookups/route";
+import { pruneRetiredResolutions } from "../../src/operations/resolution-retention";
 
 config({ path: ".env.local", quiet: true });
 
@@ -100,6 +101,92 @@ describe("bounded bulk and release operations", () => {
       .rejects.toThrow("injected preparation failure");
     const after=await pool.query("SELECT * FROM active_resolution WHERE singleton_id=1");
     expect(after.rows).toEqual(before.rows);
+  });
+});
+
+describe("bounded resolution retention", () => {
+  it("prunes only expired retired snapshots while preserving rollback and suppression references", async () => {
+    const baseline = await pool.query<{ count: string }>("SELECT count(*) FROM resolution_runs WHERE status='retired'");
+    const sourceCounts = await pool.query<{ sources: string; releases: string; records: string }>(
+      `SELECT (SELECT count(*) FROM data_sources) AS sources,
+        (SELECT count(*) FROM source_releases) AS releases,
+        (SELECT count(*) FROM source_records) AS records`,
+    );
+    const source = await pool.query<{ release_id: string; record_id: string; registry: string; prefix_bits: string;
+      prefix_length: number; organization_name: string | null; organization_address: string | null; source_slug: string }>(
+      `SELECT sr.id AS release_id, rec.id AS record_id, rec.registry, rec.prefix_bits, rec.prefix_length,
+         rec.organization_name_display AS organization_name, rec.organization_address_raw AS organization_address,
+         ds.slug AS source_slug
+       FROM source_records rec JOIN source_releases sr ON sr.id=rec.source_release_id
+       JOIN data_sources ds ON ds.id=sr.source_id
+       WHERE rec.record_kind='assignment' AND rec.record_status='eligible' ORDER BY rec.id LIMIT 1`,
+    );
+    const fixture = source.rows[0]!;
+    const runIds: string[] = [];
+    const now = new Date();
+    for (let index = 0; index < 6; index += 1) {
+      const runId = crypto.randomUUID();
+      const assignmentId = crypto.randomUUID();
+      const completedAt = new Date(now.getTime() - (100 + index) * 86_400_000);
+      runIds.push(runId);
+      await pool.query(
+        `INSERT INTO resolution_runs(id,status,policy_version,policy_commit_sha,schema_version,normalizer_version,
+           container_image_digest,input_manifest_hash,output_hash,started_at,completed_at,activated_at,validation_summary)
+         VALUES($1,'retired','retention-test','retention-test','1','2','sha256:test',$2,$3,$4,$4,$4,
+           '{"assignmentCount":1,"claimCount":0,"conflictCount":0,"conflicts":[]}'::jsonb)`,
+        [runId, `sha256:${sha256(`input:${runId}`).slice(7)}`, `sha256:${sha256(`output:${runId}`).slice(7)}`, completedAt],
+      );
+      await pool.query(
+        `INSERT INTO resolution_inputs(resolution_run_id,source_release_id,role,freshness_status,
+           source_config_snapshot,source_config_hash)
+         VALUES($1,$2,'authoritative','fresh','{}'::jsonb,$3)`,
+        [runId, fixture.release_id, `sha256:${sha256(`config:${runId}`).slice(7)}`],
+      );
+      await pool.query(
+        `INSERT INTO resolved_assignments(id,resolution_run_id,registry,prefix_bits,prefix_length,organization_name,
+           organization_address,is_private,attribution_status,core_source_record_id,core_source_slug,core_source_release_id)
+         VALUES($1,$2,$3,$4,$5,$6,$7,false,'authoritative',$8,$9,$10)`,
+        [assignmentId, runId, fixture.registry, fixture.prefix_bits, fixture.prefix_length,
+          fixture.organization_name, fixture.organization_address, fixture.record_id, fixture.source_slug, fixture.release_id],
+      );
+      await pool.query(
+        `INSERT INTO resolution_evidence(resolution_run_id,resolved_assignment_id,field_name,source_record_id,role,reason_code)
+         VALUES($1,$2,'assignment',$3,'selected','retention_test')`,
+        [runId, assignmentId, fixture.record_id],
+      );
+    }
+    const protectedRunId = runIds.at(-1)!;
+    const suppressionId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO publication_suppressions(id,resolution_run_id,prefix_bits,prefix_length,surface,reason_code,
+         ticket_reference,created_by,starts_at,status)
+       VALUES($1,$2,$3,$4,'official','retention_test','RETENTION-TEST','operator:integration',now(),'revoked')`,
+      [suppressionId, protectedRunId, fixture.prefix_bits, fixture.prefix_length],
+    );
+    try {
+      const result = await pruneRetiredResolutions(pool, { actorId: "operator:integration", now,
+        retainRetiredRuns: Number(baseline.rows[0]!.count) + 2, batchSize: 10 });
+      expect(result).toMatchObject({ status: "pruned", deleted: { runs: 3, evidence: 3, assignments: 3, inputs: 3 } });
+      expect(result.prunedRuns.map((item) => item.resolutionRunId)).toEqual(runIds.slice(2, 5).reverse());
+      const remaining = await pool.query<{ id: string }>("SELECT id FROM resolution_runs WHERE id=ANY($1::uuid[]) ORDER BY id", [runIds]);
+      expect(remaining.rows.map((row) => row.id).sort()).toEqual([runIds[0]!, runIds[1]!, protectedRunId].sort());
+      const audit = await pool.query<{ count: string }>(
+        "SELECT count(*) FROM audit_events WHERE event_type='resolution.retention_deleted' AND target_id=ANY($1::text[])",
+        [runIds],
+      );
+      expect(audit.rows[0]!.count).toBe("3");
+      await expect(pool.query<{ sources: string; releases: string; records: string }>(
+        `SELECT (SELECT count(*) FROM data_sources) AS sources,
+          (SELECT count(*) FROM source_releases) AS releases,
+          (SELECT count(*) FROM source_records) AS records`,
+      )).resolves.toMatchObject({ rows: sourceCounts.rows });
+    } finally {
+      await pool.query("DELETE FROM publication_suppressions WHERE id=$1", [suppressionId]);
+      await pool.query("DELETE FROM resolution_evidence WHERE resolution_run_id=ANY($1::uuid[])", [runIds]);
+      await pool.query("DELETE FROM resolved_assignments WHERE resolution_run_id=ANY($1::uuid[])", [runIds]);
+      await pool.query("DELETE FROM resolution_inputs WHERE resolution_run_id=ANY($1::uuid[])", [runIds]);
+      await pool.query("DELETE FROM resolution_runs WHERE id=ANY($1::uuid[])", [runIds]);
+    }
   });
 });
 

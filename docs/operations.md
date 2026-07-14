@@ -279,6 +279,16 @@ sınırlandırılır.
 
 GC active pointer, retained bir `resolution_inputs` zinciri, henüz retention süresi dolmamış suppression FK'si, rollback seti, açık correction/ticket veya legal hold ile ilişkili hiçbir source release/artifact/resolved run'ı silemez. Orphan artifacts haftalık raporlanır, 7 günlük grace period sonrası temizlenir.
 
+Deployed maintenance, successful retired resolution snapshot'ları için bu
+sınırı fail-closed uygular: en az 90 günlük geçmişi ve en yeni sekiz retired
+rollback run'ını korur, herhangi bir publication suppression tarafından
+referanslanan run'ı atlar ve invocation başına en fazla iki run siler. Silme
+publication advisory lock altında gerçekleşir; evidence, resolved claim,
+resolved assignment ve input satır sayıları append-only audit event'e yazılır.
+`data_sources`, `source_releases`, `source_records` ve source artifact'ları bu
+işlem tarafından hiçbir koşulda silinmez. Aday taraması `O(R + S)`, silme
+maliyeti seçilen en fazla iki run'ın türetilmiş satır sayısıyla `O(D)`'dir.
+
 Correction başvurusunun iletişim alanı PostgreSQL'de 32-byte production key ile
 şifreli tutulur. `correction_events` append-only audit kaydıdır; bakım işi kapanmış
 başvuruların hassas içeriğini retention süresi sonunda temizler.

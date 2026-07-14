@@ -60,6 +60,8 @@ retaining both schedules would reintroduce intermediate publications.
 
 `macvendor-source-health.timer` checks freshness, rights and active-config
 drift every six hours. `macvendor-maintenance.timer` removes expired limiter
-windows and correction contact data daily. `macvendor-correction-health.timer`
+windows and correction contact data daily and prunes at most two eligible
+retired resolution snapshots while preserving 90 days, eight rollback runs,
+and every suppression reference. `macvendor-correction-health.timer`
 checks the operator queue SLA hourly. These jobs use the immutable `macvendor-tooling:current` image,
 `/srv/sites/macvendor/release.env`, and the read-only ingest signing key.

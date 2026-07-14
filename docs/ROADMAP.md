@@ -3,7 +3,7 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.5.5 bounded public operations
+## Current — 0.5.6 bounded public operations
 
 The current release publishes governed IEEE assignments, separately labelled
 MAC context, and reviewed organization identities. Production releases must be tagged from a
@@ -88,6 +88,8 @@ and accountable correction intake are PostgreSQL-backed.
   external production probes, and CodeQL scanning;
 - [x] release synchronization verification across local, GitHub, release tag,
   public health metadata, and the active VPS release marker.
+- [x] resource-bounded retired-resolution retention with a 90-day floor, eight
+  rollback runs, suppression-reference protection, and append-only deletion audit;
 - [x] one prepare/import/build/activate transaction boundary for the scheduled
   IEEE and enrichment publication; a failed fetch cannot partially activate;
 - [x] Cloudflare Free cache-tag purge adapter with scoped-token configuration;

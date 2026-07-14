@@ -11,6 +11,7 @@
     "0008_disable_demo_sources.sql": "sha256:793ab4061d014b60a30d77109c1311512b90f3b3ce292049dd1238387872c6ea",
     "0009_shared_rate_limit.sql": "sha256:751c33fb0c8ad834620c3d35966f30c37e3410a9de32820c91e472c6fa71c9d6",
     "0010_correction_intake.sql": "sha256:e69ac9b8944eebc678747f9f2925787858cf69bc549b9e50792ace7e051e32ce",
-    "0011_organization_identity_records.sql": "sha256:4b6fa265bcefec5aacadb294fba2ace4fa7083f95d37e35408ff2b69b585f91c"
+    "0011_organization_identity_records.sql": "sha256:4b6fa265bcefec5aacadb294fba2ace4fa7083f95d37e35408ff2b69b585f91c",
+    "0012_resolution_retention.sql": "sha256:33a3bd2f468d01728e2b5fb858267a140c665d1558bfd927f5ee48cdb870f027"
   }
 }
