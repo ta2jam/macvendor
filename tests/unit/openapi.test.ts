@@ -34,6 +34,32 @@ describe("OpenAPI 3.1 publication", () => {
     expect(JSON.stringify(openapi)).toContain("/schemas/public-api-v1.schema.json#/$defs/Problem");
   });
 
+  it("publishes explicit enriched modes and bounded discovery batch sizes", () => {
+    const singleMode = openapi.paths["/v1/lookup/{mac}"].get.parameters.find(
+      (parameter) => parameter.name === "mode",
+    );
+    expect(singleMode?.schema).toMatchObject({
+      enum: ["enriched", "official", "all"],
+      default: "enriched",
+    });
+    const bulkSchema = openapi.paths["/v1/lookups"].post.requestBody.content["application/json"].schema;
+    expect(JSON.stringify(bulkSchema)).toContain('"maxItems":100');
+    expect(JSON.stringify(bulkSchema)).toContain('"maxItems":50');
+    expect(JSON.stringify(bulkSchema)).toContain('"const":"enriched"');
+  });
+
+  it("publishes version headers for every reusable response component", () => {
+    for (const [name, response] of Object.entries(openapi.components.responses)) {
+      expect(response.headers, `${name} must publish response headers`).toMatchObject({
+        "X-API-Version": { $ref: "#/components/headers/ApiVersion" },
+        "X-App-Version": { $ref: "#/components/headers/AppVersion" },
+      });
+    }
+    expect(openapi.components.responses.LookupSuccess.headers).toHaveProperty("ETag");
+    expect(openapi.components.responses.BulkLookupSuccess.headers).not.toHaveProperty("ETag");
+    expect(openapi.components.responses.Problem.headers).not.toHaveProperty("ETag");
+  });
+
   it("locks stable problem code and HTTP status pairs", () => {
     assertPublicContract("Problem", {
       type: "https://macvendor.io/problems/invalid-mac",
@@ -42,6 +68,8 @@ describe("OpenAPI 3.1 publication", () => {
       code: "INVALID_MAC",
       detail: "Synthetic invalid input.",
       requestId: "contract-test",
+      apiVersion: "v1",
+      appVersion: "0.7.0",
     });
     expect(() => assertPublicContract("Problem", {
       type: "https://macvendor.io/problems/invalid-mac",
@@ -50,6 +78,8 @@ describe("OpenAPI 3.1 publication", () => {
       code: "INVALID_MAC",
       detail: "Synthetic invalid input.",
       requestId: "contract-test",
+      apiVersion: "v1",
+      appVersion: "0.7.0",
     })).toThrow(/contract drift/);
   });
 });

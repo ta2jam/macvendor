@@ -7,7 +7,7 @@ Reconsider them only when aggregate production evidence shows at least one of:
 
 - repeat API consumers requesting stable client credentials;
 - sustained legitimate 429 responses after measured quota tuning;
-- repeated bulk requests exceeding the bounded 25-address endpoint;
+- repeated bulk requests exceeding the bounded 100-address official or 50-address enriched endpoint;
 - two or more independent requests for the same language SDK;
 - a support/SLA obligation with a paying counterparty.
 

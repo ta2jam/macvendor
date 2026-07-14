@@ -255,11 +255,15 @@ Production rate limiter PostgreSQL fixed-window sayaçlarını ve HMAC ile
 anonimleştirilmiş istemci anahtarlarını kullanır. PostgreSQL geçici olarak
 erişilemezse bounded process-local token bucket devreye girer; fallback yatay
 ölçekli ortak kota değildir. Sayaç retention'ı maintenance job tarafından
-sınırlandırılır.
+sınırlandırılır. Production'da `RATE_LIMIT_ENABLED=false` readiness'i
+`503 rate_limit_disabled` yapar; local backend ise
+`503 shared_rate_limit_required` döner. Rate limit kapalı veya process-local
+backend kullanan bir production instance deploy kapısını geçemez.
 
-- İlk koruma origin fixed window: varsayılan 10 saniyede 50 cost unit; ölçümle
-  değişir. Bulk lookup her MAC için bir cost unit tüketir ve istek başına en
-  fazla 25 MAC kabul eder.
+- İlk koruma origin fixed window: standart public politika 10 saniyede 50 cost
+  unit'tir. Official bulk en fazla 100 MAC ve her iki gönderim için yukarı
+  yuvarlanan 1 unit; enriched bulk en fazla 50 MAC ve gönderim başına 1 unit
+  tüketir. Duplicate kayıtlar da quota maliyetine dahildir.
 - Client IP yalnız güvenilen edge/load-balancer'ın overwrite ettiği header'dan alınır; public `X-Forwarded-For` zincirine doğrudan güvenilmez. Doğrudan origin erişimi firewall ile kapalıdır.
 - IPv6 limiti varsayılan `/64`, IPv4 limiti adres bazlıdır; NAT etkisi metriklerle izlenir.
 - Origin global concurrency limiti load test ile belirlenir.

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { getPool } from "@/db/pool";
 import { consumeRateLimit } from "@/http/rate-limit";
-import { problemResponse, requestId } from "@/http/responses";
+import { privateJsonResponse, problemResponse, requestId } from "@/http/responses";
 import { CorrectionValidationError, createCorrectionRequest } from "@/operations/corrections";
 
 export const runtime = "nodejs";
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     const body = JSON.parse(raw) as unknown;
     if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("request body must be an object");
     const result = await createCorrectionRequest(getPool(), body as Record<string, unknown>);
-    return Response.json(result, { status: 202, headers: { "Cache-Control": "private, no-store", "X-Request-Id": id } });
+    return privateJsonResponse(result, { status: 202, requestId: id });
   } catch (error) {
     if (error instanceof PayloadTooLargeError) {
       return problemResponse({ status: 413, code: "PAYLOAD_TOO_LARGE", title: "Payload too large",

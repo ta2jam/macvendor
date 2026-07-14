@@ -170,7 +170,7 @@ const INSIGHTS_SQL = `
   LIMIT 51
 `;
 
-export async function lookupMac(pool: Pool, mac: NormalizedMac, mode: "all" | "official"): Promise<LookupResult> {
+export async function lookupMac(pool: Pool, mac: NormalizedMac, mode: "all" | "enriched" | "official"): Promise<LookupResult> {
   const [result, insightResult] = await Promise.all([
     pool.query<LookupRow>(LOOKUP_SQL, [mac.value.toString(), mode === "official"]),
     mode === "official"

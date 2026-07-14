@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 const wcagTags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 const publicPages = [
   "/", "/methodology", "/data-sources", "/data-release", "/data-corrections",
-  "/legal/data-terms", "/api-docs", "/organizations", "/status",
+  "/legal/data-terms", "/api-docs", "/organizations", "/status", "/plans",
 ];
 
 async function expectNoAxeViolations(page: Page): Promise<void> {
@@ -62,6 +62,7 @@ test.describe("public accessibility surface", () => {
     await input.fill("001122334455");
     await submit.click();
     await expect(page.getByRole("heading", { name: "No official match found" })).toBeVisible();
+    await expect(page.getByText("No active 36-, 28-, or 24-bit official assignment matches this address.")).toBeVisible();
     await expectNoAxeViolations(page);
 
     await input.fill("not-a-mac");
@@ -99,13 +100,53 @@ test.describe("public accessibility surface", () => {
     await expect(sourceLink).toHaveAttribute("target", "_blank");
     await expect(footer.getByRole("link", { name: "Data terms" })).toBeVisible();
     await expect(footer.getByRole("link", { name: "Report a correction" })).toBeVisible();
+    await expect(footer.getByRole("link", { name: "Plans and limits" })).toBeVisible();
+  });
+
+  test("plans expose one public tier and link to the working correction channel", async ({ page }) => {
+    await page.goto("/plans");
+    await expect(page.getByRole("heading", { name: "One public plan. Explicit limits." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Public API" })).toBeVisible();
+    await expect(page.getByText("50 cost units per client IP", { exact: false })).toBeVisible();
+    await expect(page.getByText("Up to 100 MACs per official bulk request")).toBeVisible();
+    await expect(page.getByText("Up to 50 MACs per enriched bulk request")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Contact us about a correction" }))
+      .toHaveAttribute("href", "/data-corrections");
   });
 
   test("API page directs clients to the maintained service and safe integration guidance", async ({ page }) => {
     await page.goto("/api-docs");
-    await expect(page.getByText("https://macvendor.io/v1")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Build with macvendor" })).toBeVisible();
+    await expect(page.getByText("https://macvendor.io/v1", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copy cURL example" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open this JSON response" })).toHaveAttribute(
+      "href", "/v1/lookup/00000C123456?mode=enriched",
+    );
+    await expect(page.getByRole("heading", { name: "Start with these three" })).toBeVisible();
+    await expect(page.getByRole("row", { name: /429 Rate limited/ })).toContainText("Retry-After");
+    await expect(page.getByRole("heading", { name: "Budget requests by cost" })).toBeVisible();
+    await expect(page.getByText("50 cost units per client IP", { exact: false })).toBeVisible();
+    await expect(page.getByRole("row", { name: /Official bulk 100 MACs/ })).toContainText("rounded up");
+    await expect(page.getByRole("row", { name: /Enriched bulk 50 MACs/ })).toContainText("submitted MAC");
+    await page.getByText("More endpoints").click();
+    await expect(page.getByText("POST /v1/corrections", { exact: true })).toBeVisible();
     await expect(page.getByLabel("Safe API integration guidance")).toBeVisible();
     await expect(page.getByText("localhost", { exact: false })).toHaveCount(0);
+    const dimensions = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+  });
+
+  test("API examples can be copied", async ({ page, context, browserName }) => {
+    test.skip(browserName !== "chromium", "clipboard permission is verified in Chromium");
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.goto("/api-docs");
+    await page.getByRole("button", { name: "Copy cURL example" }).click();
+    await expect(page.getByRole("button", { name: "Copy cURL example" })).toHaveText("Copied");
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toContain("https://macvendor.io/v1/lookup/00000C123456?mode=enriched");
   });
 
   test("correction page never claims intake is available without configuration", async ({ page }) => {

@@ -12,6 +12,7 @@ performance. They must be reviewed against at least 30 days of traffic.
 | Disk | below 70% normal | warning 80%, critical 90% |
 | Available host memory | above 1 GiB | below 1 GiB |
 | Source freshness/rights | zero failures | any failure |
+| Shared rate limiter | enabled and healthy | disabled or degraded readiness |
 | Backup age | under 30 hours | 30 hours or failed verification |
 
 `macvendor-traffic-report.timer` produces a bounded aggregate every 15 minutes
@@ -23,9 +24,12 @@ investigation gates, not capacity claims.
 
 Single lookup performs a bounded set of indexed prefix probes, approximately
 `O(log N)` for `N` resolved rows. Bulk official lookup deduplicates inputs and
-uses one SQL statement; work is `O(k log N)` for at most `k=25`. Source builds
-remain proportional to input bytes plus resolver work and must not overlap with
-backup or another source update.
+uses one SQL statement; work is `O(k log N)` for at most `k=100`. Enriched bulk
+uses one repeatable-read snapshot and three bounded set queries for at most
+`k=50`; database work remains `O(k log N)` while response memory is driven by
+the bounded 20 curated matches and 50 insights per item. Source builds remain
+proportional to input bytes plus resolver work and must not overlap with backup
+or another source update.
 
 Before raising the bulk bound or origin quota, capture p95/p99, PostgreSQL wait
 time, RSS, CPU, disk I/O, Cloudflare cache status, 429, and 5xx under measured

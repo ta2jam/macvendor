@@ -8,6 +8,7 @@ interface ApiResult {
     normalized: string;
     flags: { locallyAdministered: boolean; multicast: boolean };
   };
+  matchStatus: "matched" | "no_match";
   assignment: null | {
     prefix: string;
     prefixLength: number;
@@ -110,7 +111,7 @@ export function LookupForm() {
       </form>
 
       <p className="sr-only" role="status" aria-live="polite">
-        {loading ? "Looking up the MAC address." : result ? "Lookup result ready." : ""}
+        {loading ? "Looking up the MAC address." : result?.matchStatus === "no_match" ? "Lookup complete. No official assignment matched." : result ? "Lookup result ready." : ""}
       </p>
       <div className="result-region" role="region" aria-label="MAC lookup status" aria-busy={loading}>
         {loading && <p className="loading-line lookup-loading" aria-hidden="true">Looking up…</p>}
@@ -135,7 +136,7 @@ export function LookupForm() {
               <div className="result-heading">
                 <div>
                   <p className="eyebrow">Authoritative assignment</p>
-                  <h2>{result.assignment?.organizationName ?? "No official match found"}</h2>
+                  <h2>{result.matchStatus === "no_match" ? "No official match found" : result.assignment?.organizationName}</h2>
                 </div>
                 {result.assignment && <span className="registry-badge">{result.assignment.registry}</span>}
               </div>
@@ -145,6 +146,9 @@ export function LookupForm() {
                   <div><dt>Source</dt><dd>{result.assignment.source.slug}</dd></div>
                   <div><dt>Address</dt><dd>{result.assignment.address ?? "Not published"}</dd></div>
                 </dl>
+              )}
+              {result.matchStatus === "no_match" && (
+                <p className="empty-state">No active 36-, 28-, or 24-bit official assignment matches this address.</p>
               )}
               <p className="notice">This record does not conclusively identify the device&apos;s actual manufacturer.</p>
             </article>

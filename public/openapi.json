@@ -12,9 +12,10 @@
     "/v1/lookup/{mac}": {
       "get": {
         "operationId": "lookupMac",
+        "description": "Returns the longest active official match by probing 36, 28, then 24 bits. A successful miss is HTTP 200 with matchStatus=no_match, assignment=null, and release metadata.",
         "parameters": [
           { "name": "mac", "in": "path", "required": true, "schema": { "type": "string" }, "example": "02AABBCC0001" },
-          { "name": "mode", "in": "query", "schema": { "type": "string", "enum": ["all", "official"], "default": "all" } }
+          { "name": "mode", "in": "query", "description": "enriched returns separate assignment, curatedMatches, and insights layers. all is a deprecated compatibility alias for enriched.", "schema": { "type": "string", "enum": ["enriched", "official", "all"], "default": "enriched" } }
         ],
         "responses": {
           "200": { "$ref": "#/components/responses/LookupSuccess" },
@@ -28,10 +29,13 @@
     "/v1/lookups": {
       "post": {
         "operationId": "bulkLookupMacs",
-        "description": "Official assignment lookup for 1 to 25 MAC addresses. Request cost equals the number of submitted addresses.",
+        "description": "Bulk lookup for up to 100 official or 50 enriched MAC addresses. Official mode is the backward-compatible default. Official cost is one unit per two submitted entries rounded up; enriched cost is one unit per submitted entry.",
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false, "required": ["macs"], "properties": { "macs": { "type": "array", "minItems": 1, "maxItems": 25, "items": { "type": "string" } } } } } }
+          "content": { "application/json": { "schema": { "oneOf": [
+            { "type": "object", "additionalProperties": false, "required": ["macs"], "properties": { "mode": { "const": "official", "default": "official" }, "macs": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "type": "string" } } } },
+            { "type": "object", "additionalProperties": false, "required": ["mode", "macs"], "properties": { "mode": { "const": "enriched" }, "macs": { "type": "array", "minItems": 1, "maxItems": 50, "items": { "type": "string" } } } }
+          ] } } }
         },
         "responses": {
           "200": { "$ref": "#/components/responses/BulkLookupSuccess" },
@@ -132,63 +136,76 @@
   "components": {
     "headers": {
       "RequestId": { "description": "Opaque request identifier", "schema": { "type": "string" } },
+      "ApiVersion": { "description": "Stable public API contract version", "schema": { "type": "string", "const": "v1" } },
+      "AppVersion": { "description": "Deployed application SemVer", "schema": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" } },
+      "CacheControl": { "description": "Representation cache policy", "schema": { "type": "string" } },
+      "ETag": { "description": "Strong representation validator for cacheable GET responses", "schema": { "type": "string" } },
       "Location": { "description": "Canonical URL", "schema": { "type": "string", "format": "uri" } },
       "RetryAfter": { "description": "Seconds before retry", "schema": { "type": "integer", "minimum": 1 } }
     },
     "responses": {
       "LookupSuccess": {
         "description": "Lookup result; no match is still a successful response",
-        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" }, "X-API-Version": { "$ref": "#/components/headers/ApiVersion" }, "X-App-Version": { "$ref": "#/components/headers/AppVersion" }, "Cache-Control": { "$ref": "#/components/headers/CacheControl" }, "ETag": { "$ref": "#/components/headers/ETag" } },
         "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/LookupResponse" } } }
       },
       "BulkLookupSuccess": {
-        "description": "Bounded official bulk lookup result",
-        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "description": "Bounded official or enriched bulk lookup result",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" }, "X-API-Version": { "$ref": "#/components/headers/ApiVersion" }, "X-App-Version": { "$ref": "#/components/headers/AppVersion" }, "Cache-Control": { "$ref": "#/components/headers/CacheControl" } },
         "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/BulkLookupResponse" } } }
       },
       "AssignmentSuccess": {
         "description": "Exact active assignment",
-        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" }, "X-API-Version": { "$ref": "#/components/headers/ApiVersion" }, "X-App-Version": { "$ref": "#/components/headers/AppVersion" }, "Cache-Control": { "$ref": "#/components/headers/CacheControl" } },
         "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/AssignmentResponse" } } }
       },
       "DataReleaseSuccess": {
         "description": "Active release metadata",
-        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" }, "X-API-Version": { "$ref": "#/components/headers/ApiVersion" }, "X-App-Version": { "$ref": "#/components/headers/AppVersion" }, "Cache-Control": { "$ref": "#/components/headers/CacheControl" }, "ETag": { "$ref": "#/components/headers/ETag" } },
         "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/DataReleaseResponse" } } }
       },
       "ReleaseChangesSuccess": {
         "description": "Aggregate active release changes",
-        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" }, "X-API-Version": { "$ref": "#/components/headers/ApiVersion" }, "X-App-Version": { "$ref": "#/components/headers/AppVersion" }, "Cache-Control": { "$ref": "#/components/headers/CacheControl" }, "ETag": { "$ref": "#/components/headers/ETag" } },
         "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/ReleaseChangesResponse" } } }
       },
       "OrganizationSearchSuccess": {
         "description": "Reviewed organization identity search",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" }, "X-API-Version": { "$ref": "#/components/headers/ApiVersion" }, "X-App-Version": { "$ref": "#/components/headers/AppVersion" }, "Cache-Control": { "$ref": "#/components/headers/CacheControl" }, "ETag": { "$ref": "#/components/headers/ETag" } },
         "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/OrganizationSearchResponse" } } }
       },
       "OrganizationSuccess": {
         "description": "Reviewed organization identity",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" }, "X-API-Version": { "$ref": "#/components/headers/ApiVersion" }, "X-App-Version": { "$ref": "#/components/headers/AppVersion" }, "Cache-Control": { "$ref": "#/components/headers/CacheControl" }, "ETag": { "$ref": "#/components/headers/ETag" } },
         "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/Organization" } } }
       },
       "CorrectionAccepted": {
         "description": "Correction request durably accepted",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" }, "X-API-Version": { "$ref": "#/components/headers/ApiVersion" }, "X-App-Version": { "$ref": "#/components/headers/AppVersion" }, "Cache-Control": { "$ref": "#/components/headers/CacheControl" } },
         "content": { "application/json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/CorrectionAccepted" } } }
       },
       "CanonicalRedirect": {
         "description": "Permanent redirect to the canonical path while preserving the query",
         "headers": {
           "X-Request-Id": { "$ref": "#/components/headers/RequestId" },
+          "X-API-Version": { "$ref": "#/components/headers/ApiVersion" },
+          "X-App-Version": { "$ref": "#/components/headers/AppVersion" },
+          "Cache-Control": { "$ref": "#/components/headers/CacheControl" },
           "Location": { "$ref": "#/components/headers/Location" }
         }
       },
       "Problem": {
         "description": "RFC 9457 problem response",
-        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" }, "X-API-Version": { "$ref": "#/components/headers/ApiVersion" }, "X-App-Version": { "$ref": "#/components/headers/AppVersion" }, "Cache-Control": { "$ref": "#/components/headers/CacheControl" } },
         "content": { "application/problem+json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/Problem" } } }
       },
       "RateLimited": {
         "description": "Rate limit exceeded",
         "headers": {
           "X-Request-Id": { "$ref": "#/components/headers/RequestId" },
+          "X-API-Version": { "$ref": "#/components/headers/ApiVersion" },
+          "X-App-Version": { "$ref": "#/components/headers/AppVersion" },
+          "Cache-Control": { "$ref": "#/components/headers/CacheControl" },
           "Retry-After": { "$ref": "#/components/headers/RetryAfter" }
         },
         "content": { "application/problem+json": { "schema": { "$ref": "/schemas/public-api-v1.schema.json#/$defs/Problem" } } }

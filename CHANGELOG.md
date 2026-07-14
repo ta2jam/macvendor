@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 0.7.0 — 2026-07-14
+
+- Made the public lookup contract explicitly deterministic: active IEEE
+  assignments are probed at 36, 28, then 24 bits, and the longest matching
+  prefix wins. Added PostgreSQL regression coverage for overlapping MA-L,
+  MA-M, and MA-S assignments in both single and bulk lookup paths.
+- Added an explicit `matchStatus` (`matched` or `no_match`) to single and bulk
+  responses, while preserving HTTP 200 with `assignment: null` for a valid MAC
+  that has no active official assignment.
+- Added `X-API-Version`, `X-App-Version`, and `X-Request-Id` to every public API
+  response. Standardized RFC 9457 problem bodies and made cacheable GET,
+  conditional 304, redirect, private bulk/evidence, and error cache policies
+  consistent.
+- Kept the shared rate limiter mandatory in production readiness, published an
+  explicit free-plan quota of 50 cost units per fixed 10-second window, and
+  raised bounded bulk requests to 100 official or 50 enriched MAC addresses.
+- Added an opt-in enriched bulk mode, a public plans page, clearer correction
+  routing, copyable API examples, and synchronized the website, README,
+  OpenAPI document, JSON Schema, operations guide, and service objectives.
+
 ## 0.5.8 — 2026-07-14
 
 - Fixed ambiguous PostgreSQL parameter inference in the shared fixed-window

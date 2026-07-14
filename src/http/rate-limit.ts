@@ -3,6 +3,7 @@ import { isIP } from "node:net";
 import type { NextRequest } from "next/server";
 import type { Pool } from "pg";
 import { getPool } from "@/db/pool";
+import { PUBLIC_RATE_LIMIT_MAX_COST, PUBLIC_RATE_LIMIT_WINDOW_SECONDS } from "@/http/public-api-policy";
 
 interface Bucket {
   tokens: number;
@@ -16,7 +17,7 @@ declare global {
 }
 
 const RATE = 5;
-const BURST = 25;
+const BURST = PUBLIC_RATE_LIMIT_MAX_COST;
 const MAX_LOCAL_BUCKETS = 10_000;
 const LOCAL_BUCKET_PRUNE_TARGET = 9_000;
 const buckets = globalThis.__macvendorRateBuckets ?? new Map<string, Bucket>();
@@ -134,13 +135,15 @@ export async function consumeRateLimit(request: NextRequest, cost = 1, pool?: Po
   if (process.env.RATE_LIMIT_ENABLED === "false" || process.env.NODE_ENV === "test") {
     return { allowed: true, retryAfter: 0, backend: "disabled" };
   }
-  if (!Number.isInteger(cost) || cost < 1 || cost > 25) throw new Error("rate limit cost must be an integer from 1 to 25");
+  if (!Number.isInteger(cost) || cost < 1 || cost > PUBLIC_RATE_LIMIT_MAX_COST) {
+    throw new Error(`rate limit cost must be an integer from 1 to ${PUBLIC_RATE_LIMIT_MAX_COST}`);
+  }
   if (process.env.RATE_LIMIT_BACKEND !== "postgres") return consumeLocalRateLimit(request, cost);
 
   const salt = process.env.RATE_LIMIT_SALT;
   if (!salt || salt.length < 32) throw new Error("RATE_LIMIT_SALT must contain at least 32 characters");
-  const windowSeconds = integerSetting("RATE_LIMIT_WINDOW_SECONDS", 10, 1, 300);
-  const maxCost = integerSetting("RATE_LIMIT_MAX_COST", 50, 1, 10_000);
+  const windowSeconds = integerSetting("RATE_LIMIT_WINDOW_SECONDS", PUBLIC_RATE_LIMIT_WINDOW_SECONDS, 1, 300);
+  const maxCost = integerSetting("RATE_LIMIT_MAX_COST", PUBLIC_RATE_LIMIT_MAX_COST, 1, 10_000);
   const keyHash = `sha256:${createHmac("sha256", salt).update(clientKey(request)).digest("hex")}`;
   try {
     const result = await (pool ?? getPool()).query<{ allowed: boolean; retry_after: number }>(

@@ -34,12 +34,13 @@ unverifiable “device manufacturer” string.
 
 A result can include:
 
-- the longest matching authoritative MA-S, MA-M, MA-L, or legacy IAB assignment;
+- the longest matching authoritative assignment, tested in strict 36 → 28 → 24-bit order for MA-S/IAB, MA-M, and MA-L;
 - separate reviewed claims and usage insights that never overwrite that assignment;
 - local-administered and multicast flags without changing the submitted address;
 - the source release, active data version, and publication version used to answer.
 
-No match is a valid result: the API returns `200` with `assignment: null`.
+No match is a valid result: the API returns `200` with `matchStatus: "no_match"`,
+`assignment: null`, and the release metadata used for that decision.
 
 ## Public API
 
@@ -51,8 +52,9 @@ and do not send credentials or unrelated personal data in requests.
 | Endpoint | Purpose |
 |---|---|
 | `GET /v1/lookup/{mac}` | Assignment, separate reviewed claims, and release metadata |
+| `GET /v1/lookup/{mac}?mode=enriched` | Explicit enriched response with separate result layers |
 | `GET /v1/lookup/{mac}?mode=official` | Authoritative assignment layer only |
-| `POST /v1/lookups` | Bounded official lookup for 1–25 addresses |
+| `POST /v1/lookups` | Up to 100 official or 50 enriched addresses |
 | `GET /v1/assignments/{registry}/{prefix}` | Exact active registry assignment |
 | `GET /v1/data-release` | Active release, sources, rights state, and hashes |
 | `GET /v1/data-release/changes` | Aggregate changes from the preceding release |
@@ -72,13 +74,13 @@ curl --fail --silent --show-error \
   'https://macvendor.io/v1/lookup/00000C123456?mode=official'
 ```
 
-Bounded bulk lookup:
+Bounded enriched bulk lookup:
 
 ```bash
 curl --fail --silent --show-error \
   --request POST \
   --header 'Content-Type: application/json' \
-  --data '{"macs":["00000C123456","001122334455"]}' \
+  --data '{"mode":"enriched","macs":["00000C123456","001122334455"]}' \
   'https://macvendor.io/v1/lookups'
 ```
 
@@ -87,14 +89,15 @@ The machine-readable contracts are published by the service:
 - [OpenAPI 3.1](https://macvendor.io/openapi.json)
 - [Public JSON Schema](https://macvendor.io/schemas/public-api-v1.schema.json)
 - [Active data release](https://macvendor.io/v1/data-release)
+- [Public plan and limits](https://macvendor.io/plans)
 
 ## Integrate safely
 
 - Accept the documented bare, colon, hyphen, or dotted EUI-48 forms. Canonical
   lookup paths use 12 uppercase hexadecimal characters.
 - Follow `308 Permanent Redirect` responses or send canonical paths directly.
-- Treat `assignment: null` as a successful no-match result, not as a transport
-  failure.
+- Treat `matchStatus: "no_match"` plus `assignment: null` as a successful result,
+  not as a transport failure.
 - Keep `assignment`, `curatedMatches`, and `insights` semantically separate.
   Never present a reviewed hint as an authoritative registration.
 - Preserve release metadata when results are stored or audited. Registry data
@@ -103,12 +106,18 @@ The machine-readable contracts are published by the service:
   responses and set client-side connection/read timeouts.
 - Use `ETag` and `If-None-Match` for repeated GET requests instead of polling
   full responses unnecessarily.
-- Keep bulk requests at or below 25 addresses. Do not parallelize requests to
-  evade service limits.
+- Read `X-API-Version`, `X-App-Version`, and `X-Request-Id` on every v1 response.
+  Cacheable GET responses have a strong `ETag`; bulk, evidence, corrections,
+  and errors use `private, no-store` without an ETag.
+- Keep bulk requests at or below 100 official or 50 enriched addresses. The
+  standard quota is 50 cost units per client IP per fixed 10-second window;
+  official bulk costs one unit per two entries rounded up and enriched bulk
+  costs one unit per entry. Honor `Retry-After` and do not parallelize retries.
 - Do not use a MAC result as the sole basis for authentication, authorization,
   fraud decisions, surveillance, or device attribution.
 
-Errors use RFC 9457 `application/problem+json` and include an `X-Request-Id`.
+Errors use one RFC 9457 `application/problem+json` shape with `type`, `title`,
+`status`, `code`, `detail`, `requestId`, `apiVersion`, and `appVersion`.
 Log that identifier when reporting a reproducible service problem, but avoid
 logging unnecessary raw MAC addresses in privacy-sensitive environments.
 

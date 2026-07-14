@@ -37,7 +37,11 @@ export default defineConfig({
       PORT: String(port),
       PUBLIC_ORIGIN: baseURL,
       DATABASE_URL: databaseUrl,
-      RATE_LIMIT_ENABLED: "false",
+      RATE_LIMIT_ENABLED: "true",
+      RATE_LIMIT_BACKEND: "postgres",
+      RATE_LIMIT_SALT: "browser-test-rate-limit-salt-value-0001",
+      RATE_LIMIT_WINDOW_SECONDS: "10",
+      RATE_LIMIT_MAX_COST: "10000",
     },
   },
   projects: [

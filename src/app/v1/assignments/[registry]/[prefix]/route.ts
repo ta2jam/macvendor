@@ -3,7 +3,7 @@ import { getAssignment } from "@/db/lookup";
 import { getPool } from "@/db/pool";
 import { InvalidPrefixError, normalizeRegistry, parseAssignmentPrefix, REGISTRY_LENGTHS } from "@/domain/mac";
 import { consumeRateLimit } from "@/http/rate-limit";
-import { jsonResponse, problemResponse, redirectResponse, requestId } from "@/http/responses";
+import { jsonResponse, privateJsonResponse, problemResponse, redirectResponse, requestId } from "@/http/responses";
 import { DATA_RELEASE_SURROGATE_KEY, resolutionSurrogateKey } from "@/cache/surrogate";
 
 export const runtime = "nodejs";
@@ -45,9 +45,10 @@ export async function GET(
     if (!result) {
       return problemResponse({ status: 404, code: "ASSIGNMENT_NOT_FOUND", title: "Assignment not found", detail: "No active assignment matches this registry and prefix.", requestId: id });
     }
+    if (include === "evidence") return privateJsonResponse(result, { requestId: id });
     return jsonResponse(request, result, {
       requestId: id,
-      cacheControl: include === "evidence" ? "private, no-store" : "public, max-age=300, s-maxage=300",
+      cacheControl: "public, max-age=300, s-maxage=300",
       etagSeed: `${result.data.activeVersion}:${result.data.publicationVersion}:${registry.registry}:${prefix.canonical}:${include ?? "none"}`,
       surrogateKeys: [resolutionSurrogateKey(result.data.resolvedReleaseId), DATA_RELEASE_SURROGATE_KEY],
     });

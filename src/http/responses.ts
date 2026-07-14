@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { normalizeSurrogateKeys } from "@/cache/surrogate";
+import { PUBLIC_API_VERSION } from "@/http/public-api-policy";
+import { APP_VERSION } from "@/lib/version";
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
 
@@ -14,8 +16,14 @@ function commonHeaders(id: string): HeadersInit {
     "Access-Control-Allow-Origin": "*",
     "Content-Type": "application/json; charset=utf-8",
     "X-Content-Type-Options": "nosniff",
+    "X-API-Version": PUBLIC_API_VERSION,
+    "X-App-Version": APP_VERSION,
     "X-Request-Id": id,
   };
+}
+
+export function publicApiHeaders(id: string): Headers {
+  return new Headers(commonHeaders(id));
 }
 
 function matchesIfNoneMatch(header: string | null, etag: string): boolean {
@@ -48,9 +56,20 @@ export function problemResponse(args: {
       code: args.code,
       detail: args.detail,
       requestId: args.requestId,
+      apiVersion: PUBLIC_API_VERSION,
+      appVersion: APP_VERSION,
     },
     { status: args.status, headers },
   );
+}
+
+export function privateJsonResponse(body: unknown, args: { requestId: string; status?: number }): Response {
+  const headers = new Headers(commonHeaders(args.requestId));
+  headers.set("Cache-Control", "private, no-store");
+  return Response.json(body, {
+    status: args.status ?? 200,
+    headers,
+  });
 }
 
 export function jsonResponse(
@@ -78,13 +97,11 @@ export function jsonResponse(
 }
 
 export function redirectResponse(url: URL, id: string): Response {
+  const headers = new Headers(commonHeaders(id));
+  headers.set("Cache-Control", "public, max-age=300");
+  headers.set("Location", url.toString());
   return new Response(null, {
     status: 308,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Cache-Control": "public, max-age=300",
-      Location: url.toString(),
-      "X-Request-Id": id,
-    },
+    headers,
   });
 }

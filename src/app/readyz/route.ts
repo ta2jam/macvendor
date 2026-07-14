@@ -7,7 +7,20 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    if (getRateLimitHealth().status === "degraded") {
+    const rateLimit = getRateLimitHealth();
+    if (process.env.NODE_ENV === "production" && rateLimit.status === "disabled") {
+      return Response.json(
+        { status: "not_ready", version: APP_VERSION, reason: "rate_limit_disabled" },
+        { status: 503, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } },
+      );
+    }
+    if (process.env.NODE_ENV === "production" && rateLimit.backend !== "postgres") {
+      return Response.json(
+        { status: "not_ready", version: APP_VERSION, reason: "shared_rate_limit_required" },
+        { status: 503, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } },
+      );
+    }
+    if (rateLimit.status === "degraded") {
       return Response.json(
         { status: "not_ready", version: APP_VERSION, reason: "rate_limit_degraded" },
         { status: 503, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } },

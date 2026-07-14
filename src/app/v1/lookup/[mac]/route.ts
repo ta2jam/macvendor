@@ -24,18 +24,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   const unsupported = [...request.nextUrl.searchParams.keys()].filter((key) => key !== "mode");
-  const mode = request.nextUrl.searchParams.get("mode") ?? "all";
-  if (unsupported.length || (mode !== "all" && mode !== "official")) {
+  const requestedMode = request.nextUrl.searchParams.get("mode") ?? "enriched";
+  if (unsupported.length || (requestedMode !== "all" && requestedMode !== "enriched" && requestedMode !== "official")) {
     return problemResponse({
       status: 400,
       code: "UNSUPPORTED_PARAMETER",
       title: "Unsupported parameter",
-      detail: "Only mode=all or mode=official is supported.",
+      detail: "Only mode=enriched or mode=official is supported. mode=all remains a compatibility alias for enriched.",
       requestId: id,
     });
   }
 
   try {
+    const mode = requestedMode === "official" ? "official" : "enriched";
     const { mac: rawMac } = await params;
     const mac = normalizeMac(rawMac);
     if (rawMac !== mac.normalized) {
@@ -53,12 +54,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         normalized: mac.normalized,
         flags: mac.flags,
       },
+      matchStatus: result.assignment ? "matched" as const : "no_match" as const,
       ...result,
     };
-    const positive = Boolean(result.assignment || result.curatedMatches.length || result.insights.length);
+    const officialMatched = Boolean(result.assignment);
     return jsonResponse(request, body, {
       requestId: id,
-      cacheControl: positive
+      cacheControl: officialMatched
         ? "public, max-age=60, s-maxage=300, stale-while-revalidate=60"
         : "public, max-age=30, s-maxage=60",
       etagSeed: `${result.data.activeVersion}:${result.data.publicationVersion}:${mode}:${mac.normalized}`,

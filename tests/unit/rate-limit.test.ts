@@ -22,6 +22,14 @@ afterEach(() => {
 });
 
 describe("shared rate limiting", () => {
+  it("admits one published maximum-cost request and rejects cost above the public bound", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    process.env.RATE_LIMIT_ENABLED = "true";
+    const maximum = await consumeRateLimit(request(), 50);
+    expect(maximum).toMatchObject({ allowed: true, backend: "local" });
+    await expect(consumeRateLimit(request(), 51)).rejects.toThrow("1 to 50");
+  });
+
   it("bounds local fallback memory under many client addresses", async () => {
     vi.stubEnv("NODE_ENV", "production");
     process.env.RATE_LIMIT_ENABLED = "true";

@@ -29,7 +29,7 @@ import { migrate } from "../../src/db/migrate";
 import { applySourceGovernance, previewSourceGovernance } from "../../src/operations/source-governance";
 import { searchOrganizations } from "../../src/db/organizations";
 import { POST as correctionRoute } from "../../src/app/v1/corrections/route";
-import { bulkLookupOfficial } from "../../src/db/bulk-lookup";
+import { bulkLookupEnriched, bulkLookupOfficial } from "../../src/db/bulk-lookup";
 import { getReleaseChanges } from "../../src/db/release-changes";
 import { sourceValueReport } from "../../src/operations/source-value";
 import { updateAllSources } from "../../src/operations/source-update";
@@ -48,6 +48,11 @@ process.env.DATABASE_URL = testUrl;
 process.env.RATE_LIMIT_ENABLED = "false";
 
 const pool = createPool(testUrl);
+
+function restoreEnvironment(name: string, value: string | undefined) {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}
 
 beforeAll(async () => {
   await pool.query("SELECT 1");
@@ -151,8 +156,45 @@ describe("bounded bulk and release operations", () => {
     }
   });
 
+  it("blocks production readiness when rate limiting is disabled", async () => {
+    const previous = { enabled: process.env.RATE_LIMIT_ENABLED, nodeEnv: process.env.NODE_ENV };
+    Object.defineProperty(process.env, "NODE_ENV", {
+      value: "production", configurable: true, writable: true, enumerable: true,
+    });
+    process.env.RATE_LIMIT_ENABLED = "false";
+    try {
+      const response = await readinessRoute();
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toMatchObject({ reason: "rate_limit_disabled" });
+    } finally {
+      restoreEnvironment("RATE_LIMIT_ENABLED", previous.enabled);
+      restoreEnvironment("NODE_ENV", previous.nodeEnv);
+    }
+  });
+
+  it("blocks production readiness when rate limiting is process-local", async () => {
+    const previous = {
+      enabled: process.env.RATE_LIMIT_ENABLED, backend: process.env.RATE_LIMIT_BACKEND, nodeEnv: process.env.NODE_ENV,
+    };
+    Object.defineProperty(process.env, "NODE_ENV", {
+      value: "production", configurable: true, writable: true, enumerable: true,
+    });
+    process.env.RATE_LIMIT_ENABLED = "true";
+    process.env.RATE_LIMIT_BACKEND = "local";
+    try {
+      const response = await readinessRoute();
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toMatchObject({ reason: "shared_rate_limit_required" });
+    } finally {
+      for (const [name, value] of Object.entries(previous)) {
+        const environmentName = name === "enabled" ? "RATE_LIMIT_ENABLED" : name === "backend" ? "RATE_LIMIT_BACKEND" : "NODE_ENV";
+        restoreEnvironment(environmentName, value);
+      }
+    }
+  });
+
   it("serves the public bulk route with bounded CORS preflight and no-store output", async () => {
-    const preflight=await bulkOptionsRoute();
+    const preflight=await bulkOptionsRoute(new NextRequest("http://localhost:3000/v1/lookups", { method: "OPTIONS" }));
     expect(preflight.status).toBe(204);
     expect(preflight.headers.get("access-control-allow-methods")).toBe("POST, OPTIONS");
     const response=await bulkLookupRoute(new NextRequest("http://localhost:3000/v1/lookups",{
@@ -162,10 +204,60 @@ describe("bounded bulk and release operations", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("access-control-allow-origin")).toBe("*");
     expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.get("etag")).toBeNull();
+    expect(response.headers.get("x-api-version")).toBe("v1");
+    expect(response.headers.get("x-app-version")).toMatch(/^\d+\.\d+\.\d+$/);
     expect(response.headers.get("x-request-id")).toBe("test-bulk-route");
     const body=await response.json() as {data:{results:unknown[]};meta:{count:number;uniqueCount:number}};
     expect(body.data.results).toHaveLength(2);
     expect(body.meta).toMatchObject({count:2,uniqueCount:2});
+  });
+
+  it("serves explicit enriched bulk results without merging result layers", async () => {
+    const response = await bulkLookupRoute(new NextRequest("http://localhost:3000/v1/lookups", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode: "enriched", macs: ["02AABBCC0001", "02AABBCC0001"] }),
+    }));
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      data: { mode: string; results: Array<{ assignment: unknown; curatedMatches: unknown[]; insights: unknown[] }> };
+    };
+    expect(body.data.mode).toBe("enriched");
+    expect(body.data.results).toHaveLength(2);
+    expect(body.data.results[0]).toMatchObject({
+      assignment: { organizationName: "Example Networks Lab" },
+      curatedMatches: [{ organizationName: "Example Devices Community" }],
+      insights: [],
+    });
+    expect(body.data.results[0]).toEqual(body.data.results[1]);
+    assertPublicContract("BulkLookupResponse", body);
+  });
+
+  it("accepts official discovery batches larger than the former 25-address bound", async () => {
+    const macs = Array.from({ length: 26 }, (_, index) => `0011223344${index.toString(16).padStart(2, "0")}`);
+    const response = await bulkLookupRoute(new NextRequest("http://localhost:3000/v1/lookups", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ macs }),
+    }));
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: { mode: string; results: unknown[] } };
+    expect(body.data.mode).toBe("official");
+    expect(body.data.results).toHaveLength(26);
+    assertPublicContract("BulkLookupResponse", body);
+  });
+
+  it("enforces mode-specific bulk bounds", async () => {
+    const macs = Array.from({ length: 101 }, () => "001122334455");
+    const official = await bulkLookupRoute(new NextRequest("http://localhost:3000/v1/lookups", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ macs }),
+    }));
+    const enriched = await bulkLookupRoute(new NextRequest("http://localhost:3000/v1/lookups", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode: "enriched", macs: macs.slice(0, 51) }),
+    }));
+    expect(official.status).toBe(400);
+    expect(await official.json()).toMatchObject({ code: "INVALID_BULK_REQUEST", detail: expect.stringContaining("1..100") });
+    expect(enriched.status).toBe(400);
+    expect(await enriched.json()).toMatchObject({ code: "INVALID_BULK_REQUEST", detail: expect.stringContaining("1..50") });
   });
 
   it("resolves duplicate bulk inputs with one deduplicated SQL input and a stable release", async () => {
@@ -174,6 +266,20 @@ describe("bounded bulk and release operations", () => {
     expect(result).toHaveLength(2);
     expect(result[0]).toEqual(result[1]);
     expect(result[0]).toMatchObject({normalizedMac:"02AABBCC0001",assignment:{prefix:"02AABB",prefixLength:24}});
+  });
+
+  it("resolves enriched bulk inputs inside one stable release snapshot", async () => {
+    const mac = normalizeMac("02AABBCC0001");
+    const result = await bulkLookupEnriched(pool, [mac, mac]);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual(result[1]);
+    expect(result[0]).toMatchObject({
+      assignment: { prefix: "02AABB", prefixLength: 24 },
+      curatedMatches: [{ prefix: "02AABBCC", prefixLength: 32 }],
+      curatedMatchesTruncated: false,
+      insights: [],
+      insightsTruncated: false,
+    });
   });
 
   it("reports aggregate release changes and per-source value without mutating sources", async () => {
@@ -341,6 +447,43 @@ describe("organization identity and correction intake", () => {
 });
 
 describe("database lookup", () => {
+  it("selects 36 over 28 over 24 bits for single and bulk official lookup", async () => {
+    const mac = normalizeMac("02AABBCC0001");
+    const base = await pool.query<{
+      resolution_run_id: string; core_source_record_id: string; core_source_slug: string; core_source_release_id: string;
+    }>(`SELECT resolution_run_id, core_source_record_id, core_source_slug, core_source_release_id
+       FROM resolved_assignments WHERE resolution_run_id=(SELECT resolution_run_id FROM active_resolution WHERE singleton_id=1)
+         AND prefix_length=24 AND prefix_bits=$1 LIMIT 1`, [prefixBits(mac.value, 24).toString()]);
+    const context = base.rows[0]!;
+    const maMId = crypto.randomUUID();
+    const maSId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO resolved_assignments (
+         id,resolution_run_id,registry,prefix_bits,prefix_length,organization_name,organization_address,
+         is_private,attribution_status,core_source_record_id,core_source_slug,core_source_release_id
+       ) VALUES
+         ($1,$3,'MA-M',$4,28,'Synthetic 28-bit winner',NULL,false,'authoritative',$6,$7,$8),
+         ($2,$3,'MA-S',$5,36,'Synthetic 36-bit winner',NULL,false,'authoritative',$6,$7,$8)`,
+      [maMId, maSId, context.resolution_run_id, prefixBits(mac.value, 28).toString(),
+        prefixBits(mac.value, 36).toString(), context.core_source_record_id,
+        context.core_source_slug, context.core_source_release_id],
+    );
+    try {
+      const single36 = await lookupMac(pool, mac, "official");
+      const bulk36 = await bulkLookupOfficial(pool, [mac]);
+      expect(single36.assignment).toMatchObject({ prefixLength: 36, registry: "MA-S", organizationName: "Synthetic 36-bit winner" });
+      expect(bulk36[0]!.assignment).toMatchObject({ prefixLength: 36, registry: "MA-S", organizationName: "Synthetic 36-bit winner" });
+
+      await pool.query("DELETE FROM resolved_assignments WHERE id=$1", [maSId]);
+      const single28 = await lookupMac(pool, mac, "official");
+      const bulk28 = await bulkLookupOfficial(pool, [mac]);
+      expect(single28.assignment).toMatchObject({ prefixLength: 28, registry: "MA-M", organizationName: "Synthetic 28-bit winner" });
+      expect(bulk28[0]!.assignment).toMatchObject({ prefixLength: 28, registry: "MA-M", organizationName: "Synthetic 28-bit winner" });
+    } finally {
+      await pool.query("DELETE FROM resolved_assignments WHERE id=ANY($1::uuid[])", [[maMId, maSId]]);
+    }
+  });
+
   it("returns authoritative and curated layers independently", async () => {
     const result = await lookupMac(pool, normalizeMac("02:AA:BB:CC:00:01"), "all");
     expect(result.assignment).toMatchObject({
@@ -560,6 +703,33 @@ describe("publication suppression operations", () => {
 });
 
 describe("lookup route", () => {
+  it("returns an explicit successful no-match status with release metadata", async () => {
+    const response = await lookupRoute(
+      new NextRequest("http://localhost:3000/v1/lookup/001122334455"),
+      { params: Promise.resolve({ mac: "001122334455" }) },
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("etag")).toBeTruthy();
+    expect(response.headers.get("cache-control")).toBe("public, max-age=30, s-maxage=60");
+    expect(response.headers.get("x-api-version")).toBe("v1");
+    const body = await response.json();
+    expect(body).toMatchObject({ matchStatus: "no_match", assignment: null,
+      data: { activeVersion: expect.any(Number), publicationVersion: expect.any(Number), policyVersion: expect.any(String) } });
+    assertPublicContract("LookupResponse", body);
+  });
+
+  it("treats enriched as the explicit name for the default response", async () => {
+    const defaultResponse = await lookupRoute(
+      new NextRequest("http://localhost:3000/v1/lookup/02AABBCC0001"),
+      { params: Promise.resolve({ mac: "02AABBCC0001" }) },
+    );
+    const enrichedResponse = await lookupRoute(
+      new NextRequest("http://localhost:3000/v1/lookup/02AABBCC0001?mode=enriched"),
+      { params: Promise.resolve({ mac: "02AABBCC0001" }) },
+    );
+    expect(await enrichedResponse.json()).toEqual(await defaultResponse.json());
+  });
+
   it("redirects a valid noncanonical MAC", async () => {
     const request = new NextRequest("http://localhost:3000/v1/lookup/02:aa:bb:cc:00:01");
     const response = await lookupRoute(request, { params: Promise.resolve({ mac: "02:aa:bb:cc:00:01" }) });
@@ -587,6 +757,7 @@ describe("lookup route", () => {
     expect(response.status).toBe(400);
     expect(response.headers.get("content-type")).toContain("application/problem+json");
     expect(body.code).toBe("INVALID_MAC");
+    expect(body).toMatchObject({ apiVersion: "v1", appVersion: expect.stringMatching(/^\d+\.\d+\.\d+$/) });
     assertPublicContract("Problem", body);
   });
 
@@ -613,6 +784,8 @@ describe("lookup route", () => {
     });
     expect(response.status).toBe(200);
     expect(response.headers.get("surrogate-key")).toBeNull();
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.get("etag")).toBeNull();
     assertPublicContract("AssignmentResponse", await response.json());
 
     const publicResponse = await assignmentRoute(

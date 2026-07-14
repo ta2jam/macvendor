@@ -18,7 +18,7 @@ export default function HomePage() {
             <a href={GITHUB_REPOSITORY_URL} target="_blank" rel="noopener noreferrer"
               aria-label={`View macvendor v${APP_VERSION} on GitHub`}>v{APP_VERSION}</a>
             <strong>36 → 28 → 24 bit</strong>
-            <p>Fixed candidate set, versioned results, and explicit provenance.</p>
+            <p>The first active match wins, so a /36 overrides an overlapping /28 or /24 without deleting either record.</p>
           </div>
         </div>
       </section>

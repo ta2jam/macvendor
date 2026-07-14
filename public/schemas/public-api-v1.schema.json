@@ -71,7 +71,7 @@
     "LookupResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["query", "assignment", "curatedMatches", "curatedMatchesTruncated", "insights", "insightsTruncated", "data"],
+      "required": ["query", "matchStatus", "assignment", "curatedMatches", "curatedMatchesTruncated", "insights", "insightsTruncated", "data"],
       "properties": {
         "query": {
           "type": "object",
@@ -91,45 +91,96 @@
             }
           }
         },
+        "matchStatus": { "type": "string", "enum": ["matched", "no_match"] },
         "assignment": { "oneOf": [{ "$ref": "#/$defs/Assignment" }, { "type": "null" }] },
         "curatedMatches": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/CuratedMatch" } },
         "curatedMatchesTruncated": { "type": "boolean" },
         "insights": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/LookupInsight" } },
         "insightsTruncated": { "type": "boolean" },
         "data": { "$ref": "#/$defs/ReleaseData" }
-      }
+      },
+      "allOf": [
+        { "if": { "properties": { "matchStatus": { "const": "no_match" } } }, "then": { "properties": { "assignment": { "type": "null" } } } },
+        { "if": { "properties": { "matchStatus": { "const": "matched" } } }, "then": { "properties": { "assignment": { "$ref": "#/$defs/Assignment" } } } }
+      ]
     },
     "BulkLookupItem": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["normalizedMac", "assignment", "release"],
+      "required": ["normalizedMac", "matchStatus", "assignment", "release"],
       "properties": {
         "normalizedMac": { "type": "string", "pattern": "^[0-9A-F]{12}$" },
+        "matchStatus": { "type": "string", "enum": ["matched", "no_match"] },
         "assignment": { "oneOf": [{ "$ref": "#/$defs/Assignment" }, { "type": "null" }] },
         "release": { "$ref": "#/$defs/ReleaseData" }
-      }
+      },
+      "allOf": [
+        { "if": { "properties": { "matchStatus": { "const": "no_match" } } }, "then": { "properties": { "assignment": { "type": "null" } } } },
+        { "if": { "properties": { "matchStatus": { "const": "matched" } } }, "then": { "properties": { "assignment": { "$ref": "#/$defs/Assignment" } } } }
+      ]
     },
-    "BulkLookupResponse": {
+    "BulkEnrichedLookupItem": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["data", "meta"],
+      "required": ["normalizedMac", "matchStatus", "assignment", "release", "curatedMatches", "curatedMatchesTruncated", "insights", "insightsTruncated"],
       "properties": {
-        "data": {
-          "type": "object", "additionalProperties": false, "required": ["type", "mode", "results"],
+        "normalizedMac": { "type": "string", "pattern": "^[0-9A-F]{12}$" },
+        "matchStatus": { "type": "string", "enum": ["matched", "no_match"] },
+        "assignment": { "oneOf": [{ "$ref": "#/$defs/Assignment" }, { "type": "null" }] },
+        "release": { "$ref": "#/$defs/ReleaseData" },
+        "curatedMatches": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/CuratedMatch" } },
+        "curatedMatchesTruncated": { "type": "boolean" },
+        "insights": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/LookupInsight" } },
+        "insightsTruncated": { "type": "boolean" }
+      },
+      "allOf": [
+        { "if": { "properties": { "matchStatus": { "const": "no_match" } } }, "then": { "properties": { "assignment": { "type": "null" } } } },
+        { "if": { "properties": { "matchStatus": { "const": "matched" } } }, "then": { "properties": { "assignment": { "$ref": "#/$defs/Assignment" } } } }
+      ]
+    },
+    "BulkLookupResponse": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false, "required": ["data", "meta"],
           "properties": {
-            "type": { "const": "bulk_lookup" }, "mode": { "const": "official" },
-            "results": { "type": "array", "minItems": 1, "maxItems": 25, "items": { "$ref": "#/$defs/BulkLookupItem" } }
+            "data": {
+              "type": "object", "additionalProperties": false, "required": ["type", "mode", "results"],
+              "properties": {
+                "type": { "const": "bulk_lookup" }, "mode": { "const": "official" },
+                "results": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "$ref": "#/$defs/BulkLookupItem" } }
+              }
+            },
+            "meta": {
+              "type": "object", "additionalProperties": false, "required": ["requestId", "count", "uniqueCount"],
+              "properties": {
+                "requestId": { "type": "string", "minLength": 1 },
+                "count": { "type": "integer", "minimum": 1, "maximum": 100 },
+                "uniqueCount": { "type": "integer", "minimum": 1, "maximum": 100 }
+              }
+            }
           }
         },
-        "meta": {
-          "type": "object", "additionalProperties": false, "required": ["requestId", "count", "uniqueCount"],
+        {
+          "type": "object", "additionalProperties": false, "required": ["data", "meta"],
           "properties": {
-            "requestId": { "type": "string", "minLength": 1 },
-            "count": { "type": "integer", "minimum": 1, "maximum": 25 },
-            "uniqueCount": { "type": "integer", "minimum": 1, "maximum": 25 }
+            "data": {
+              "type": "object", "additionalProperties": false, "required": ["type", "mode", "results"],
+              "properties": {
+                "type": { "const": "bulk_lookup" }, "mode": { "const": "enriched" },
+                "results": { "type": "array", "minItems": 1, "maxItems": 50, "items": { "$ref": "#/$defs/BulkEnrichedLookupItem" } }
+              }
+            },
+            "meta": {
+              "type": "object", "additionalProperties": false, "required": ["requestId", "count", "uniqueCount"],
+              "properties": {
+                "requestId": { "type": "string", "minLength": 1 },
+                "count": { "type": "integer", "minimum": 1, "maximum": 50 },
+                "uniqueCount": { "type": "integer", "minimum": 1, "maximum": 50 }
+              }
+            }
           }
         }
-      }
+      ]
     },
     "Evidence": {
       "type": "object",
@@ -300,14 +351,16 @@
     "Problem": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "title", "status", "code", "detail", "requestId"],
+      "required": ["type", "title", "status", "code", "detail", "requestId", "apiVersion", "appVersion"],
       "properties": {
         "type": { "type": "string", "format": "uri", "pattern": "^https://macvendor\\.io/problems/" },
         "title": { "type": "string", "minLength": 1 },
         "status": { "type": "integer", "enum": [400, 404, 413, 415, 429, 503] },
         "code": { "type": "string", "enum": ["INVALID_MAC", "INVALID_PREFIX", "INVALID_REGISTRY", "UNSUPPORTED_PARAMETER", "INVALID_JSON", "INVALID_BULK_REQUEST", "BULK_BODY_TOO_LARGE", "ASSIGNMENT_NOT_FOUND", "INVALID_ORGANIZATION_QUERY", "INVALID_ORGANIZATION_KEY", "ORGANIZATION_NOT_FOUND", "INVALID_CORRECTION_REQUEST", "PAYLOAD_TOO_LARGE", "UNSUPPORTED_MEDIA_TYPE", "CORRECTION_INTAKE_UNAVAILABLE", "RATE_LIMITED", "DATA_RELEASE_UNAVAILABLE", "SERVICE_UNAVAILABLE"] },
         "detail": { "type": "string", "minLength": 1 },
-        "requestId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$" }
+        "requestId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$" },
+        "apiVersion": { "const": "v1" },
+        "appVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
       },
       "allOf": [
         {
