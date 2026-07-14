@@ -1,0 +1,14 @@
+[Unit]
+Description=Bound macvendor Docker image and build-cache retention
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/flock -n /run/macvendor-image-retention.lock /usr/local/sbin/macvendor-image-retention
+Nice=15
+IOSchedulingClass=idle
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/docker /run

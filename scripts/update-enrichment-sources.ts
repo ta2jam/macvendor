@@ -55,7 +55,8 @@ try{
     containerImageDigest:process.env.BUILD_IMAGE_DIGEST??"local",now:observedAt});
   if(build.status==="rejected")throw new Error("enrichment resolution was rejected");
   const activation=await activateResolution(pool,build.resolutionRunId,{actorId:actor,
-    expectedPreviousResolutionRunId:inputSnapshot.baseResolutionRunId});
+    expectedPreviousResolutionRunId:inputSnapshot.baseResolutionRunId,
+    expectedPreviousPublicationVersion:inputSnapshot.basePublicationVersion});
   const cachePurge=activation.status==="already_active"?{status:"skipped",reason:"no_change"}:await purgeSurrogateKeys([
     ...(activation.previousResolutionRunId?[resolutionSurrogateKey(activation.previousResolutionRunId)]:[]),DATA_RELEASE_SURROGATE_KEY]);
   const health=await checkSourceGovernance(pool);

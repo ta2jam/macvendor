@@ -1,0 +1,39 @@
+#!/bin/sh
+set -eu
+
+root=/srv/sites/macvendor
+current=$(basename "$(readlink -f "$root/app")")
+current=${current#v}
+previous=$(find "$root/releases" -mindepth 1 -maxdepth 1 -type d -name 'v*' -printf '%f\n' \
+  | sed 's/^v//' | sort -V | awk -v current="$current" '$0 != current { previous=$0 } END { print previous }')
+
+keep_tag() {
+  repository=$1
+  tag=$2
+  case "$repository:$tag" in
+    "macvendor-app:latest"|"macvendor-app:v$current"|"macvendor-tooling:current"|"macvendor-tooling:v$current")
+      return 0
+      ;;
+  esac
+  if [ -n "$previous" ]; then
+    case "$repository:$tag" in
+      "macvendor-app:v$previous"|"macvendor-app:rollback-v$previous"|"macvendor-tooling:v$previous")
+        return 0
+        ;;
+    esac
+  fi
+  return 1
+}
+
+docker image ls --format '{{.Repository}} {{.Tag}}' \
+  | awk '$1 == "macvendor-app" || $1 == "macvendor-tooling" { print $1, $2 }' \
+  | while read -r repository tag; do
+      [ "$tag" = "<none>" ] && continue
+      if ! keep_tag "$repository" "$tag"; then
+        docker image rm "$repository:$tag" >/dev/null
+      fi
+    done
+
+# Builder cache is not runtime state. Bound only entries unused for seven days;
+# never prune containers, volumes, database images, or another site's image tags.
+docker builder prune --force --filter until=168h >/dev/null

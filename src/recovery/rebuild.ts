@@ -116,7 +116,11 @@ export async function rebuildFromSyntheticArtifacts(options: {
       if (resolution.status !== "validated") {
         throw new RecoveryError("REBUILD_RESOLUTION_REJECTED", "synthetic artifact resolution did not validate");
       }
-      await activateResolution(pool, resolution.resolutionRunId, { actorId: "recovery:artifact-rebuild" });
+      await activateResolution(pool, resolution.resolutionRunId, {
+        actorId: "recovery:artifact-rebuild",
+        expectedPreviousResolutionRunId: null,
+        expectedPreviousPublicationVersion: null,
+      });
       const lookup = await lookupMac(pool, normalizeMac("02AABBCC0001"), "all");
       if (lookup.assignment?.organizationName !== "Example Networks Lab"
         || lookup.curatedMatches[0]?.organizationName !== "Example Devices Community") {

@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { ACTIVE_SUPPRESSION_SQL, assignmentSuppressionTargetSql } from "./suppression-match";
 
 interface IdentityRow {
   organization_key: string; organization_name: string; scheme: string; identifier: string;
@@ -32,6 +33,11 @@ async function assignments(pool: Pool, keys: string[], registry?: string): Promi
      JOIN resolved_assignments ra ON ra.resolution_run_id=ar.resolution_run_id
        AND lower(ra.organization_name)=lower(m.registered_name)
      WHERE ($2::text IS NULL OR ra.registry=$2)
+       AND NOT EXISTS (
+         SELECT 1 FROM publication_suppressions ps
+         WHERE ${ACTIVE_SUPPRESSION_SQL}
+           AND ${assignmentSuppressionTargetSql("ra", "ar")}
+       )
      ORDER BY m.organization_key,ra.prefix_length DESC,ra.prefix_bits LIMIT 2001`, [keys, registry ?? null],
   );
   const grouped=new Map<string,{items:unknown[];truncated:boolean}>();

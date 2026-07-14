@@ -3,6 +3,7 @@ set -eu
 
 : "${DEPLOY_HOST:?DEPLOY_HOST is required, for example deploy@example.invalid}"
 origin=${PRODUCTION_ORIGIN:-https://macvendor.io}
+identity=${DEPLOY_IDENTITY:-}
 version=$(node -p "require('./package.json').version")
 tag="v$version"
 local_sha=$(git rev-parse HEAD)
@@ -19,8 +20,12 @@ test "$(curl --fail --silent --show-error "$origin/healthz" | node -e '
   });
 ')" = "$version"
 
-remote_sha=$(ssh "$DEPLOY_HOST" "cat /srv/sites/macvendor/releases/$tag/COMMIT_SHA")
-remote_app=$(ssh "$DEPLOY_HOST" "readlink -f /srv/sites/macvendor/app")
+set -- -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15
+if [ -n "$identity" ]; then
+  set -- "$@" -i "$identity"
+fi
+remote_sha=$(ssh "$@" "$DEPLOY_HOST" "cat /srv/sites/macvendor/releases/$tag/COMMIT_SHA")
+remote_app=$(ssh "$@" "$DEPLOY_HOST" "readlink -f /srv/sites/macvendor/app")
 test "$remote_sha" = "$local_sha"
 test "$remote_app" = "/srv/sites/macvendor/releases/$tag/app"
 

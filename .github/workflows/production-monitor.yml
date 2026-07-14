@@ -20,10 +20,12 @@ jobs:
       - name: Verify public health and governed release
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --retry 3 --retry-all-errors --max-time 20 \
-            https://macvendor.io/healthz | jq -e '.status == "ok" and (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))'
           curl --fail --silent --show-error --retry 3 --retry-all-errors --max-time 30 \
             https://macvendor.io/v1/data-release > release.json
+          curl --fail --silent --show-error --retry 3 --retry-all-errors --max-time 20 \
+            https://macvendor.io/healthz | jq -e '.status == "ok"
+              and .controls.rateLimit != "degraded"
+              and (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))'
           jq -e '(.sources | length) >= 19
             and all(.sources[]; .currentRightsStatus == "approved" or .currentRightsStatus == "owner_asserted")
             and (now - (.sources | map(.observedAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) | min) < 691200)' release.json

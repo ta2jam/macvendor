@@ -53,6 +53,11 @@ It sends only failure/recovery transitions to Slack `#team`; a sleeping Mac is
 not an independent monitoring system, so GitHub Production Monitor remains the
 external HTTP probe.
 
+`macvendor-image-retention.timer` preserves the current and immediately
+previous macvendor runtime/tooling images, removes only older macvendor tags,
+and prunes builder cache unused for seven days. It does not prune containers,
+volumes, PostgreSQL images, or images belonging to other sites.
+
 The daily scheduled publication is `macvendor-source-update.timer`. It prepares
 all IEEE and enrichment inputs before import, then performs one build and one
 activation. Disable and mask the legacy `macvendor-ieee-update.timer`;

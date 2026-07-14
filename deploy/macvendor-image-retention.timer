@@ -1,0 +1,11 @@
+[Unit]
+Description=Run macvendor Docker image retention weekly
+
+[Timer]
+OnCalendar=Sun *-*-* 04:20:00 UTC
+Persistent=true
+RandomizedDelaySec=30m
+Unit=macvendor-image-retention.service
+
+[Install]
+WantedBy=timers.target

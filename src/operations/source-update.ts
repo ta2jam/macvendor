@@ -132,6 +132,7 @@ export async function updateAllSources(pool: Pool, options: UpdateAllSourcesOpti
     const activation = await activateResolution(pool, build.resolutionRunId, {
       actorId: options.actorId,
       expectedPreviousResolutionRunId: inputSnapshot.baseResolutionRunId,
+      expectedPreviousPublicationVersion: inputSnapshot.basePublicationVersion,
     });
     const purge = options.purge ?? purgeSurrogateKeys;
     let cachePurge;

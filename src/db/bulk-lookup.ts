@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { formatPrefix, type NormalizedMac } from "@/domain/mac";
+import { ACTIVE_SUPPRESSION_SQL, assignmentSuppressionTargetSql } from "./suppression-match";
 
 interface BulkRow {
   normalized_mac: string;
@@ -25,12 +26,12 @@ const BULK_LOOKUP_SQL = `
   ), inputs AS (
     SELECT * FROM unnest($1::text[], $2::bigint[]) AS input(normalized_mac, mac_value)
   )
-  SELECT input.normalized_mac, active.resolution_run_id, active.version AS active_version,
-    active.publication_version, active.policy_version, active.completed_at AS generated_at,
+  SELECT input.normalized_mac, a.resolution_run_id, a.version AS active_version,
+    a.publication_version, a.policy_version, a.completed_at AS generated_at,
     match.registry, match.prefix_bits, match.prefix_length, match.organization_name,
     match.organization_address, match.core_source_slug AS source_slug,
     match.core_source_release_id AS source_release_id
-  FROM inputs input CROSS JOIN active
+  FROM inputs input CROSS JOIN active a
   LEFT JOIN LATERAL (
     SELECT ra.*
     FROM (VALUES
@@ -38,17 +39,12 @@ const BULK_LOOKUP_SQL = `
       (28::smallint, input.mac_value >> 20),
       (24::smallint, input.mac_value >> 24)
     ) candidate(prefix_length, prefix_bits)
-    JOIN resolved_assignments ra ON ra.resolution_run_id = active.resolution_run_id
+    JOIN resolved_assignments ra ON ra.resolution_run_id = a.resolution_run_id
       AND ra.prefix_length = candidate.prefix_length AND ra.prefix_bits = candidate.prefix_bits
     WHERE ra.registry <> 'CID' AND NOT EXISTS (
       SELECT 1 FROM publication_suppressions ps
-      WHERE ps.status = 'active' AND ps.starts_at <= now() AND (ps.expires_at IS NULL OR ps.expires_at > now())
-        AND (ps.resolved_assignment_id = ra.id OR (
-          ps.resolved_assignment_id IS NULL AND ps.resolved_claim_id IS NULL
-          AND (ps.resolution_run_id IS NULL OR ps.resolution_run_id = active.resolution_run_id)
-          AND ps.prefix_bits = ra.prefix_bits AND ps.prefix_length = ra.prefix_length
-          AND ps.surface IN ('official','both') AND (ps.source_slug IS NULL OR ps.source_slug = ra.core_source_slug)
-        ))
+      WHERE ${ACTIVE_SUPPRESSION_SQL}
+        AND ${assignmentSuppressionTargetSql("ra", "a")}
     )
     ORDER BY ra.prefix_length DESC LIMIT 1
   ) match ON true

@@ -2,7 +2,7 @@ import { config } from "dotenv";
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { getAssignment, getDataRelease, lookupMac } from "../../src/db/lookup";
 import { createPool } from "../../src/db/pool";
@@ -36,7 +36,9 @@ import { updateAllSources } from "../../src/operations/source-update";
 import { OPTIONS as bulkOptionsRoute, POST as bulkLookupRoute } from "../../src/app/v1/lookups/route";
 import { pruneRetiredResolutions } from "../../src/operations/resolution-retention";
 import { SOURCE_PUBLICATION_LOCK } from "../../src/operations/source-publication";
-import { consumeRateLimit } from "../../src/http/rate-limit";
+import {
+  consumeRateLimit, getRateLimitHealth, resetRateLimitHealth,
+} from "../../src/http/rate-limit";
 
 config({ path: ".env.local", quiet: true });
 
@@ -102,6 +104,50 @@ describe("bounded bulk and release operations", () => {
       restore("RATE_LIMIT_MAX_COST", previous.maximum);
       restore("TRUST_PROXY", previous.proxy);
       restore("NODE_ENV", previous.nodeEnv);
+    }
+  });
+
+  it("exposes PostgreSQL limiter degradation in health and readiness, then recovers", async () => {
+    const previous = {
+      enabled: process.env.RATE_LIMIT_ENABLED,
+      backend: process.env.RATE_LIMIT_BACKEND,
+      salt: process.env.RATE_LIMIT_SALT,
+      nodeEnv: process.env.NODE_ENV,
+    };
+    Object.defineProperty(process.env, "NODE_ENV", {
+      value: "production", configurable: true, writable: true, enumerable: true,
+    });
+    process.env.RATE_LIMIT_ENABLED = "true";
+    process.env.RATE_LIMIT_BACKEND = "postgres";
+    process.env.RATE_LIMIT_SALT = "integration-degradation-salt-value";
+    resetRateLimitHealth();
+    const request = new NextRequest("http://localhost:3000/v1/data-release");
+    const failedPool = { query: async () => { throw new Error("rate database unavailable"); } };
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      await expect(consumeRateLimit(request, 1, failedPool as never))
+        .resolves.toMatchObject({ backend: "local" });
+      expect(getRateLimitHealth().status).toBe("degraded");
+      await expect(healthRoute().json()).resolves.toMatchObject({
+        status: "ok", controls: { rateLimit: "degraded" },
+      });
+      expect((await readinessRoute()).status).toBe(503);
+
+      await expect(consumeRateLimit(request, 1, pool)).resolves.toMatchObject({ backend: "postgres" });
+      expect(getRateLimitHealth().status).toBe("healthy");
+      await expect(healthRoute().json()).resolves.toMatchObject({ controls: { rateLimit: "healthy" } });
+      expect((await readinessRoute()).status).toBe(200);
+    } finally {
+      logged.mockRestore();
+      const restore = (name: string, value: string | undefined) => {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      };
+      restore("RATE_LIMIT_ENABLED", previous.enabled);
+      restore("RATE_LIMIT_BACKEND", previous.backend);
+      restore("RATE_LIMIT_SALT", previous.salt);
+      restore("NODE_ENV", previous.nodeEnv);
+      resetRateLimitHealth();
     }
   });
 
@@ -710,6 +756,112 @@ describe("source importer", () => {
 });
 
 describe("resolution publication lifecycle", () => {
+  it("carries exact and prefix suppressions across semantically identical publications", async () => {
+    const original = await pool.query<{ resolution_run_id: string; publication_version: string }>(
+      "SELECT resolution_run_id, publication_version FROM active_resolution WHERE singleton_id = 1",
+    );
+    const baseRunId = original.rows[0]!.resolution_run_id;
+    const assignment = await pool.query<{ id: string }>(
+      "SELECT id FROM resolved_assignments WHERE resolution_run_id = $1 LIMIT 1", [baseRunId],
+    );
+    const claim = await pool.query<{ prefix_bits: string; prefix_length: number }>(
+      "SELECT prefix_bits, prefix_length FROM resolved_claims WHERE resolution_run_id = $1 LIMIT 1", [baseRunId],
+    );
+    let exactSuppressionId: string | undefined;
+    let prefixSuppressionId: string | undefined;
+    let identityId: string | undefined;
+    try {
+      const exact = await createSuppression(pool, {
+        target: { assignmentId: assignment.rows[0]!.id }, reasonCode: "cross_release_review",
+        ticketReference: "CARRY-EXACT", actorId: "operator:integration",
+      });
+      exactSuppressionId = exact.suppressionId;
+      const prefixSuppression = await createSuppression(pool, {
+        target: {
+          prefixBits: BigInt(claim.rows[0]!.prefix_bits), prefixLength: claim.rows[0]!.prefix_length,
+          surface: "curated",
+        },
+        reasonCode: "cross_release_review", ticketReference: "CARRY-PREFIX", actorId: "operator:integration",
+      });
+      prefixSuppressionId = prefixSuppression.suppressionId;
+      await expect(pool.query(
+        "SELECT resolution_run_id FROM publication_suppressions WHERE id = $1", [prefixSuppressionId],
+      )).resolves.toMatchObject({ rows: [{ resolution_run_id: null }] });
+
+      const releases = await pool.query<{ source_release_id: string }>(
+        "SELECT source_release_id FROM resolution_inputs WHERE resolution_run_id = $1 ORDER BY source_release_id",
+        [baseRunId],
+      );
+      const built = await buildResolution(pool, {
+        sourceReleaseIds: releases.rows.map((row) => row.source_release_id),
+        policyVersion: `suppression-carry-${crypto.randomUUID()}`,
+        policyCommitSha: "integration-suppression-carry",
+        containerImageDigest: "sha256:integration-suppression-carry",
+        now: new Date("2026-07-14T01:00:00.000Z"),
+      });
+      expect(built.status).toBe("validated");
+      await activateResolution(pool, built.resolutionRunId, {
+        actorId: "integration-suppression-carry",
+        expectedPreviousResolutionRunId: baseRunId,
+        expectedPreviousPublicationVersion: prefixSuppression.publicationVersion,
+      });
+
+      const replacement = await pool.query<{ id: string }>(
+        "SELECT id FROM resolved_assignments WHERE resolution_run_id = $1 LIMIT 1", [built.resolutionRunId],
+      );
+      await expect(createSuppression(pool, {
+        target: { assignmentId: replacement.rows[0]!.id }, reasonCode: "duplicate_review",
+        ticketReference: "CARRY-DUPLICATE", actorId: "operator:integration",
+      })).rejects.toMatchObject({ code: "ALREADY_SUPPRESSED" });
+
+      const hidden = await lookupMac(pool, normalizeMac("02AABBCC0001"), "all");
+      expect(hidden.assignment).toBeNull();
+      expect(hidden.curatedMatches).toEqual([]);
+
+      const release = await pool.query<{ id: string }>(`SELECT sr.id FROM source_releases sr
+        JOIN data_sources ds ON ds.id=sr.source_id WHERE ds.slug='demo-curated' LIMIT 1`);
+      identityId = crypto.randomUUID();
+      await pool.query(`INSERT INTO source_records(id,source_release_id,record_kind,record_status,prefix_bits,prefix_length,
+        organization_name_display,claim_value,origin_type,rights_basis,distribution_scope,verification_status,
+        evidence_reference,raw_record_hash,raw_locator)
+        VALUES($1,$2,'organization_identity','eligible',NULL,NULL,'Example Networks Legal',
+        '{"organizationKey":"test:suppressed","scheme":"test","identifier":"SUP-1","aliases":["Suppressed"],"registeredNames":["Example Networks Lab"]}'::jsonb,
+        'imported','owner_created','api_output','reviewed','fixture',$3,'identity:suppressed')`,
+      [identityId, release.rows[0]!.id, sha256(`identity:${identityId}`)]);
+      const organizations = await searchOrganizations(pool, "Suppressed", 10);
+      expect(organizations.results[0]!.assignments).toEqual([]);
+
+      await revokeSuppression(pool, {
+        suppressionId: exactSuppressionId, ticketReference: "CARRY-EXACT-REVOKE", actorId: "operator:integration",
+      });
+      exactSuppressionId = undefined;
+      await revokeSuppression(pool, {
+        suppressionId: prefixSuppressionId, ticketReference: "CARRY-PREFIX-REVOKE", actorId: "operator:integration",
+      });
+      prefixSuppressionId = undefined;
+      const restored = await lookupMac(pool, normalizeMac("02AABBCC0001"), "all");
+      expect(restored.assignment?.organizationName).toBe("Example Networks Lab");
+      expect(restored.curatedMatches).toHaveLength(1);
+    } finally {
+      if (identityId) await pool.query("DELETE FROM source_records WHERE id = $1", [identityId]);
+      for (const suppressionId of [exactSuppressionId, prefixSuppressionId]) {
+        if (suppressionId) await revokeSuppression(pool, {
+          suppressionId, ticketReference: "CARRY-CLEANUP", actorId: "operator:integration",
+        }).catch(() => undefined);
+      }
+      const active = await pool.query<{ resolution_run_id: string; publication_version: string }>(
+        "SELECT resolution_run_id, publication_version FROM active_resolution WHERE singleton_id = 1",
+      );
+      if (active.rows[0]!.resolution_run_id !== baseRunId) {
+        await activateResolution(pool, baseRunId, {
+          actorId: "integration-suppression-restore", rollback: true,
+          expectedPreviousResolutionRunId: active.rows[0]!.resolution_run_id,
+          expectedPreviousPublicationVersion: Number(active.rows[0]!.publication_version),
+        });
+      }
+    }
+  });
+
   it("builds idempotently, activates atomically, and rolls back to the previous run", async () => {
     const original = await pool.query<{ resolution_run_id: string; version: string; publication_version: string }>(
       "SELECT resolution_run_id, version, publication_version FROM active_resolution WHERE singleton_id = 1",
@@ -851,6 +1003,37 @@ describe("resolution publication lifecycle", () => {
       if (active.rows[0]!.resolution_run_id !== baseResolutionRunId) {
         await activateResolution(pool, baseResolutionRunId, { actorId: "integration-restore", rollback: true });
       }
+    }
+  });
+
+  it("rejects activation when only the publication overlay changed", async () => {
+    const original = await pool.query<{ resolution_run_id: string; publication_version: string }>(
+      "SELECT resolution_run_id, publication_version FROM active_resolution WHERE singleton_id = 1",
+    );
+    const releases = await pool.query<{ source_release_id: string }>(
+      "SELECT source_release_id FROM resolution_inputs WHERE resolution_run_id = $1 ORDER BY source_release_id",
+      [original.rows[0]!.resolution_run_id],
+    );
+    const built = await buildResolution(pool, {
+      sourceReleaseIds: releases.rows.map((row) => row.source_release_id),
+      policyVersion: `publication-cas-${crypto.randomUUID()}`,
+      policyCommitSha: "integration-publication-cas",
+      containerImageDigest: "sha256:integration-publication-cas",
+      now: new Date("2026-07-14T02:00:00.000Z"),
+    });
+    await pool.query("UPDATE active_resolution SET publication_version = publication_version + 1");
+    try {
+      await expect(activateResolution(pool, built.resolutionRunId, {
+        actorId: "integration-publication-cas",
+        expectedPreviousResolutionRunId: original.rows[0]!.resolution_run_id,
+        expectedPreviousPublicationVersion: Number(original.rows[0]!.publication_version),
+      })).rejects.toMatchObject({ code: "ACTIVE_PUBLICATION_CHANGED" });
+      await expect(pool.query("SELECT status FROM resolution_runs WHERE id = $1", [built.resolutionRunId]))
+        .resolves.toMatchObject({ rows: [{ status: "validated" }] });
+    } finally {
+      await pool.query("UPDATE active_resolution SET publication_version = $1 WHERE singleton_id = 1", [
+        original.rows[0]!.publication_version,
+      ]);
     }
   });
 });

@@ -4,6 +4,7 @@ export const SOURCE_PUBLICATION_LOCK = 6_104_227_008;
 
 export interface ActiveSourceInputSnapshot {
   baseResolutionRunId: string;
+  basePublicationVersion: number;
   retainedSourceReleaseIds: string[];
 }
 
@@ -11,8 +12,8 @@ export async function readActiveSourceInputSnapshot(
   client: PoolClient,
   excludedSlugs: string[],
 ): Promise<ActiveSourceInputSnapshot> {
-  const active = await client.query<{ resolution_run_id: string }>(
-    "SELECT resolution_run_id FROM active_resolution WHERE singleton_id = 1",
+  const active = await client.query<{ resolution_run_id: string; publication_version: string }>(
+    "SELECT resolution_run_id, publication_version FROM active_resolution WHERE singleton_id = 1",
   );
   const baseResolutionRunId = active.rows[0]?.resolution_run_id;
   if (!baseResolutionRunId) throw new Error("active resolution is unavailable");
@@ -30,6 +31,7 @@ export async function readActiveSourceInputSnapshot(
 
   return {
     baseResolutionRunId,
+    basePublicationVersion: Number(active.rows[0]!.publication_version),
     retainedSourceReleaseIds: retained.rows.map((row) => row.source_release_id),
   };
 }

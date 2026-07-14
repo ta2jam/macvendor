@@ -12,6 +12,7 @@ interface Bucket {
 
 declare global {
   var __macvendorRateBuckets: Map<string, Bucket> | undefined;
+  var __macvendorRateLimitHealth: RateLimitRuntimeHealth | undefined;
 }
 
 const RATE = 5;
@@ -20,6 +21,67 @@ const MAX_LOCAL_BUCKETS = 10_000;
 const LOCAL_BUCKET_PRUNE_TARGET = 9_000;
 const buckets = globalThis.__macvendorRateBuckets ?? new Map<string, Bucket>();
 globalThis.__macvendorRateBuckets = buckets;
+
+interface RateLimitRuntimeHealth {
+  status: "unknown" | "healthy" | "degraded";
+  consecutiveFailures: number;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+}
+
+export interface RateLimitHealth {
+  backend: "disabled" | "local" | "postgres";
+  status: "disabled" | "local" | "unknown" | "healthy" | "degraded";
+  consecutiveFailures: number;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+}
+
+const runtimeHealth = globalThis.__macvendorRateLimitHealth ?? {
+  status: "unknown" as const,
+  consecutiveFailures: 0,
+  lastSuccessAt: null,
+  lastFailureAt: null,
+};
+globalThis.__macvendorRateLimitHealth = runtimeHealth;
+
+function configuredBackend(): RateLimitHealth["backend"] {
+  if (process.env.RATE_LIMIT_ENABLED === "false" || process.env.NODE_ENV === "test") return "disabled";
+  return process.env.RATE_LIMIT_BACKEND === "postgres" ? "postgres" : "local";
+}
+
+export function getRateLimitHealth(): RateLimitHealth {
+  const backend = configuredBackend();
+  if (backend !== "postgres") {
+    return {
+      backend,
+      status: backend,
+      consecutiveFailures: 0,
+      lastSuccessAt: null,
+      lastFailureAt: null,
+    };
+  }
+  return { backend, ...runtimeHealth };
+}
+
+export function resetRateLimitHealth(): void {
+  runtimeHealth.status = "unknown";
+  runtimeHealth.consecutiveFailures = 0;
+  runtimeHealth.lastSuccessAt = null;
+  runtimeHealth.lastFailureAt = null;
+}
+
+function markPostgresSuccess(): void {
+  runtimeHealth.status = "healthy";
+  runtimeHealth.consecutiveFailures = 0;
+  runtimeHealth.lastSuccessAt = new Date().toISOString();
+}
+
+function markPostgresFailure(): void {
+  runtimeHealth.status = "degraded";
+  runtimeHealth.consecutiveFailures += 1;
+  runtimeHealth.lastFailureAt = new Date().toISOString();
+}
 
 function clientKey(request: NextRequest): string {
   if (process.env.TRUST_PROXY === "true") {
@@ -101,8 +163,10 @@ export async function consumeRateLimit(request: NextRequest, cost = 1, pool?: Po
       [keyHash, windowSeconds, cost, maxCost],
     );
     const row = result.rows[0]!;
+    markPostgresSuccess();
     return { allowed: row.allowed, retryAfter: row.allowed ? 0 : row.retry_after, backend: "postgres" };
   } catch (error) {
+    markPostgresFailure();
     console.error("shared rate limiter unavailable; using local fallback", { error });
     return consumeLocalRateLimit(request, cost);
   }

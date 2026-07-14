@@ -56,10 +56,12 @@ rows.
 
 ```bash
 OPERATOR_ACTOR_ID=operator:alice \
-  npm run resolution:activate -- --run 00000000-0000-0000-0000-000000000003
+  npm run resolution:activate -- --run 00000000-0000-0000-0000-000000000003 \
+    --expected-active-run 00000000-0000-0000-0000-000000000002 --expected-publication-version 7
 
 OPERATOR_ACTOR_ID=operator:alice \
-  npm run resolution:rollback -- --run 00000000-0000-0000-0000-000000000004
+  npm run resolution:rollback -- --run 00000000-0000-0000-0000-000000000004 \
+    --expected-active-run 00000000-0000-0000-0000-000000000003 --expected-publication-version 8
 ```
 
 Normal activation accepts only a `validated` run. Rollback accepts only a

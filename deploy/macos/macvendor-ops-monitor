@@ -18,12 +18,12 @@ notify() {
 }
 
 problems=""
-health=$(curl --fail --silent --show-error --max-time 15 https://macvendor.io/healthz 2>/dev/null || true)
-printf '%s' "$health" | jq -e '.status == "ok" and (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))' >/dev/null 2>&1 \
-  || problems="$problems public-health"
 release=$(curl --fail --silent --show-error --max-time 15 https://macvendor.io/v1/data-release 2>/dev/null || true)
 printf '%s' "$release" | jq -e '.activeVersion > 0 and .publicationVersion > 0 and (.sources | length) > 0' >/dev/null 2>&1 \
   || problems="$problems data-release"
+health=$(curl --fail --silent --show-error --max-time 15 https://macvendor.io/healthz 2>/dev/null || true)
+printf '%s' "$health" | jq -e '.status == "ok" and .controls.rateLimit != "degraded" and (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))' >/dev/null 2>&1 \
+  || problems="$problems public-health"
 backup_success=$(cat "$backup_success_file" 2>/dev/null || true)
 case "$backup_success" in
   ''|*[!0-9]*) problems="$problems offhost-backup:missing" ;;
@@ -68,7 +68,7 @@ else
     [ "$2" -lt 80 ] || problems="$problems disk:$2%"
     [ "$3" -ge 1024 ] || problems="$problems memory:${3}MiB"
     [ "$4" -eq 0 ] || problems="$problems unhealthy-containers:$4"
-    [ "$5" -ge 7 ] || problems="$problems timers:$5"
+    [ "$5" -ge 8 ] || problems="$problems timers:$5"
     [ "$6" -lt 108000 ] || problems="$problems host-backup-age:${6}s"
     [ "$7" -lt 3600 ] || problems="$problems traffic-report-age:${7}s"
     [ "$9" -lt 3000 ] || problems="$problems traffic-peak:${9}/min"

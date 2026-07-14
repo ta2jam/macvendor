@@ -7,8 +7,13 @@ import {
 
 const args = process.argv.slice(2);
 const runIndex = args.indexOf("--run");
-if (runIndex < 0 || !args[runIndex + 1] || args.length !== 2) {
-  console.error("Usage: npm run resolution:activate -- --run UUID");
+const activeIndex = args.indexOf("--expected-active-run");
+const publicationIndex = args.indexOf("--expected-publication-version");
+const publicationVersion = Number(args[publicationIndex + 1]);
+if (runIndex < 0 || activeIndex < 0 || publicationIndex < 0
+  || !args[runIndex + 1] || !args[activeIndex + 1]
+  || !Number.isSafeInteger(publicationVersion) || publicationVersion < 1 || args.length !== 6) {
+  console.error("Usage: npm run resolution:activate -- --run UUID --expected-active-run UUID --expected-publication-version N");
   process.exit(2);
 }
 const url = process.env.DATABASE_URL;
@@ -18,6 +23,8 @@ let committed: Awaited<ReturnType<typeof activateResolution>> | undefined;
 try {
   committed = await activateResolution(pool, args[runIndex + 1]!, {
     actorId: process.env.OPERATOR_ACTOR_ID ?? "cli:resolution-activate",
+    expectedPreviousResolutionRunId: args[activeIndex + 1]!,
+    expectedPreviousPublicationVersion: publicationVersion,
   });
   const cachePurge = committed.status === "already_active"
     ? { status: "skipped", reason: "no_change" }

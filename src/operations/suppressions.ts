@@ -96,11 +96,42 @@ export async function createSuppression(pool: Pool, options: CreateSuppressionOp
       if (!UUID.test(assignmentId)) throw new SuppressionError("INVALID_TARGET", "assignmentId is not a UUID");
       const target = await client.query("SELECT 1 FROM resolved_assignments WHERE id = $1 AND resolution_run_id = $2", [assignmentId, active.runId]);
       if (!target.rowCount) throw new SuppressionError("TARGET_NOT_ACTIVE", "assignment is not part of the active resolution");
+      const duplicate = await client.query(
+        `SELECT 1 FROM publication_suppressions ps
+         JOIN resolved_assignments suppressed ON suppressed.id = ps.resolved_assignment_id
+         JOIN resolved_assignments target ON target.id = $1
+         WHERE ps.status = 'active'
+           AND suppressed.registry = target.registry
+           AND suppressed.prefix_bits = target.prefix_bits
+           AND suppressed.prefix_length = target.prefix_length
+           AND suppressed.core_source_slug = target.core_source_slug
+           AND suppressed.organization_name IS NOT DISTINCT FROM target.organization_name
+           AND suppressed.organization_address IS NOT DISTINCT FROM target.organization_address
+           AND suppressed.is_private = target.is_private
+         LIMIT 1`,
+        [assignmentId],
+      );
+      if (duplicate.rowCount) throw new SuppressionError("ALREADY_SUPPRESSED", "an active suppression already exists for this target");
     } else if (kind === "claim") {
       claimId = (options.target as { claimId: string }).claimId;
       if (!UUID.test(claimId)) throw new SuppressionError("INVALID_TARGET", "claimId is not a UUID");
       const target = await client.query("SELECT 1 FROM resolved_claims WHERE id = $1 AND resolution_run_id = $2", [claimId, active.runId]);
       if (!target.rowCount) throw new SuppressionError("TARGET_NOT_ACTIVE", "claim is not part of the active resolution");
+      const duplicate = await client.query(
+        `SELECT 1 FROM publication_suppressions ps
+         JOIN resolved_claims suppressed ON suppressed.id = ps.resolved_claim_id
+         JOIN resolved_claims target ON target.id = $1
+         WHERE ps.status = 'active'
+           AND suppressed.claim_type = target.claim_type
+           AND suppressed.prefix_bits = target.prefix_bits
+           AND suppressed.prefix_length = target.prefix_length
+           AND suppressed.source_slug = target.source_slug
+           AND suppressed.claim_value = target.claim_value
+           AND suppressed.organization_name IS NOT DISTINCT FROM target.organization_name
+         LIMIT 1`,
+        [claimId],
+      );
+      if (duplicate.rowCount) throw new SuppressionError("ALREADY_SUPPRESSED", "an active suppression already exists for this target");
     } else {
       const target = options.target as Extract<SuppressionTarget, { prefixBits: bigint }>;
       if (!Number.isInteger(target.prefixLength) || target.prefixLength < 1 || target.prefixLength > 48 || target.prefixBits < 0n
@@ -129,7 +160,7 @@ export async function createSuppression(pool: Pool, options: CreateSuppressionOp
           prefix_bits, prefix_length, surface, source_slug, reason_code,
           ticket_reference, created_by, starts_at, expires_at, status
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'active')`,
-        [id, kind === "prefix" ? active.runId : null, assignmentId, claimId, prefixBits,
+        [id, null, assignmentId, claimId, prefixBits,
           prefixLength, surface, sourceSlug, options.reasonCode, options.ticketReference,
           options.actorId, now, options.expiresAt ?? null],
       );

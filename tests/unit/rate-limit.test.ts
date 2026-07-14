@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
 import type { Pool } from "pg";
-import { consumeRateLimit } from "../../src/http/rate-limit";
+import {
+  consumeRateLimit, getRateLimitHealth, resetRateLimitHealth,
+} from "../../src/http/rate-limit";
 
 function request(ip = "203.0.113.10"): NextRequest {
   return { headers: new Headers({ "x-real-ip": ip }) } as NextRequest;
@@ -9,6 +11,7 @@ function request(ip = "203.0.113.10"): NextRequest {
 
 afterEach(() => {
   globalThis.__macvendorRateBuckets?.clear();
+  resetRateLimitHealth();
   vi.unstubAllEnvs();
   delete process.env.RATE_LIMIT_BACKEND;
   delete process.env.RATE_LIMIT_SALT;
@@ -54,6 +57,7 @@ describe("shared rate limiting", () => {
     expect(result).toEqual({ allowed: false, retryAfter: 7, backend: "postgres" });
     expect(query.mock.calls[0]![1][0]).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(JSON.stringify(query.mock.calls)).not.toContain("203.0.113.10");
+    expect(getRateLimitHealth()).toMatchObject({ backend: "postgres", status: "healthy", consecutiveFailures: 0 });
   });
 
   it("falls back locally when PostgreSQL is unavailable", async () => {
@@ -66,7 +70,25 @@ describe("shared rate limiting", () => {
     const result = await consumeRateLimit(request(), 1, { query } as unknown as Pool);
     expect(result.backend).toBe("local");
     expect(result.allowed).toBe(true);
+    expect(getRateLimitHealth()).toMatchObject({ backend: "postgres", status: "degraded", consecutiveFailures: 1 });
     expect(logged).toHaveBeenCalledOnce();
+    logged.mockRestore();
+  });
+
+  it("recovers the degraded control after PostgreSQL succeeds", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    process.env.RATE_LIMIT_ENABLED = "true";
+    process.env.RATE_LIMIT_BACKEND = "postgres";
+    process.env.RATE_LIMIT_SALT = "c".repeat(32);
+    const query = vi.fn()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ rows: [{ allowed: true, retry_after: 0 }] });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await consumeRateLimit(request(), 1, { query } as unknown as Pool);
+    expect(getRateLimitHealth().status).toBe("degraded");
+    await consumeRateLimit(request(), 1, { query } as unknown as Pool);
+    expect(getRateLimitHealth()).toMatchObject({ status: "healthy", consecutiveFailures: 0 });
     logged.mockRestore();
   });
 });

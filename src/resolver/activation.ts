@@ -18,7 +18,12 @@ export interface ActivationResult {
 export async function activateResolution(
   pool: Pool,
   runId: string,
-  options: { actorId: string; rollback?: boolean; expectedPreviousResolutionRunId?: string | null },
+  options: {
+    actorId: string;
+    rollback?: boolean;
+    expectedPreviousResolutionRunId?: string | null;
+    expectedPreviousPublicationVersion?: number | null;
+  },
 ): Promise<ActivationResult> {
   const client = await pool.connect();
   try {
@@ -63,11 +68,19 @@ export async function activateResolution(
       "SELECT resolution_run_id, version, publication_version FROM active_resolution WHERE singleton_id = 1 FOR UPDATE",
     );
     const previousResolutionRunId = pointer.rows[0]?.resolution_run_id ?? null;
+    const previousPublicationVersion = pointer.rows[0] ? Number(pointer.rows[0].publication_version) : null;
     if (options.expectedPreviousResolutionRunId !== undefined
       && previousResolutionRunId !== options.expectedPreviousResolutionRunId) {
       throw new ActivationError(
         "ACTIVE_RESOLUTION_CHANGED",
         "active resolution changed after the source inputs were selected",
+      );
+    }
+    if (options.expectedPreviousPublicationVersion !== undefined
+      && previousPublicationVersion !== options.expectedPreviousPublicationVersion) {
+      throw new ActivationError(
+        "ACTIVE_PUBLICATION_CHANGED",
+        "active publication changed after the source inputs were selected",
       );
     }
     if (pointer.rows[0]) {

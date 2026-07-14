@@ -1,6 +1,9 @@
 import type { Pool } from "pg";
 import { formatPrefix, type NormalizedMac, type Registry } from "@/domain/mac";
 import type { Assignment, CuratedMatch, LookupInsight, LookupResult, ReleaseData } from "@/domain/types";
+import {
+  ACTIVE_SUPPRESSION_SQL, assignmentSuppressionTargetSql, claimSuppressionTargetSql,
+} from "./suppression-match";
 
 export class DataReleaseUnavailableError extends Error {
   constructor() {
@@ -33,12 +36,6 @@ interface LookupRow {
   claim_source_release_id: string | null;
 }
 
-const ACTIVE_SUPPRESSION = `
-  ps.status = 'active'
-  AND ps.starts_at <= now()
-  AND (ps.expires_at IS NULL OR ps.expires_at > now())
-`;
-
 export const LOOKUP_SQL = `
   WITH active AS (
     SELECT ar.resolution_run_id, ar.version, ar.publication_version,
@@ -62,19 +59,8 @@ export const LOOKUP_SQL = `
     WHERE ra.registry <> 'CID'
       AND NOT EXISTS (
         SELECT 1 FROM publication_suppressions ps
-        WHERE ${ACTIVE_SUPPRESSION}
-          AND (
-            ps.resolved_assignment_id = ra.id
-            OR (
-              ps.resolved_assignment_id IS NULL
-              AND ps.resolved_claim_id IS NULL
-              AND (ps.resolution_run_id IS NULL OR ps.resolution_run_id = a.resolution_run_id)
-              AND ps.prefix_bits = ra.prefix_bits
-              AND ps.prefix_length = ra.prefix_length
-              AND ps.surface IN ('official', 'both')
-              AND (ps.source_slug IS NULL OR ps.source_slug = ra.core_source_slug)
-            )
-          )
+        WHERE ${ACTIVE_SUPPRESSION_SQL}
+          AND ${assignmentSuppressionTargetSql("ra", "a")}
       )
     ORDER BY ra.prefix_length DESC
     LIMIT 1
@@ -94,19 +80,8 @@ export const LOOKUP_SQL = `
       AND rc.claim_type = 'curated_vendor_claim'
       AND NOT EXISTS (
         SELECT 1 FROM publication_suppressions ps
-        WHERE ${ACTIVE_SUPPRESSION}
-          AND (
-            ps.resolved_claim_id = rc.id
-            OR (
-              ps.resolved_assignment_id IS NULL
-              AND ps.resolved_claim_id IS NULL
-              AND (ps.resolution_run_id IS NULL OR ps.resolution_run_id = a.resolution_run_id)
-              AND ps.prefix_bits = rc.prefix_bits
-              AND ps.prefix_length = rc.prefix_length
-              AND ps.surface IN ('curated', 'both')
-              AND (ps.source_slug IS NULL OR ps.source_slug = rc.source_slug)
-            )
-          )
+        WHERE ${ACTIVE_SUPPRESSION_SQL}
+          AND ${claimSuppressionTargetSql("rc", "a")}
       )
     ORDER BY rc.prefix_length DESC,
       CASE rc.verification_status
@@ -183,17 +158,8 @@ const INSIGHTS_SQL = `
   WHERE rc.claim_type IN ('vendor_alias', 'device_hint', 'usage_note')
     AND NOT EXISTS (
       SELECT 1 FROM publication_suppressions ps
-      WHERE ${ACTIVE_SUPPRESSION}
-        AND (
-          ps.resolved_claim_id = rc.id
-          OR (
-            ps.resolved_assignment_id IS NULL AND ps.resolved_claim_id IS NULL
-            AND (ps.resolution_run_id IS NULL OR ps.resolution_run_id = a.resolution_run_id)
-            AND ps.prefix_bits = rc.prefix_bits AND ps.prefix_length = rc.prefix_length
-            AND ps.surface IN ('curated', 'both')
-            AND (ps.source_slug IS NULL OR ps.source_slug = rc.source_slug)
-          )
-        )
+      WHERE ${ACTIVE_SUPPRESSION_SQL}
+        AND ${claimSuppressionTargetSql("rc", "a")}
     )
   ORDER BY rc.prefix_length DESC,
     CASE rc.verification_status
@@ -321,17 +287,8 @@ export async function getAssignment(
         WHERE ra.registry = $1 AND ra.prefix_bits = $2 AND ra.prefix_length = $3
           AND NOT EXISTS (
             SELECT 1 FROM publication_suppressions ps
-            WHERE ${ACTIVE_SUPPRESSION}
-              AND (
-                ps.resolved_assignment_id = ra.id
-                OR (
-                  ps.resolved_assignment_id IS NULL AND ps.resolved_claim_id IS NULL
-                  AND (ps.resolution_run_id IS NULL OR ps.resolution_run_id = a.resolution_run_id)
-                  AND ps.prefix_bits = ra.prefix_bits AND ps.prefix_length = ra.prefix_length
-                  AND ps.surface IN ('official', 'both')
-                  AND (ps.source_slug IS NULL OR ps.source_slug = ra.core_source_slug)
-                )
-              )
+            WHERE ${ACTIVE_SUPPRESSION_SQL}
+              AND ${assignmentSuppressionTargetSql("ra", "a")}
           )
       )
       SELECT a.resolution_run_id, a.version AS active_version, a.publication_version,

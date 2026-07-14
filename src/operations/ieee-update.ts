@@ -155,6 +155,7 @@ export async function updateIeeeSources(pool: Pool, options: UpdateIeeeOptions) 
     const activation = await activateResolution(pool, build.resolutionRunId, {
       actorId: options.actorId,
       expectedPreviousResolutionRunId: inputSnapshot.baseResolutionRunId,
+      expectedPreviousPublicationVersion: inputSnapshot.basePublicationVersion,
     });
     let cachePurge;
     try {
