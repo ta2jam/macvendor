@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.5.7 — 2026-07-14
+
+- Fixed a lost-update race where overlapping IEEE, enrichment, and atomic
+  source jobs could each build from the same active release and the later
+  activation could silently revert the newer job's source inputs.
+- All automated source publication paths now share one session-level lock and
+  retain inputs from an explicit base resolution snapshot.
+- Activation now supports an atomic compare-and-swap guard under the
+  publication lock; a stale candidate remains validated and fails with
+  `ACTIVE_RESOLUTION_CHANGED` instead of replacing the active pointer.
+- Added PostgreSQL regression coverage for cross-job serialization and stale
+  activation rejection.
+
 ## 0.5.6 — 2026-07-14
 
 - Added bounded retired-resolution garbage collection after a production audit

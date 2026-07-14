@@ -3,7 +3,7 @@
 This roadmap is directional, not a promise. Security, data rights, privacy, and
 correctness gates can delay or reject a feature.
 
-## Current — 0.5.6 bounded public operations
+## Current — 0.5.7 concurrency-safe publication
 
 The current release publishes governed IEEE assignments, separately labelled
 MAC context, and reviewed organization identities. Production releases must be tagged from a
@@ -23,6 +23,8 @@ and accountable correction intake are PostgreSQL-backed.
 - [x] authoritative conflict rejection and independent curated claims;
 - [x] idempotent, concurrency-locked builds;
 - [x] guarded atomic activation and rollback commands.
+- [x] one shared automated-publication lock, base-resolution input snapshots,
+  and compare-and-swap activation that rejects stale source builds.
 - [x] OpenAPI 3.1 and JSON Schema response contracts;
 - [x] runtime response-drift tests;
 - [x] audited create, revoke, list, and expire suppression commands;

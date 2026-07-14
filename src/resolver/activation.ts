@@ -18,7 +18,7 @@ export interface ActivationResult {
 export async function activateResolution(
   pool: Pool,
   runId: string,
-  options: { actorId: string; rollback?: boolean },
+  options: { actorId: string; rollback?: boolean; expectedPreviousResolutionRunId?: string | null },
 ): Promise<ActivationResult> {
   const client = await pool.connect();
   try {
@@ -62,6 +62,14 @@ export async function activateResolution(
     const pointer = await client.query<{ resolution_run_id: string; version: string; publication_version: string }>(
       "SELECT resolution_run_id, version, publication_version FROM active_resolution WHERE singleton_id = 1 FOR UPDATE",
     );
+    const previousResolutionRunId = pointer.rows[0]?.resolution_run_id ?? null;
+    if (options.expectedPreviousResolutionRunId !== undefined
+      && previousResolutionRunId !== options.expectedPreviousResolutionRunId) {
+      throw new ActivationError(
+        "ACTIVE_RESOLUTION_CHANGED",
+        "active resolution changed after the source inputs were selected",
+      );
+    }
     if (pointer.rows[0]) {
       await client.query("UPDATE resolution_runs SET status = 'retired' WHERE id = $1", [pointer.rows[0].resolution_run_id]);
       await client.query("UPDATE resolution_runs SET status = 'active', activated_at = now() WHERE id = $1", [runId]);
@@ -87,7 +95,7 @@ export async function activateResolution(
       `INSERT INTO audit_events (event_type, actor_id, target_type, target_id, metadata)
        VALUES ($1, $2, 'resolution_run', $3, $4)`,
       [options.rollback ? "resolution.rolled_back" : "resolution.activated", options.actorId,
-        runId, JSON.stringify({ previousRunId: pointer.rows[0]?.resolution_run_id ?? null,
+        runId, JSON.stringify({ previousRunId: previousResolutionRunId,
           activeVersion: Number(updated.rows[0]!.version), publicationVersion: Number(updated.rows[0]!.publication_version) })],
     );
     await client.query("COMMIT");
@@ -96,7 +104,7 @@ export async function activateResolution(
       resolutionRunId: runId,
       activeVersion: Number(updated.rows[0]!.version),
       publicationVersion: Number(updated.rows[0]!.publication_version),
-      previousResolutionRunId: pointer.rows[0]?.resolution_run_id ?? null,
+      previousResolutionRunId,
     };
   } catch (error) {
     await client.query("ROLLBACK");

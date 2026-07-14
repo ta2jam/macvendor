@@ -35,6 +35,7 @@ import { sourceValueReport } from "../../src/operations/source-value";
 import { updateAllSources } from "../../src/operations/source-update";
 import { OPTIONS as bulkOptionsRoute, POST as bulkLookupRoute } from "../../src/app/v1/lookups/route";
 import { pruneRetiredResolutions } from "../../src/operations/resolution-retention";
+import { SOURCE_PUBLICATION_LOCK } from "../../src/operations/source-publication";
 
 config({ path: ".env.local", quiet: true });
 
@@ -101,6 +102,27 @@ describe("bounded bulk and release operations", () => {
       .rejects.toThrow("injected preparation failure");
     const after=await pool.query("SELECT * FROM active_resolution WHERE singleton_id=1");
     expect(after.rows).toEqual(before.rows);
+  });
+
+  it("serializes every automated source publication path under one lock", async () => {
+    const lock = await pool.connect();
+    try {
+      await lock.query("SELECT pg_advisory_lock($1)", [SOURCE_PUBLICATION_LOCK]);
+      const allPrepare = async () => { throw new Error("all-source preparation must not run"); };
+      const ieeePrepare = async () => { throw new Error("IEEE preparation must not run"); };
+      await expect(updateAllSources(pool, {
+        ieeeOutput: "/tmp/unused-ieee", enrichmentOutput: "/tmp/unused-enrichment",
+        privateKeyPath: "/tmp/unused-key", policyVersion: "test", policyCommitSha: "test",
+        containerImageDigest: "test", actorId: "operator:integration", prepareIeee: allPrepare,
+      })).resolves.toEqual({ status: "already_running" });
+      await expect(updateIeeeSources(pool, {
+        policyVersion: "test", policyCommitSha: "test", containerImageDigest: "test",
+        actorId: "operator:integration", prepare: ieeePrepare,
+      })).resolves.toEqual({ status: "already_running" });
+    } finally {
+      await lock.query("SELECT pg_advisory_unlock($1)", [SOURCE_PUBLICATION_LOCK]);
+      lock.release();
+    }
   });
 });
 
@@ -739,6 +761,52 @@ describe("resolution publication lifecycle", () => {
       await pool.query("UPDATE data_sources SET config_version = config_version - 1 WHERE slug = 'demo-authoritative'");
     }
   });
+
+  it("rejects a stale candidate instead of reverting a newer publication", async () => {
+    const original = await pool.query<{ resolution_run_id: string }>(
+      "SELECT resolution_run_id FROM active_resolution WHERE singleton_id = 1",
+    );
+    const baseResolutionRunId = original.rows[0]!.resolution_run_id;
+    const releases = await pool.query<{ source_release_id: string }>(
+      "SELECT source_release_id FROM resolution_inputs WHERE resolution_run_id = $1 ORDER BY source_release_id",
+      [baseResolutionRunId],
+    );
+    const common = {
+      sourceReleaseIds: releases.rows.map((row) => row.source_release_id),
+      containerImageDigest: "sha256:integration-stale-publication",
+      now: new Date("2026-07-11T00:00:00.000Z"),
+    };
+    const newer = await buildResolution(pool, {
+      ...common, policyVersion: "stale-publication-a", policyCommitSha: "stale-publication-a",
+    });
+    const stale = await buildResolution(pool, {
+      ...common, policyVersion: "stale-publication-b", policyCommitSha: "stale-publication-b",
+    });
+    expect(newer.status).toBe("validated");
+    expect(stale.status).toBe("validated");
+
+    try {
+      await expect(activateResolution(pool, newer.resolutionRunId, {
+        actorId: "integration-newer-publication",
+        expectedPreviousResolutionRunId: baseResolutionRunId,
+      })).resolves.toMatchObject({ status: "activated", previousResolutionRunId: baseResolutionRunId });
+      await expect(activateResolution(pool, stale.resolutionRunId, {
+        actorId: "integration-stale-publication",
+        expectedPreviousResolutionRunId: baseResolutionRunId,
+      })).rejects.toMatchObject({ code: "ACTIVE_RESOLUTION_CHANGED" });
+      await expect(pool.query("SELECT resolution_run_id FROM active_resolution WHERE singleton_id = 1"))
+        .resolves.toMatchObject({ rows: [{ resolution_run_id: newer.resolutionRunId }] });
+      await expect(pool.query("SELECT status FROM resolution_runs WHERE id = $1", [stale.resolutionRunId]))
+        .resolves.toMatchObject({ rows: [{ status: "validated" }] });
+    } finally {
+      const active = await pool.query<{ resolution_run_id: string }>(
+        "SELECT resolution_run_id FROM active_resolution WHERE singleton_id = 1",
+      );
+      if (active.rows[0]!.resolution_run_id !== baseResolutionRunId) {
+        await activateResolution(pool, baseResolutionRunId, { actorId: "integration-restore", rollback: true });
+      }
+    }
+  });
 });
 
 async function writePreparedIeeeSnapshot(directory: string, preparedAt: string): Promise<PreparedIeeeSnapshot> {
@@ -847,11 +915,11 @@ describe("guarded IEEE update", () => {
 
       const lock = await pool.connect();
       try {
-        await lock.query("SELECT pg_advisory_lock($1)", [6_104_227_006]);
+        await lock.query("SELECT pg_advisory_lock($1)", [SOURCE_PUBLICATION_LOCK]);
         await expect(updateIeeeSources(pool, { ...common, prepare: async () => prepared }))
           .resolves.toEqual({ status: "already_running" });
       } finally {
-        await lock.query("SELECT pg_advisory_unlock($1)", [6_104_227_006]);
+        await lock.query("SELECT pg_advisory_unlock($1)", [SOURCE_PUBLICATION_LOCK]);
         lock.release();
       }
 

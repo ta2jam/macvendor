@@ -8,8 +8,7 @@ import { buildResolution } from "@/resolver/build";
 import { prepareEnrichmentSources } from "@/sources/prepare-enrichments";
 import { prepareIeeeSources } from "@/sources/prepare-ieee";
 import { checkSourceGovernance } from "./source-health";
-
-const ALL_SOURCE_UPDATE_LOCK = 6_104_227_008;
+import { readActiveSourceInputSnapshot, SOURCE_PUBLICATION_LOCK } from "./source-publication";
 
 export interface UpdateAllSourcesOptions {
   ieeeOutput: string;
@@ -47,7 +46,7 @@ export async function updateAllSources(pool: Pool, options: UpdateAllSourcesOpti
   const lock = await pool.connect();
   const acquired = await lock.query<{ acquired: boolean }>(
     "SELECT pg_try_advisory_lock($1) AS acquired",
-    [ALL_SOURCE_UPDATE_LOCK],
+    [SOURCE_PUBLICATION_LOCK],
   );
   if (!acquired.rows[0]?.acquired) {
     lock.release();
@@ -92,17 +91,7 @@ export async function updateAllSources(pool: Pool, options: UpdateAllSourcesOpti
       imports.push({ ...item, ...imported });
     }
 
-    const retained = await lock.query<{ source_release_id: string }>(
-      `SELECT ri.source_release_id
-       FROM active_resolution ar
-       JOIN resolution_inputs ri ON ri.resolution_run_id = ar.resolution_run_id
-       JOIN source_releases sr ON sr.id = ri.source_release_id
-       JOIN data_sources ds ON ds.id = sr.source_id
-       WHERE ar.singleton_id = 1 AND ds.slug <> ALL($1::text[])
-         AND ds.publish_mode = 'production' AND ds.source_class <> 'reference'
-       ORDER BY ds.slug`,
-      [slugs],
-    );
+    const inputSnapshot = await readActiveSourceInputSnapshot(lock, slugs);
 
     await lock.query("BEGIN");
     try {
@@ -133,14 +122,17 @@ export async function updateAllSources(pool: Pool, options: UpdateAllSourcesOpti
     }
 
     const build = await buildResolution(pool, {
-      sourceReleaseIds: [...imports.map((item) => item.sourceReleaseId), ...retained.rows.map((item) => item.source_release_id)],
+      sourceReleaseIds: [...imports.map((item) => item.sourceReleaseId), ...inputSnapshot.retainedSourceReleaseIds],
       policyVersion: options.policyVersion,
       policyCommitSha: options.policyCommitSha,
       containerImageDigest: options.containerImageDigest,
       now: observedAt,
     });
     if (build.status === "rejected") throw new Error("atomic source resolution was rejected");
-    const activation = await activateResolution(pool, build.resolutionRunId, { actorId: options.actorId });
+    const activation = await activateResolution(pool, build.resolutionRunId, {
+      actorId: options.actorId,
+      expectedPreviousResolutionRunId: inputSnapshot.baseResolutionRunId,
+    });
     const purge = options.purge ?? purgeSurrogateKeys;
     let cachePurge;
     try {
@@ -167,14 +159,14 @@ export async function updateAllSources(pool: Pool, options: UpdateAllSourcesOpti
       preparedAt: observedAt.toISOString(),
       prepared: { ieee: ieee.datasets.length, enrichments: enrichments.sources.length },
       imports: imports.map((item) => ({ slug: item.slug, sourceReleaseId: item.sourceReleaseId, recordCount: item.recordCount })),
-      retainedSourceReleases: retained.rows.length,
+      retainedSourceReleases: inputSnapshot.retainedSourceReleaseIds.length,
       build,
       activation,
       cachePurge,
       health: health.summary,
     };
   } finally {
-    await lock.query("SELECT pg_advisory_unlock($1)", [ALL_SOURCE_UPDATE_LOCK]).catch(() => undefined);
+    await lock.query("SELECT pg_advisory_unlock($1)", [SOURCE_PUBLICATION_LOCK]).catch(() => undefined);
     lock.release();
   }
 }

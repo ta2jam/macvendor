@@ -7,7 +7,9 @@ Importer ve resolver aynı repo/build artifact'inden CLI komutlarıdır. Public 
 Her job:
 
 - Import için `(source_id, import_key)`, resolution için `(input_manifest_hash, policy_commit_sha, schema_version)` idempotency anahtarı kullanır.
-- İş türüne göre advisory lock alır: ingest için source-scoped, resolver için tek global build lock, activation için tek global publication lock.
+- İş türüne göre advisory lock alır: ingest için source-scoped, resolver için tek
+  global build lock, tüm otomatik source-publication yolları için tek ortak job
+  lock ve activation için tek global publication lock.
 - Başlangıç/bitiş/audit event yazar.
 - Timeout ve bounded retry uygular.
 - Aynı idempotency anahtarı tamamlanmışsa no-op olur. Artifact byte'larının aynı olması, adapter/normalizer/policy değiştiğinde no-op nedeni değildir.
@@ -53,8 +55,12 @@ OPERATOR_ACTOR_ID=operator:ieee-scheduler npm run source:update:ieee
 
 Komut sabit MA-L/MA-M/MA-S URL'lerini prepare, verify, import, resolve ve activate
 eder; commit sonrası surrogate purge ve source-health kontrolünü çalıştırır.
-Session-level advisory lock nedeniyle çakışan ikinci job `already_running`
-döndürür. Sağlayıcıya özgü scheduler bu repoya gömülü değildir; günlük UTC
+IEEE, enrichment ve birleşik source update aynı session-level advisory lock'ı
+paylaşır; çakışan ikinci job `already_running` döndürür. Her job retained
+input'ları açık bir base resolution'dan seçer ve activation transaction'ı aktif
+pointer'ın hâlâ bu base üzerinde olduğunu compare-and-swap ile doğrular. Başka
+bir yayın arada commit ettiyse stale build `ACTIVE_RESOLUTION_CHANGED` ile durur
+ve aktif pointer'ı değiştirmez. Sağlayıcıya özgü scheduler bu repoya gömülü değildir; günlük UTC
 çalıştırma, jitter, secret injection ve non-zero exit alarmı deployment
 sorumluluğudur.
 
@@ -411,6 +417,7 @@ P1:
 - Constraint/index existence.
 - Evidence/suppression FK ve exactly-one-target constraint'leri.
 - Advisory lock ve concurrent activation.
+- Farklı source job'ları arasında ortak kilit ve stale-base compare-and-swap.
 - Pointer rollback sırasında canlı trafik.
 
 ### Cache/edge

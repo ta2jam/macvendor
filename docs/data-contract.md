@@ -241,11 +241,15 @@ Tek satırlı pointer tablosudur.
 Aktivasyon transaction'ı:
 
 1. Global PostgreSQL advisory lock alır.
-2. `active_resolution` satırını `FOR UPDATE` kilitler.
-3. Run'ın `validated` veya rollback için `retired` olduğunu; input manifest, policy ve output hash bütünlüğünü doğrular.
-4. Eski run'ı `retired`, yeniyi `active` yapar.
-5. Pointer, version ve publication_version'ı günceller.
-6. Audit event yazar ve commit eder.
+2. Aday run'ı kilitler; `validated` veya rollback için `retired` olduğunu ve
+   source config snapshot bütünlüğünü doğrular.
+3. `active_resolution` satırını `FOR UPDATE` kilitler.
+4. Otomatik source job'u bir base resolution bildirdiyse aktif pointer'ın hâlâ
+   aynı run olduğunu doğrular; değişmişse `ACTIVE_RESOLUTION_CHANGED` ile hiçbir
+   pointer/status değişikliği yapmadan rollback eder.
+5. Eski run'ı `retired`, yeniyi `active` yapar.
+6. Pointer, version ve publication_version'ı günceller.
+7. Audit event yazar ve commit eder.
 
 Aynı `resolution_run_id` zaten aktifse tekrar aktivasyon idempotent no-op'tur. Yalnız `output_hash` eşitliği no-op için yeterli değildir: yeni source release veya hak/config snapshot'ı aynı public satırları üretse bile provenance değişmiştir ve yeni active version gerekir.
 

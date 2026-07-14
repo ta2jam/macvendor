@@ -9,6 +9,7 @@ import { checkSourceGovernance } from "../src/operations/source-health";
 import { prepareEnrichmentSources } from "../src/sources/prepare-enrichments";
 import { DATA_RELEASE_SURROGATE_KEY,purgeSurrogateKeys,resolutionSurrogateKey } from "../src/cache/surrogate";
 import { RESOLUTION_POLICY_REVISION,RESOLUTION_POLICY_VERSION } from "../src/resolver/policy";
+import { readActiveSourceInputSnapshot,SOURCE_PUBLICATION_LOCK } from "../src/operations/source-publication";
 
 const values=new Map<string,string>();
 for(let index=0;index<process.argv.slice(2).length;index+=2){
@@ -22,7 +23,7 @@ const pool=getPool();
 const actor=process.env.OPERATOR_ACTOR_ID??"cli:enrichment-update";
 const lock=await pool.connect();
 try{
-  const acquired=await lock.query<{acquired:boolean}>("SELECT pg_try_advisory_lock(6104227007) AS acquired");
+  const acquired=await lock.query<{acquired:boolean}>("SELECT pg_try_advisory_lock($1) AS acquired",[SOURCE_PUBLICATION_LOCK]);
   if(!acquired.rows[0]?.acquired){console.log(JSON.stringify({status:"already_running"}));process.exit(0);}
   const prepared=await prepareEnrichmentSources({ieeeDirectory:path.resolve(ieeeDirectory),
     output:values.get("--output")?path.resolve(values.get("--output")!):undefined,
@@ -36,10 +37,7 @@ try{
     imports.push({...imported,slug:source.slug,manifestPath:source.manifestPath});
   }
   const slugs=imports.map((item)=>item.slug);
-  const retained=await lock.query<{source_release_id:string}>(`SELECT ri.source_release_id FROM active_resolution ar
-    JOIN resolution_inputs ri ON ri.resolution_run_id=ar.resolution_run_id JOIN source_releases sr ON sr.id=ri.source_release_id
-    JOIN data_sources ds ON ds.id=sr.source_id WHERE ar.singleton_id=1 AND ds.slug<>ALL($1::text[])
-      AND ds.publish_mode='production' AND ds.source_class<>'reference' ORDER BY ds.slug`,[slugs]);
+  const inputSnapshot=await readActiveSourceInputSnapshot(lock,slugs);
   const observedAt=new Date(prepared.preparedAt);
   await lock.query("BEGIN");
   try{
@@ -52,16 +50,17 @@ try{
     }
     await lock.query("COMMIT");
   }catch(error){await lock.query("ROLLBACK");throw error;}
-  const build=await buildResolution(pool,{sourceReleaseIds:[...imports.map((item)=>item.sourceReleaseId),...retained.rows.map((row)=>row.source_release_id)],
+  const build=await buildResolution(pool,{sourceReleaseIds:[...imports.map((item)=>item.sourceReleaseId),...inputSnapshot.retainedSourceReleaseIds],
     policyVersion:RESOLUTION_POLICY_VERSION,policyCommitSha:RESOLUTION_POLICY_REVISION,
     containerImageDigest:process.env.BUILD_IMAGE_DIGEST??"local",now:observedAt});
   if(build.status==="rejected")throw new Error("enrichment resolution was rejected");
-  const activation=await activateResolution(pool,build.resolutionRunId,{actorId:actor});
+  const activation=await activateResolution(pool,build.resolutionRunId,{actorId:actor,
+    expectedPreviousResolutionRunId:inputSnapshot.baseResolutionRunId});
   const cachePurge=activation.status==="already_active"?{status:"skipped",reason:"no_change"}:await purgeSurrogateKeys([
     ...(activation.previousResolutionRunId?[resolutionSurrogateKey(activation.previousResolutionRunId)]:[]),DATA_RELEASE_SURROGATE_KEY]);
   const health=await checkSourceGovernance(pool);
   if(!health.healthy)throw new Error("source governance is unhealthy after enrichment activation");
   console.log(JSON.stringify({status:"updated",prepared,imports,build,activation,cachePurge,health:health.summary},null,2));
 }finally{
-  await lock.query("SELECT pg_advisory_unlock(6104227007)").catch(()=>undefined);lock.release();await pool.end();
+  await lock.query("SELECT pg_advisory_unlock($1)",[SOURCE_PUBLICATION_LOCK]).catch(()=>undefined);lock.release();await pool.end();
 }
