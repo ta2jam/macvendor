@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.7.3 — 2026-07-14
+
+- Made conditional GETs recognize and preserve Caddy's weak gzip, zstd, and
+  Brotli validator variants. Public `If-None-Match` now returns 304 through the
+  compression proxy with the same client-visible ETag.
+- Corrected the API guide, README, OpenAPI, and binding contract to describe
+  ETags as opaque representation validators instead of promising a strong tag
+  after transport compression.
+
 ## 0.7.2 — 2026-07-14
 
 - Increased both clickable application-version labels to WCAG 2.2 target size

@@ -26,12 +26,26 @@ export function publicApiHeaders(id: string): Headers {
   return new Headers(commonHeaders(id));
 }
 
-function matchesIfNoneMatch(header: string | null, etag: string): boolean {
-  if (!header) return false;
-  return header.split(",").some((candidate) => {
+function validatorIdentity(value: string): string | null {
+  const weak = value.startsWith("W/");
+  const tag = weak ? value.slice(2) : value;
+  const quoted = /^"([^"]*)"$/u.exec(tag);
+  if (!quoted) return null;
+  // Caddy's encode handler derives weak validators for compressed variants by
+  // adding the content-coding suffix. If-None-Match on GET uses weak
+  // comparison, so the encoded and identity representations share semantics.
+  return weak ? quoted[1].replace(/-(?:br|gzip|zstd)$/u, "") : quoted[1];
+}
+
+function matchingIfNoneMatch(header: string | null, etag: string): string | null {
+  if (!header) return null;
+  const expected = validatorIdentity(etag);
+  for (const candidate of header.split(",")) {
     const value = candidate.trim();
-    return value === "*" || value === etag || value.replace(/^W\//u, "") === etag;
-  });
+    if (value === "*") return etag;
+    if (expected !== null && validatorIdentity(value) === expected) return value;
+  }
+  return null;
 }
 
 export function problemResponse(args: {
@@ -89,7 +103,9 @@ export function jsonResponse(
     headers.set("Cache-Tag", keys.join(","));
   }
 
-  if (matchesIfNoneMatch(request.headers.get("if-none-match"), etag)) {
+  const matchingValidator = matchingIfNoneMatch(request.headers.get("if-none-match"), etag);
+  if (matchingValidator) {
+    headers.set("ETag", matchingValidator);
     headers.delete("Content-Type");
     return new Response(null, { status: 304, headers });
   }

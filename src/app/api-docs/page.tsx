@@ -176,14 +176,14 @@ export default function ApiDocsPage() {
           <table className="api-error-table">
             <thead><tr><th scope="col">Response</th><th scope="col">Cache-Control</th><th scope="col">ETag</th></tr></thead>
             <tbody>
-              <tr><th scope="row">Matched lookup</th><td><code>public, max-age=60, s-maxage=300, stale-while-revalidate=60</code></td><td>Strong</td></tr>
-              <tr><th scope="row">No match</th><td><code>public, max-age=30, s-maxage=60</code></td><td>Strong</td></tr>
+              <tr><th scope="row">Matched lookup</th><td><code>public, max-age=60, s-maxage=300, stale-while-revalidate=60</code></td><td>Opaque validator</td></tr>
+              <tr><th scope="row">No match</th><td><code>public, max-age=30, s-maxage=60</code></td><td>Opaque validator</td></tr>
               <tr><th scope="row">Bulk, evidence, correction, error</th><td><code>private, no-store</code></td><td>None</td></tr>
               <tr><th scope="row">Canonical redirect</th><td><code>public, max-age=300</code></td><td>None</td></tr>
             </tbody>
           </table>
         </div>
-        <div className="callout">Send <code>If-None-Match</code> on repeated GETs. A matching validator returns HTTP 304 with the same ETag, cache policy, and version headers.</div>
+        <div className="callout">Send <code>If-None-Match</code> on repeated GETs and treat ETags as opaque. Compression may expose a weak encoded variant. A matching validator returns HTTP 304 with the same ETag, cache policy, and version headers.</div>
       </section>
 
       <section className="api-section" aria-labelledby="errors-heading">

@@ -196,7 +196,7 @@ correction işlemleri 5 unit harcar. Limit aşımında `429` ve saniye cinsinden
 
 - Başarılı pozitif eşleşme: `Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=60`
 - Geçerli fakat eşleşmesiz sorgu: `Cache-Control: public, max-age=30, s-maxage=60`
-- ETag: seçilen aktif sürüm, canonical sorgu ve yanıt varyantından deterministik üretilir.
+- ETag: seçilen aktif sürüm, canonical sorgu ve yanıt varyantından deterministik üretilen opaque validator'dır. İstemci değeri parse etmez; HTTP compression katmanı weak encoded varyant sunabilir.
 - Eşleşen `If-None-Match`, body olmadan `304` döndürür ve aynı ETag, Cache-Control ile sürüm header'larını korur.
 - Bulk, evidence, correction ve bütün problem yanıtları `private, no-store` kullanır ve ETag taşımaz.
 - Canonical `308` redirect `public, max-age=300` kullanır ve ETag taşımaz.

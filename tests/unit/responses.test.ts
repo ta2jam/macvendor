@@ -25,6 +25,18 @@ describe("conditional JSON responses", () => {
     expect(response("*").status).toBe(304);
   });
 
+  it("recognizes and preserves weak validators derived by proxy compression", () => {
+    const etag = response().headers.get("etag")!;
+    const opaque = etag.slice(1, -1);
+    for (const coding of ["gzip", "zstd", "br"]) {
+      const encoded = `W/"${opaque}-${coding}"`;
+      const cached = response(encoded);
+      expect(cached.status).toBe(304);
+      expect(cached.headers.get("etag")).toBe(encoded);
+    }
+    expect(response(`W/"${opaque}-deflate"`).status).toBe(200);
+  });
+
   it("returns the representation when no validator matches", () => {
     expect(response('"unrelated"').status).toBe(200);
   });

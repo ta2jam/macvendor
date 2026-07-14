@@ -107,8 +107,9 @@ The machine-readable contracts are published by the service:
 - Use `ETag` and `If-None-Match` for repeated GET requests instead of polling
   full responses unnecessarily.
 - Read `X-API-Version`, `X-App-Version`, and `X-Request-Id` on every v1 response.
-  Cacheable GET responses have a strong `ETag`; bulk, evidence, corrections,
-  and errors use `private, no-store` without an ETag.
+  Cacheable GET responses have an opaque `ETag` validator; compression proxies
+  may expose its weak encoded variant. Bulk, evidence, corrections, and errors
+  use `private, no-store` without an ETag.
 - Keep bulk requests at or below 100 official or 50 enriched addresses. The
   standard quota is 50 cost units per client IP per fixed 10-second window;
   official bulk costs one unit per two entries rounded up and enriched bulk

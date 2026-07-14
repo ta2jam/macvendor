@@ -139,7 +139,7 @@
       "ApiVersion": { "description": "Stable public API contract version", "schema": { "type": "string", "const": "v1" } },
       "AppVersion": { "description": "Deployed application SemVer", "schema": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" } },
       "CacheControl": { "description": "Representation cache policy", "schema": { "type": "string" } },
-      "ETag": { "description": "Strong representation validator for cacheable GET responses", "schema": { "type": "string" } },
+      "ETag": { "description": "Opaque representation validator for cacheable GET responses; compression proxies may expose a weak encoded variant", "schema": { "type": "string" } },
       "Location": { "description": "Canonical URL", "schema": { "type": "string", "format": "uri" } },
       "RetryAfter": { "description": "Seconds before retry", "schema": { "type": "integer", "minimum": 1 } }
     },
