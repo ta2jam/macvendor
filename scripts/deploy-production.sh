@@ -111,11 +111,11 @@ until [ "$(docker inspect macvendor-app-1 --format '{{.State.Health.Status}}' 2>
 done
 test "$(docker inspect macvendor-app-1 --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$sha"
 systemctl start macvendor-backup.service
-/usr/local/sbin/macvendor-image-retention
 
 promoting=0
 rm -f "$previous_env"
 trap - EXIT HUP INT TERM
+/usr/local/sbin/macvendor-image-retention
 REMOTE
 
 DEPLOY_HOST="$DEPLOY_HOST" PRODUCTION_ORIGIN="$origin" DEPLOY_IDENTITY="$identity" \

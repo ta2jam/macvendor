@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-root=/srv/sites/macvendor
-current=$(basename "$(readlink -f "$root/app")")
+root=${MACVENDOR_ROOT:-/srv/sites/macvendor}
+current=$(basename "$(dirname "$(readlink -f "$root/app")")")
 current=${current#v}
 previous=$(find "$root/releases" -mindepth 1 -maxdepth 1 -type d -name 'v*' -printf '%f\n' \
   | sed 's/^v//' | sort -V | awk -v current="$current" '$0 != current { previous=$0 } END { print previous }')
