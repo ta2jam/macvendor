@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.7.2 — 2026-07-14
+
+- Increased both clickable application-version labels to WCAG 2.2 target size
+  after the Linux mobile-browser gate detected the compact homepage label as a
+  serious accessibility violation.
+
 ## 0.7.1 — 2026-07-14
 
 - Made the container smoke environment use the same shared PostgreSQL rate
