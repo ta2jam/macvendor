@@ -4,6 +4,12 @@ set -eu
 : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
 : "${STAGING_DATABASE_URL:?STAGING_DATABASE_URL is required}"
 
+# Staging runs the same shared limiter topology as production. The default is
+# derived from the disposable database password and never reused outside this
+# short-lived Compose stack.
+STAGING_RATE_LIMIT_SALT=${STAGING_RATE_LIMIT_SALT:-"staging-${POSTGRES_PASSWORD}-rate-limit-salt"}
+export STAGING_RATE_LIMIT_SALT
+
 compose_file=${COMPOSE_FILE:-compose.staging.yaml}
 app_port=${APP_PORT:-3000}
 

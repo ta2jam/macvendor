@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.7.1 — 2026-07-14
+
+- Made the container smoke environment use the same shared PostgreSQL rate
+  limiter topology required by production readiness. The staging salt is
+  derived from its disposable database credential and is not a production
+  secret.
+
 ## 0.7.0 — 2026-07-14
 
 - Made the public lookup contract explicitly deterministic: active IEEE
