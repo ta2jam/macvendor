@@ -1,7 +1,7 @@
 # macvendor.io — sürdürülebilir V1 mimarisi
 
 Tarih: 15 Temmuz 2026
-Durum: v0.7.4 production gerçekliğiyle eşitlenmiş bağlayıcı mimari
+Durum: v0.7.x production gerçekliğiyle eşitlenmiş bağlayıcı mimari
 
 ## Ürün sınırı
 

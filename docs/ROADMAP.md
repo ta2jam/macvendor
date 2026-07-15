@@ -3,7 +3,7 @@
 This roadmap records current production truth and evidence gates. It is not a
 feature wish list.
 
-## Current — 0.7.4 observation release
+## Current — 0.7.x observation line
 
 The modular monolith serves governed IEEE assignments and separately labelled
 enrichment through the web interface and versioned API. Production uses

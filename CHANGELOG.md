@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.7.7 — 2026-07-15
+
+- Removed patch-specific active-version wording from the binding architecture
+  and roadmap headers. The v0.7.5/v0.7.6 emergency monitor fixes had made the
+  newly reconciled `0.7.4` headings stale immediately; the durable `0.7.x`
+  observation-line wording prevents the same documentation drift on later fixes.
+
 ## 0.7.6 — 2026-07-15
 
 - Added the missing pinned repository checkout to the external Production
