@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.7.6 — 2026-07-15
+
+- Added the missing pinned repository checkout to the external Production
+  Monitor job. The v0.7.5 live run proved that the tested header helper was not
+  available in a workflow that previously contained only inline commands.
+- This is a second P1 observation-window exception. Application/API behavior
+  remains unchanged; the correction restores the mandatory external monitor.
+
 ## 0.7.5 — 2026-07-15
 
 - Fixed the external production monitor's Cloudflare/API header gate on Linux.
