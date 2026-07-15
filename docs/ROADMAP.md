@@ -1,127 +1,74 @@
 # macvendor technical roadmap
 
-This roadmap is directional, not a promise. Security, data rights, privacy, and
-correctness gates can delay or reject a feature.
+This roadmap records current production truth and evidence gates. It is not a
+feature wish list.
 
-## Current — 0.5.8 concurrency-safe publication
+## Current — 0.7.4 observation release
 
-The current release publishes governed IEEE assignments, separately labelled
-MAC context, and reviewed organization identities. Production releases must be tagged from a
-commit reachable from `main` and pass the release gate. Shared rate limiting
-and accountable correction intake are PostgreSQL-backed.
+The modular monolith serves governed IEEE assignments and separately labelled
+enrichment through the web interface and versioned API. Production uses
+PostgreSQL, Caddy, Cloudflare's free transport proxy, shared origin rate
+limiting, immutable data releases, encrypted correction intake, scheduled
+source publication, backups, restore drills, and external monitoring.
 
-- [x] strict EUI-48 normalization;
-- [x] authoritative and curated layers kept separate;
-- [x] immutable source/release/resolution schema;
-- [x] active release pointer and suppression overlay;
-- [x] web UI and versioned API;
-- [x] synthetic local seed;
-- [x] unit, PostgreSQL integration, build, and HTTP smoke coverage;
-- [x] CI, issue templates, contribution, security, and release policy.
-- [x] offline manifest-driven CSV/TSV/JSONL source-release importer;
-- [x] deterministic input manifests and semantic output hashes;
-- [x] authoritative conflict rejection and independent curated claims;
-- [x] idempotent, concurrency-locked builds;
-- [x] guarded atomic activation and rollback commands.
-- [x] one shared automated-publication lock, base-resolution input snapshots,
-  and compare-and-swap activation that rejects stale source builds.
-- [x] OpenAPI 3.1 and JSON Schema response contracts;
-- [x] runtime response-drift tests;
-- [x] audited create, revoke, list, and expire suppression commands;
-- [x] provider-neutral non-root staging image and container smoke workflow.
-- [x] isolated allowlisted HTTPS fetch and DNS/IP SSRF controls;
-- [x] Ed25519 artifact authenticity verification;
-- [x] full-snapshot completeness, duplicate, and release-diff gates.
-- [x] snapshot-consistent logical backup with checksum manifest;
-- [x] guarded disposable-database restore and integrity verification;
-- [x] zero-from-artifact migration/import/resolution rebuild drill.
-- [x] WCAG A/AA-oriented axe gate across Chromium, Firefox, WebKit, and a
-  320 px mobile viewport;
-- [x] skip link, visible focus, async status/error semantics, mobile navigation,
-  and measured text contrast fixes;
-- [x] public data-use/attribution terms and correction/takedown process pages;
-- [x] runtime-validated correction email with an explicit unavailable state;
+The implemented contract includes:
 
-## Next — production-data readiness
+- exact 36 -> 28 -> 24-bit authoritative longest-prefix matching;
+- explicit `matched` and `no_match` results;
+- official and enriched single/bulk modes;
+- OpenAPI 3.1, JSON Schema, RFC 9457 errors, version headers, ETag and cache policy;
+- 19 governed production inputs with provenance, rights expiry, source health,
+  atomic publication and rollback;
+- bounded resolver, correction, retention, backup, restore, accessibility,
+  supply-chain, release-sync and production-monitor gates;
+- privacy-preserving traffic reporting that separates product routes,
+  operational probes and likely automated exploit scans.
 
-- [x] approve scoped IEEE MA-L/MA-M/MA-S derived API output under the documented
-  2013/2014 evidence chain, explicit owner risk acceptance, annual re-review,
-  direct-origin requirement, and no-raw-redistribution boundary — issue #8;
-- [x] prepare, sign, import, resolve, and locally activate a real 53,283-row IEEE
-  release while omitting two ambiguous duplicate MA-L prefixes;
-- [x] guarded one-command IEEE prepare/import/build/activate workflow with
-  overlap rejection, immutable unchanged-snapshot observations, freshness
-  continuity, and explicit post-commit failure reporting — issue #29;
-- [x] exact migration SHA-256 ledger, applied-history drift rejection, and
-  transactional legacy checksum backfill — issue #31;
-- [x] compile-time reviewed source-adapter registry, version/source ownership
-  bindings, bounded transform contract, and database-free fixture validator —
-  issue #33;
-- [x] preview-first source governance decisions with transactional config
-  versioning/audit, active-publication risk acceptance, and cache invalidation —
-  issue #35;
-- [x] active non-production source failure, config-snapshot drift visibility in
-  health/release metadata, and rebuild closure — issue #37;
-- [x] latest fetch-observation release metadata, observation-aware ETags, and
-  targeted unchanged-snapshot cache invalidation — issue #39;
-- [x] live active-source and human-readable release UI backed by the public
-  data-release contract;
+## Observation window — 2026-07-15 through 2026-08-14
 
-## Independent hardening while data rights are blocked
+Feature expansion and new production data sources are frozen. Security,
+correctness, data-rights, dependency, recovery and operational fixes remain
+allowed. Ordinary fixes are bundled into at most one scheduled release in any
+seven-day period; a measured P0/P1 incident may justify an emergency release.
 
-- [x] provider-neutral surrogate-key headers, purge hook, failure-injection
-  tests, and a direct Cloudflare Free cache-tag adapter; production activation
-  waits for a newly rotated scoped token — issue #18;
-- [x] shared PostgreSQL fixed-window rate limiting with HMAC client keys, bounded
-  local fallback, and retention maintenance — issue #19;
-- [x] encrypted correction intake, append-only audit events, operator-only CLI,
-  and contact-data retention purge — issue #26;
-- [x] importer fuzz corpus and resource-limit enforcement — issue #17;
-- [x] source freshness and rights-expiry monitoring — issue #17;
-- [x] accessibility and cross-browser UI verification — issue #21;
-- [x] reproducible lookup p50/p95/p99, throughput, exact query plans,
-  PostgreSQL buffer/I/O, Node CPU, and peak RSS baseline; deployment SLO and
-  capacity remain intentionally unset until target infrastructure and traffic
-  concurrency are known — issue #23;
-- [x] indexed resolver matching and batch materialization with unchanged-output
-  regression evidence;
-- [x] stable resolution-policy revision independent of application releases;
-- [x] correction key rotation, queue-SLA timer, bounded host backup retention,
-  external production probes, and CodeQL scanning;
-- [x] release synchronization verification across local, GitHub, release tag,
-  public health metadata, and the active VPS release marker.
-- [x] resource-bounded retired-resolution retention with a 90-day floor, eight
-  rollback runs, suppression-reference protection, and append-only deletion audit;
-- [x] one prepare/import/build/activate transaction boundary for the scheduled
-  IEEE and enrichment publication; a failed fetch cannot partially activate;
-- [x] Cloudflare Free cache-tag purge adapter with scoped-token configuration;
-- [x] encrypted MacBook restic copy, Slack `#team` state-change monitor, and
-  public aggregate release-change status;
-- [x] source contribution reporting and a non-publishing owner-created source
-  quarantine workflow;
-- [x] bounded official bulk lookup, organization filters/detail pages, SBOM,
-  Git-history secret scanning, and runtime-image vulnerability scanning.
+The review must use 30 days of evidence:
 
-## After data readiness
+- availability, p95/p99 origin latency, 4xx classes, 429, 5xx and peak minute;
+- product-route requests separated from health checks and likely exploit scans;
+- source freshness, publication failures, rights-review horizon and correction SLA;
+- host and container CPU, memory, disk, I/O and backup growth;
+- real restore/rollback evidence and local/GitHub/release/production sync;
+- documented independent users or integrations, not page views, bots, stars or
+  synthetic monitor traffic.
 
-- [x] synthetic contributor adapter kit with rights and provenance gates.
+The detailed decision record is in
+[`production-observation.md`](./production-observation.md).
 
-Owner-created intake is complete and available on demand. `owner:prepare` can
-only produce `qa_only`, `internal_only` quarantine artifacts and cannot remove
-or replace a source. Production publication is not backlog work: it begins only
-when a real file and declaration are supplied and pass rights, privacy, conflict,
-correction, and rollback review.
+## Next decision
 
-## Explicitly not current scope
+After 2026-08-14, choose one path from evidence:
 
-- device model, operating system, user, or location identification;
-- scraping commercial lookup services;
-- raw third-party database redistribution;
-- automatic fuzzy organization merging;
-- payments, accounts, API-key plans, Kubernetes, or microservices;
-- claims of “optimal”, “official device vendor”, or privacy guarantees without
-  measured evidence and review.
+1. Keep the bounded free public service unchanged when capacity and demand are low.
+2. Improve documentation and integration examples when valid API use exists but
+   integration errors remain material.
+3. Add API keys/account quotas only after at least three independent integrations
+   or repeated legitimate quota requests.
+4. Raise bulk or origin limits only after measured concurrency, PostgreSQL wait,
+   RSS, CPU, I/O and latency evidence.
 
-Propose roadmap changes through a focused
-[feature request](https://github.com/ta2jam/macvendor/issues/new?template=feature_request.yml)
-or [Discussion](https://github.com/ta2jam/macvendor/discussions).
+Accounts, payments, SDK repositories, raw data redistribution, Redis,
+microservices and Kubernetes remain out of scope without those gates. Amateur
+data stays in the existing non-publishing quarantine path until a real file,
+rights declaration and privacy review are supplied.
+
+## Version 1.0 gate
+
+Do not publish 1.0 until all are true:
+
+- at least 30 days of measured production stability;
+- no binding-document drift against the deployed API and operations;
+- successful real-backup restore and rollback drills;
+- current source-rights reviews and zero unresolved publication failures;
+- a documented backward-compatibility policy and frozen v1 contract;
+- evidence of independent use;
+- PR-based protected-main releases and a documented continuity path.

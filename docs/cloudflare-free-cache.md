@@ -1,9 +1,14 @@
 # Cloudflare Free cache policy
 
-Production currently uses release-scoped ETags and a maximum five-minute shared
-TTL. This has no Cloudflare credential and no paid-feature dependency. A
-suppression or activation can therefore remain in an already cached response for
-at most five minutes; origin state changes immediately.
+Production currently uses Cloudflare Free as a TLS/DDoS/transport proxy, not as
+a forced public-API response cache. Lookup responses intentionally show
+`CF-Cache-Status: DYNAMIC`, so every request reaches the shared PostgreSQL
+origin limiter. Client and intermediary caches may still honor the documented
+opaque ETag and bounded `Cache-Control` values.
+
+This is a deliberate quota-correctness decision. Enabling a Cloudflare Cache
+Rule for `/v1/*` before an edge quota design would let cache hits bypass the
+origin limiter and make the published plan inaccurate.
 
 macvendor also supports Cloudflare's cache-tag purge API directly when a new,
 unexposed scoped credential is deliberately added. It does not need a paid
@@ -31,6 +36,8 @@ publication frequency stay below those constants.
 - https://developers.cloudflare.com/cache/plans/
 - https://developers.cloudflare.com/cache/how-to/purge-cache/
 
-Purge is an optional latency optimization, not a production correctness
-dependency. If enabled later, set `CACHE_PURGE_REQUIRED=true` only after a
-staging purge succeeds. Previously exposed tokens must not be reused.
+Purge is an optional future latency optimization, not a production correctness
+dependency in the current `DYNAMIC` policy. Do not enable lookup caching or set
+`CACHE_PURGE_REQUIRED=true` until measured load justifies it and cache-hit rate,
+negative-result TTL, suppression latency and rate-limit semantics are tested in
+staging. Previously exposed tokens must not be reused.

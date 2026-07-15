@@ -44,8 +44,10 @@ agent forwarding, TCP forwarding, and tunnels remain disabled.
 previous three-failure, one-hour exponentially increasing ban caused avoidable
 operator lockout on a public-key-only host. Do not allowlist a dynamic home IP.
 
-`macvendor-traffic-report.timer` builds a privacy-preserving 24-hour aggregate
-every 15 minutes in constant working memory. The Mac launch agent checks public
+`macvendor-traffic-report.timer` builds a privacy-preserving 24-hour v2 aggregate
+every 15 minutes in constant working memory. It separates fixed product route
+buckets, operational/known-monitor requests and heuristic exploit scans without
+retaining a raw URI, MAC, IP or User-Agent. The Mac launch agent checks public
 health, release metadata, SSH, failed units, disk, available memory, unhealthy
 containers, backup age, traffic-report age, peak traffic, 429, 5xx, and timer
 count every 15 minutes.

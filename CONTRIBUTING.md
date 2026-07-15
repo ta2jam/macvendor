@@ -11,7 +11,7 @@ valuable than adding broad product surface.
   open-ended design questions.
 - Report vulnerabilities through [private vulnerability reporting](SECURITY.md),
   never a public issue.
-- Small, isolated fixes can go directly to a pull request. Large schema, API,
+- Every normal code or production change uses a pull request. Large schema, API,
   resolver, source-policy, or privacy changes need an issue first.
 - A dataset proposal must use the data-source issue template and include rights
   and provenance evidence. “Publicly downloadable” is not a license.
@@ -102,16 +102,25 @@ proposal.
 ## Version and release policy
 
 Every released version is represented by an explicit commit and annotated tag.
+Tags are deployment artifacts, not progress counters. Ordinary fixes are
+bundled into no more than one scheduled release in any seven-day period. P0/P1
+security, correctness, rights, recovery, or production incidents are exempt
+when the release notes record the incident reason.
 
 1. Choose the SemVer version from the actual compatibility impact.
 2. Update `package.json` and `package-lock.json` together.
 3. Move relevant `Unreleased` entries in `CHANGELOG.md` under the dated version.
 4. Update user-visible version references if present.
 5. Run `npm run verify` and `npm audit --audit-level=low`.
-6. Commit all release changes with `release: vX.Y.Z`.
-7. Create `git tag -a vX.Y.Z -m "macvendor vX.Y.Z"` from that commit.
-8. Push the commit and tag; publish release notes from the changelog.
+6. Merge the green pull request into protected `main`.
+7. Create `git tag -a vX.Y.Z -m "macvendor vX.Y.Z"` from the exact main commit.
+8. Push the tag, publish release notes, pass the release gate, deploy, and run
+   release-sync plus public-contract checks.
 
 Version-only changes must never remain uncommitted. A tag must not point to a
 commit whose package/changelog version differs, and a release must not be made
-from a dirty working tree.
+from a dirty working tree. Do not create a release for documentation-only
+progress, issue closure, or each individual patch when bundling is safe.
+
+The current sole-maintainer limitation and temporary zero-independent-approval
+policy are explicit in [`docs/maintainer-continuity.md`](docs/maintainer-continuity.md).

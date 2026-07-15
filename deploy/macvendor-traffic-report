@@ -4,20 +4,63 @@ set -eu
 log=${MACVENDOR_CADDY_LOG:-/var/log/caddy/macvendor-access.log}
 output_dir=${MACVENDOR_METRICS_DIR:-/srv/sites/macvendor/metrics}
 output=$output_dir/traffic-latest.json
+output_owner=${MACVENDOR_METRICS_OWNER:-root}
+output_group=${MACVENDOR_METRICS_GROUP:-deploy}
 cutoff=$(($(date +%s) - 86400))
 
-install -d -o root -g deploy -m 0750 "$output_dir"
+install -d -o "$output_owner" -g "$output_group" -m 0750 "$output_dir"
 metrics=$(jq -r --argjson cutoff "$cutoff" '
   select(.ts >= $cutoff)
-  | [(.ts / 60 | floor), (.status // 0), ((.duration // 0) * 1000)]
+  | [(.ts / 60 | floor), (.status // 0), ((.duration // 0) * 1000),
+      (.request.method // ""), (.request.uri // ""),
+      (.request.headers["User-Agent"][0] // "")]
   | @tsv
 ' "$log" | awk -F '\t' '
+  function endpoint(path, method) {
+    sub(/\?.*/, "", path)
+    if (path == "/") return "home"
+    if (path == "/healthz" || path == "/readyz") return "health"
+    if (path == "/v1/lookups") return "bulk"
+    if (path ~ /^\/v1\/lookup\//) return "lookup"
+    if (path ~ /^\/v1\/assignments\//) return "assignments"
+    if (path == "/v1/data-release" || path == "/v1/data-release/changes") return "dataRelease"
+    if (path == "/v1/organizations" || path ~ /^\/v1\/organizations\//) return "organizations"
+    if (path == "/v1/corrections" || path == "/data-corrections") return "corrections"
+    if (path == "/api-docs" || path == "/openapi.json" ||
+        path == "/schemas/public-api-v1.schema.json" || path == "/plans" ||
+        path == "/methodology" || path == "/data-sources" ||
+        path == "/data-release" || path == "/status" ||
+        path == "/organizations" || path ~ /^\/legal\//) return "docs"
+    if (path ~ /^\/_next\// || path == "/favicon.ico" ||
+        path == "/robots.txt" || path == "/sitemap.xml") return "static"
+    return "other"
+  }
+  function likely_scan(path, lower) {
+    lower = tolower(path)
+    return lower ~ /(^|\/)(wp-|wordpress|cgi-bin|\.git|\.env|vendor\/phpunit)/ ||
+      lower ~ /\.php([\/?]|$)/
+  }
   {
     total += 1
     per_minute[$1] += 1
-    if ($2 >= 400 && $2 < 500) client_errors += 1
+    status = $2 + 0
+    path = $5
+    bucket = endpoint(path, $4)
+    endpoint_count[bucket] += 1
+    monitor = ($6 ~ /^macvendor-production-monitor\//)
+    scan = likely_scan(path)
+    if (monitor) monitor_requests += 1
+    if (scan) scan_requests += 1
+    if (bucket == "health" || monitor) operational_requests += 1
+    if (bucket != "other" && bucket != "health" && bucket != "static" && !monitor) product_requests += 1
+    if (status >= 200 && status < 300) successful += 1
+    if (status >= 300 && status < 400) redirected += 1
+    if (status >= 400 && status < 500) client_errors += 1
+    if (status == 400) bad_request += 1
+    if (status == 404) not_found += 1
     if ($2 == 429) rate_limited += 1
-    if ($2 >= 500) server_errors += 1
+    if (status >= 400 && status < 500 && status != 400 && status != 404 && status != 429) other_4xx += 1
+    if (status >= 500) server_errors += 1
     duration_sum += $3
     if ($3 > duration_max) duration_max = $3
   }
@@ -25,30 +68,29 @@ metrics=$(jq -r --argjson cutoff "$cutoff" '
     peak = 0
     for (minute in per_minute) if (per_minute[minute] > peak) peak = per_minute[minute]
     mean = total ? duration_sum / total : 0
-    printf "%d %d %d %d %d %.3f %.3f\n", total, peak, client_errors, rate_limited, server_errors, mean, duration_max
+    printf "{"
+    printf "\"schemaVersion\":\"macvendor-traffic/v2\","
+    printf "\"requests\":%d,\"productRequests\":%d,\"operationalRequests\":%d,", total, product_requests, operational_requests
+    printf "\"knownMonitorRequests\":%d,\"likelyAutomatedScanRequests\":%d,", monitor_requests, scan_requests
+    printf "\"peakRequestsPerMinute\":%d,\"clientErrors\":%d,\"rateLimited\":%d,\"serverErrors\":%d,", peak, client_errors, rate_limited, server_errors
+    printf "\"meanOriginMs\":%.3f,\"maxOriginMs\":%.3f,", mean, duration_max
+    printf "\"status\":{\"successful\":%d,\"redirected\":%d,\"clientErrors\":%d,\"serverErrors\":%d},", successful, redirected, client_errors, server_errors
+    printf "\"clientErrorBreakdown\":{\"badRequest\":%d,\"notFound\":%d,\"rateLimited\":%d,\"other\":%d},", bad_request, not_found, rate_limited, other_4xx
+    printf "\"endpoints\":{\"home\":%d,\"docs\":%d,\"lookup\":%d,\"bulk\":%d,", endpoint_count["home"], endpoint_count["docs"], endpoint_count["lookup"], endpoint_count["bulk"]
+    printf "\"assignments\":%d,\"dataRelease\":%d,\"organizations\":%d,", endpoint_count["assignments"], endpoint_count["dataRelease"], endpoint_count["organizations"]
+    printf "\"corrections\":%d,\"health\":%d,\"static\":%d,\"other\":%d},", endpoint_count["corrections"], endpoint_count["health"], endpoint_count["static"], endpoint_count["other"]
+    printf "\"edgePolicy\":\"origin_rate_limited\"}"
   }
 ')
 
-# The awk output is seven bounded numeric fields; intentional field splitting.
-# shellcheck disable=SC2086
-set -- $metrics
-test "$#" -eq 7
+printf '%s' "$metrics" | jq -e '.schemaVersion == "macvendor-traffic/v2"' >/dev/null
 tmp=$output.$$
 jq -n \
   --arg checkedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --argjson windowSeconds 86400 \
-  --argjson requests "$1" \
-  --argjson peakRequestsPerMinute "$2" \
-  --argjson clientErrors "$3" \
-  --argjson rateLimited "$4" \
-  --argjson serverErrors "$5" \
-  --argjson meanOriginMs "$6" \
-  --argjson maxOriginMs "$7" \
-  '{checkedAt:$checkedAt,windowSeconds:$windowSeconds,requests:$requests,
-    peakRequestsPerMinute:$peakRequestsPerMinute,clientErrors:$clientErrors,
-    rateLimited:$rateLimited,serverErrors:$serverErrors,
-    meanOriginMs:$meanOriginMs,maxOriginMs:$maxOriginMs}' > "$tmp"
-chown root:deploy "$tmp"
+  --argjson metrics "$metrics" \
+  '$metrics + {checkedAt:$checkedAt,windowSeconds:$windowSeconds}' > "$tmp"
+chown "$output_owner:$output_group" "$tmp"
 chmod 0640 "$tmp"
 mv "$tmp" "$output"
 cat "$output"
