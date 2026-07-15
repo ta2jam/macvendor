@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.7.5 — 2026-07-15
+
+- Fixed the external production monitor's Cloudflare/API header gate on Linux.
+  The probe now normalizes curl's CRLF header file before matching instead of
+  relying on incompatible GNU/BSD `grep -E` handling of `\r`.
+- Added deterministic CRLF, LF, and policy-violation regression coverage for
+  the production-header checker. This is a P1 observation-window exception:
+  the first v0.7.4 live workflow exposed the cross-platform monitor failure.
+
 ## 0.7.4 — 2026-07-15
 
 - Replaced the undifferentiated traffic counter with the fixed-cardinality,
