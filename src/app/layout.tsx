@@ -5,11 +5,19 @@ import { GITHUB_REPOSITORY_URL } from "@/lib/project";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://macvendor.io"),
   title: {
     default: "macvendor.io — MAC assignment lookup",
     template: "%s — macvendor.io",
   },
   description: "Source-aware MAC address block assignment lookup with explicit provenance.",
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: "macvendor.io",
+    title: "macvendor.io — MAC assignment lookup",
+    description: "Source-aware MAC address block assignment lookup with explicit provenance.",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

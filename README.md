@@ -157,3 +157,8 @@ Bug reports, narrowly scoped improvements, and well-evidenced source proposals
 are welcome through [GitHub Issues](https://github.com/ta2jam/macvendor/issues).
 Source-code licensing does not grant rights to third-party MAC assignment or
 vendor data.
+
+The project is in a measured production-observation window. See the
+[technical roadmap](docs/ROADMAP.md) and
+[30-day evidence gate](docs/production-observation.md); request volume, stars,
+and synthetic probes are not presented as proof of adoption.

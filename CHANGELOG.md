@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.7.4 — 2026-07-15
+
+- Replaced the undifferentiated traffic counter with the fixed-cardinality,
+  privacy-preserving `macvendor-traffic/v2` report. It separates product routes,
+  operational and known-monitor requests, likely automated exploit scans,
+  endpoint buckets, and 4xx classes without retaining raw URIs, MACs, IPs, or
+  User-Agent values.
+- Made production deployment install and refresh the traffic-report service,
+  added a deterministic fixture test, and gave external probes an explicit
+  monitor identity. The external monitor now also enforces a 45-day rights-
+  review horizon and the deliberate Cloudflare `DYNAMIC` API-cache policy.
+- Reconciled the architecture, roadmap, cache, operations, service-objective,
+  release, and maintainer-continuity documents with the deployed system. A
+  30-day feature/data-source freeze and evidence gate now precedes expansion.
+- Added canonical metadata, `robots.txt`, `sitemap.xml`, and an application icon
+  after production traffic showed repeated 404s for standard discovery assets.
+
 ## 0.7.3 — 2026-07-14
 
 - Made conditional GETs recognize and preserve Caddy's weak gzip, zstd, and

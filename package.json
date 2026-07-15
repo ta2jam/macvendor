@@ -1,6 +1,6 @@
 {
   "name": "macvendor",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "type": "module",
   "private": false,
   "description": "Source-aware MAC address block assignment lookup service.",
@@ -54,7 +54,7 @@
     "recovery:smoke": "tsx scripts/recovery-smoke.ts",
     "release:verify-sync": "sh scripts/verify-release-sync.sh",
     "release:deploy": "sh scripts/deploy-production.sh",
-    "ops:verify": "sh -n scripts/deploy-production.sh scripts/verify-release-sync.sh deploy/macvendor-image-retention deploy/macos/macvendor-ops-monitor",
+    "ops:verify": "sh -n scripts/deploy-production.sh scripts/verify-release-sync.sh deploy/macvendor-image-retention deploy/macvendor-traffic-report deploy/macos/macvendor-ops-monitor tests/operations/traffic-report.sh && sh tests/operations/traffic-report.sh",
     "db:test:prepare": "tsx scripts/prepare-test-db.ts",
     "test:integration": "npm run db:test:prepare && vitest run tests/integration",
     "verify": "npm run db:migrations:verify && npm run ops:verify && npm run lint && npm run typecheck && npm run test && npm run test:integration && npm run build",

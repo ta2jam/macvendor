@@ -97,8 +97,13 @@ chmod 0600 "$root/release.env"
 install -m 0755 "$release/deploy/macvendor-image-retention" /usr/local/sbin/macvendor-image-retention
 install -m 0644 "$release/deploy/macvendor-image-retention.service" /etc/systemd/system/macvendor-image-retention.service
 install -m 0644 "$release/deploy/macvendor-image-retention.timer" /etc/systemd/system/macvendor-image-retention.timer
+install -m 0755 "$release/deploy/macvendor-traffic-report" /usr/local/sbin/macvendor-traffic-report
+install -m 0644 "$release/deploy/macvendor-traffic-report.service" /etc/systemd/system/macvendor-traffic-report.service
+install -m 0644 "$release/deploy/macvendor-traffic-report.timer" /etc/systemd/system/macvendor-traffic-report.timer
 systemctl daemon-reload
 systemctl enable --now macvendor-image-retention.timer
+systemctl enable --now macvendor-traffic-report.timer
+systemctl start macvendor-traffic-report.service
 
 cd "$root/app"
 docker compose --env-file "$root/.env" -f compose.production.yaml \

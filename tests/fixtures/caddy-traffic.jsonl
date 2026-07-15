@@ -1,0 +1,10 @@
+{"ts":4102444800,"status":200,"duration":0.010,"request":{"method":"GET","uri":"/","headers":{"User-Agent":["Mozilla/5.0"]}}}
+{"ts":4102444801,"status":200,"duration":0.020,"request":{"method":"GET","uri":"/v1/lookup/00000C123456?mode=official","headers":{"User-Agent":["example-client/1"]}}}
+{"ts":4102444802,"status":400,"duration":0.030,"request":{"method":"GET","uri":"/v1/lookup/invalid","headers":{"User-Agent":["example-client/1"]}}}
+{"ts":4102444803,"status":429,"duration":0.040,"request":{"method":"POST","uri":"/v1/lookups","headers":{"User-Agent":["example-client/1"]}}}
+{"ts":4102444804,"status":404,"duration":0.050,"request":{"method":"GET","uri":"/wp-admin/install.php","headers":{"User-Agent":["scanner"]}}}
+{"ts":4102444805,"status":404,"duration":0.060,"request":{"method":"GET","uri":"/.env","headers":{"User-Agent":["scanner"]}}}
+{"ts":4102444806,"status":200,"duration":0.070,"request":{"method":"GET","uri":"/healthz","headers":{"User-Agent":["macvendor-production-monitor/1"]}}}
+{"ts":4102444807,"status":200,"duration":0.080,"request":{"method":"GET","uri":"/v1/data-release","headers":{"User-Agent":["macvendor-production-monitor/1"]}}}
+{"ts":4102444808,"status":308,"duration":0.090,"request":{"method":"GET","uri":"/v1/lookup/00:00:0c:12:34:56","headers":{"User-Agent":["example-client/1"]}}}
+{"ts":4102444809,"status":503,"duration":0.100,"request":{"method":"GET","uri":"/v1/organizations?q=test","headers":{"User-Agent":["example-client/1"]}}}

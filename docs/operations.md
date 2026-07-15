@@ -200,13 +200,13 @@ Kabul edilen diğer biçimler normalize edilir ve `308 Permanent Redirect` ile c
 
 Pozitif ve curated sonuç:
 
-- `ETag: "rr-{activeVersion}-pv-{publicationVersion}-{responseHash}"`
-- `Cache-Control: public, max-age=300, s-maxage=300`
+- opaque `ETag`; Caddy compression client'a weak encoded variant gösterebilir
+- `Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=60`
 - `Surrogate-Key: data-release resolved-release-{resolutionRunId}`
 
 Geçerli fakat eşleşmeyen MAC:
 
-- `Cache-Control: public, max-age=60, s-maxage=300`
+- `Cache-Control: public, max-age=30, s-maxage=60`
 
 Hata, rate-limit ve evidence içeren response shared cache'e girmez.
 
@@ -215,12 +215,12 @@ Hata, rate-limit ve evidence içeren response shared cache'e girmez.
 1. DB pointer transaction commit.
 2. Yeni active version uygulama tarafından okunabilir olur.
 3. Yapılandırılmışsa eski surrogate key purge edilir.
-4. Purge yoksa veya başarısızsa beş dakikalık shared TTL stale pencereyi sınırlar.
+4. Purge yoksa veya başarısızsa yanıt türünün bounded shared TTL'i stale pencereyi sınırlar.
 
 Suppression ekleme/revoke/expire işlemi `publicationVersion` değerini atomik
 artırır ve yapılandırılmışsa aynı release surrogate key'ini purge eder. Origin
-yeni overlay'i transaction commit edildiği anda uygular; edge ve istemci cache'i
-purge olmasa da en geç beş dakikalık TTL sonunda yenilenir.
+yeni overlay'i transaction commit edildiği anda uygular; cache kullanan bir
+istemci/aracı proxy bounded TTL veya yeni ETag ile yenilenir.
 
 Mutation CLI'ları commit sonrasında provider-bağımsız bir HTTPS adapter'ına şu
 sözleşmeyle çağrı yapar:
@@ -238,10 +238,10 @@ redirect izlenmez ve çağrı 5 saniyede kesilir. Cloudflare Free için generic
 endpoint yerine `CACHE_PURGE_PROVIDER=cloudflare`, `CLOUDFLARE_ZONE_ID` ve
 yalnız ilgili zone için Cache Purge yetkisi taşıyan yeni bir token kullanılır;
 doğrudan adapter `docs/cloudflare-free-cache.md` dosyasında açıklanır. Daha önce
-ifşa edilmiş token yeniden kullanılmaz. Mevcut production kısa TTL/ETag
-stratejisinde purge opsiyoneldir. Yeni token staging'de doğrulandıktan sonra
-istenirse `CACHE_PURGE_REQUIRED=true` yapılabilir. Purge hatası commit'i geri
-almış gibi sunulmaz:
+ifşa edilmiş token yeniden kullanılmaz. Production public API'si şu anda
+Cloudflare'da `DYNAMIC` bırakılır; her istek origin kotasına girer. Edge cache,
+quota semantiğini atlatmayacağı staging'de kanıtlanmadan açılmaz. Purge hatası
+commit'i geri almış gibi sunulmaz:
 CLI non-zero çıkar ve commit edilmiş mutation bilgisini makine-okunur hata
 içinde döndürür.
 

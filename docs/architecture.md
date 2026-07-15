@@ -1,7 +1,7 @@
 # macvendor.io — sürdürülebilir V1 mimarisi
 
-Tarih: 11 Temmuz 2026
-Durum: Bağlayıcı temel tasarım; çekirdek ve ölçüm temeli v0.0.10'da uygulanmıştır
+Tarih: 15 Temmuz 2026
+Durum: v0.7.4 production gerçekliğiyle eşitlenmiş bağlayıcı mimari
 
 ## Ürün sınırı
 
@@ -31,8 +31,8 @@ V1 düşük bağımlılıklı modüler monolittir:
 
 - TypeScript uygulama ve worker kodu,
 - PostgreSQL ana veri deposu,
-- S3 uyumlu object storage ham artifact ve manifestler için,
-- CDN/edge cache public GET trafiği için,
+- imzalı ve hash'lenmiş artifact/manifestler için host üzerinde sınırlı çalışma alanı ve off-host şifreli backup,
+- host seviyesinde Caddy ve Cloudflare reverse proxy; public API origin rate limit'ini atlatan zorunlu edge cache yok,
 - tek deploy edilebilir uygulama; importer ve resolver ayrı komut/işlem olarak çalışır.
 
 Redis, mesaj kuyruğu, arama motoru ve mikroservis V1'e alınmaz. Ölçülmüş bir darboğaz yokken bunlar operasyon yükü yaratır.
@@ -48,7 +48,7 @@ flowchart LR
     F --> H["Atomik active resolution pointer"]
     G --> H
     H --> I["Public API"]
-    I --> J["CDN cache"]
+    I --> J["Caddy + Cloudflare transport proxy"]
 ```
 
 Çevrimdışı yol kaynak indirir, doğrular, normalize eder, çözümler ve yeni değişmez sürüm üretir. Çevrimiçi lookup hiçbir dış kaynağı çağırmaz; yalnız aktif sürümü okur. Bu ayrım bir kaynak kapandığında public API'nin çalışmaya devam etmesini sağlar.
@@ -70,11 +70,11 @@ Tek çalışma anahtarı `publish_mode` değeridir:
 
 Ayrı bir `enabled` alanı yoktur; iki bayrak çelişkili durum yaratır. Kaynağın indirilebilir olması production kullanım hakkı vermez.
 
-Başlangıç yaklaşımı:
+Production yaklaşımı:
 
 | Kaynak | Başlangıç rolü |
 |---|---|
-| IEEE Registration Authority MA-L/MA-M/MA-S | 2026-07-11 kanıt zinciri ve açık owner risk acceptance ile `authoritative/production`; direct-origin, imza, yıllık review ve yalnız `api_output` |
+| IEEE Registration Authority MA-L/MA-M/MA-S/IAB/CID | 2026-07-11 kanıt zinciri ve açık owner risk acceptance ile `authoritative/production`; direct-origin, imza, yıllık review ve yalnız `api_output`; CID full-MAC lookup'a girmez |
 | KIT NETVS OUI lookup/verisi | `reference/qa_only`; availability veya kamuya açık oluşu yeniden dağıtım izni sayılmaz |
 | Ringmast4r OUI Master ve benzeri derlemeler | Lisans ve satır kökeni çözülene kadar `reference/qa_only` |
 | Eski Gist snapshot'ı | Güncellik ve haklar yetersizse `disabled` |
@@ -99,7 +99,7 @@ Kürasyonlu claim'ler resmî sonucu ezmez. 1–48 bit için en fazla 48 aday sor
 
 ## Fiziksel V1 kapsamı
 
-V1'de gerçekten oluşturulacak tablolar:
+V1'de gerçekten oluşturulan tablolar:
 
 1. `data_sources`
 2. `source_releases`
@@ -114,8 +114,13 @@ V1'de gerçekten oluşturulacak tablolar:
 11. `active_resolution`
 12. `publication_suppressions`
 13. `audit_events`
+14. `rate_limit_windows`
+15. `correction_requests`
+16. `correction_events`
 
-`organizations`, `organization_aliases`, kullanıcı hesabı, ödeme, API key ve vendor search tabloları V1'e dahil değildir. Vendor adı şu aşamada kaynak iddiasıdır; otomatik fuzzy birleştirme yapılmaz.
+Organization araması ayrı organization tablosu üretmez; reviewed `organization_identity`
+source record'ları üzerinde exact anahtar ve bounded filtre kullanır. Kullanıcı hesabı,
+ödeme, API key ve otomatik fuzzy birleştirme V1'e dahil değildir.
 
 ## Yayınlama ve geri alma
 
@@ -134,13 +139,21 @@ Rollback yeni veri yazmaz; pointer'ı önceki doğrulanmış sürüme aynı prot
 
 ## Dış API
 
-V1'in üç public ucu vardır:
+V1'in mevcut public uçları şunlardır:
 
 - `GET /v1/lookup/{mac}`
+- `POST /v1/lookups`
 - `GET /v1/assignments/{registry}/{prefix}`
 - `GET /v1/data-release`
+- `GET /v1/data-release/changes`
+- `GET /v1/organizations`
+- `GET /v1/organizations/{key}`
+- `POST /v1/corrections`
 
-Lookup yanıtı resmî `assignment` ile `curatedMatches` dizisini ayırır. Eşleşmesiz geçerli sorgu `200` ve `assignment: null` döndürür. Hatalar RFC 9457 problem JSON kullanır. Ayrıntılı şema ve cache davranışı `api-contract.md` içindedir.
+Lookup yanıtı resmî `assignment`, `curatedMatches` ve `insights` katmanlarını
+ayırır. Eşleşmesiz geçerli sorgu `200`, `matchStatus: "no_match"` ve
+`assignment: null` döndürür. Hatalar tek RFC 9457 problem JSON biçimini
+kullanır. Ayrıntılı şema ve cache davranışı `api-contract.md` içindedir.
 
 ## Güvenlik ve veri hakları
 
@@ -189,7 +202,7 @@ ancak deployment trafiği ölçüldükten sonra belirlenir; artifact/payload sı
 2. PostgreSQL migration'ları, check constraint'ler ve immutable release modeli kurulur.
 3. Normalizer ve adapter sözleşmesi; property/fuzz testleriyle uygulanır.
 4. Deterministik resolver, conflict kapıları ve active pointer transaction'ı uygulanır.
-5. Public API, problem JSON, ETag, CDN ve rate limit uygulanır.
+5. Public API, problem JSON, ETag, transport proxy ve rate limit uygulanır.
 6. Düzeltme/suppression kanalı, audit, backup/restore ve gözlemlenebilirlik tamamlanır.
 7. Yük, race, failure-injection ve sıfırdan rebuild testleri geçmeden production açılmaz.
 

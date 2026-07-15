@@ -28,6 +28,7 @@ Describe the smallest relevant implementation.
 
 ## Scope
 
+- [ ] This is not feature/data-source expansion during the active observation window, or it documents a measured P0/P1 exception.
 - [ ] Authoritative assignments and curated claims remain separate.
 - [ ] No unrelated changes or third-party dataset rows are included.
 - [ ] No claim of official device identity, privacy, verification, or optimality is made without evidence.
