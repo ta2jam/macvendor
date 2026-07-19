@@ -62,6 +62,7 @@ export async function fetchSourceArtifact(
     maxRedirects: remote.maxRedirects,
     maxBytes: MAX_ARTIFACT_BYTES,
     timeoutMs: FETCH_TIMEOUT_MS,
+    sourceSlug: manifest.source.slug,
   }, networkOptions);
   const contentHash = sha256(artifactDownload.bytes);
   if (contentHash !== manifest.artifact.sha256) {
@@ -77,6 +78,7 @@ export async function fetchSourceArtifact(
       maxRedirects: remote.maxRedirects,
       maxBytes: MAX_SIGNATURE_BYTES,
       timeoutMs: FETCH_TIMEOUT_MS,
+      sourceSlug: manifest.source.slug,
     }, networkOptions)).bytes;
   }
   const signatureKeyHash = await verifyArtifactSignature(manifest, manifestPath, artifactDownload.bytes, signatureBytes);

@@ -19,7 +19,7 @@ IEEE preparation is a narrower reviewed workflow:
 npm run source:prepare:ieee
 ```
 
-It downloads only the three fixed official CSV URLs, pins raw hashes, signs the
+It downloads only the five fixed official CSV URLs, pins raw hashes, signs the
 raw bytes with the operator ingest key, writes manifests under ignored `.local/`,
 and runs complete adapter/signature/schema validation before reporting success.
 IEEE does not publish detached signatures, so `signature.origin` is `operator`;
@@ -86,9 +86,18 @@ The public-key file is a reviewed local trust anchor. Its bytes must match
   result.
 - Loopback, private, shared, link-local, documentation, benchmark, multicast,
   reserved, and non-global IPv6 ranges are blocked.
-- The validated IP is pinned into the TLS connection, while certificate hostname
-  validation still uses the original hostname. This closes DNS re-resolution
-  between validation and connect.
+- Each validated IP is pinned into its own TLS attempt, while certificate
+  hostname validation still uses the original hostname. This closes DNS
+  re-resolution between validation and connect.
+- Transient transport failures, ten seconds without network progress, and HTTP
+  408, 425, 500, 502, 503, or 504 responses fail over sequentially to the next
+  validated DNS address within the original wall deadline. HTTP 429 is not
+  failed over because switching addresses could bypass an origin-wide rate
+  limit. Other 4xx/5xx responses, security-policy violations, size breaches,
+  hash/signature failures, and parser errors are not retried.
+- Fetch errors include the governed source slug, sanitized origin/path, HTTP
+  status when available, and bounded address-attempt count. Query strings and
+  credentials remain rejected before that context can be emitted.
 - TLS verification cannot be disabled by the CLI.
 - Compressed responses are rejected. Declared and streamed size are bounded.
 - Artifact and detached-signature fetches each have a 30-second wall deadline.
@@ -117,7 +126,9 @@ the same registry/prefix are rejected before the database transaction.
 
 ## Cost model
 
-Network and signature work is `O(B)` time and memory for at most 20 MiB artifact
-bytes. Parsing is `O(B + R)` and keeps at most 250,000 normalized records. Diff
-validation is `O(R + P)` memory/time for current and previous record-hash sets.
-These constants must be benchmarked before admitting a large production source.
+For artifact size `B` and at most eight validated DNS addresses `A`, network
+transfer is `O(A * B)` worst-case and memory remains `O(B)` because attempts are
+sequential and capped by the unchanged wall deadline. Parsing is `O(B + R)` and
+keeps at most 250,000 normalized records. Diff validation is `O(R + P)`
+memory/time for current and previous record-hash sets. These constants must be
+benchmarked before admitting a large production source.
