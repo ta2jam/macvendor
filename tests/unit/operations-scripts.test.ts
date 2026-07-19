@@ -48,4 +48,13 @@ fi
     expect(script).toContain("trap rollback EXIT HUP INT TERM");
     expect(script).not.toMatch(/RELEASE_SHA=[0-9a-f]{40}/);
   });
+
+  it("gives the hardened retention unit an isolated writable Docker config", async () => {
+    const unit = await readFile("deploy/macvendor-image-retention.service", "utf8");
+    expect(unit).toContain("Environment=DOCKER_CONFIG=/run/macvendor-image-retention/docker");
+    expect(unit).toContain("RuntimeDirectory=macvendor-image-retention");
+    expect(unit).toContain("RuntimeDirectoryMode=0700");
+    expect(unit).toContain("ProtectHome=true");
+    expect(unit).toContain("ProtectSystem=full");
+  });
 });
