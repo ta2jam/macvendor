@@ -15,12 +15,32 @@ interface LookupAddress {
   family: number;
 }
 
+const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 500, 502, 503, 504]);
+
 export interface DownloadPolicy {
   allowedOrigins: string[];
   maxRedirects: number;
   maxBytes: number;
   timeoutMs: number;
+  idleTimeoutMs?: number;
+  sourceSlug?: string;
   accept?: "application/octet-stream" | "application/json" | "text/plain" | "text/html";
+}
+
+export class RemoteFetchError extends ImportValidationError {
+  constructor(
+    code: string,
+    message: string,
+    public readonly sourceSlug: string | null,
+    public readonly remoteUrl: string,
+    public readonly addressAttempts: number,
+    public readonly statusCode: number | null = null,
+  ) {
+    super(code, `${message}; source=${sourceSlug ?? "unattributed"}; remote=${remoteUrl}; addressAttempts=${addressAttempts}${
+      statusCode === null ? "" : `; status=${statusCode}`
+    }`);
+    this.name = "RemoteFetchError";
+  }
 }
 
 function ipv4Number(address: string): number {
@@ -87,7 +107,7 @@ function safeUrl(value: string): URL {
   return url;
 }
 
-async function pinnedAddress(url: URL, options: FetchNetworkOptions, timeoutMs: number): Promise<LookupAddress> {
+async function pinnedAddresses(url: URL, options: FetchNetworkOptions, timeoutMs: number): Promise<LookupAddress[]> {
   const hostname = url.hostname.startsWith("[") ? url.hostname.slice(1, -1) : url.hostname;
   const literalFamily = isIP(hostname);
   const addresses = literalFamily
@@ -109,11 +129,14 @@ async function pinnedAddress(url: URL, options: FetchNetworkOptions, timeoutMs: 
   if (!options.testOnlyAllowPrivateAddresses && addresses.some((item) => !isPublicAddress(item.address))) {
     throw new ImportValidationError("SSRF_ADDRESS_BLOCKED", "remote hostname resolved to a non-public address");
   }
-  return [...addresses].sort((left, right) => left.family - right.family || left.address.localeCompare(right.address))[0]!;
+  const unique = [...new Map(addresses.map((item) => [`${item.family}:${item.address}`, item])).values()];
+  // Preserve resolver order because it can encode reachability and load-balancer
+  // preference. Every candidate was already validated as public.
+  return unique;
 }
 
 function requestBuffer(url: URL, address: LookupAddress, maximumBytes: number, timeoutMs: number,
-  ca: SecureContextOptions["ca"], accept: DownloadPolicy["accept"]): Promise<{
+  idleTimeoutMs: number, ca: SecureContextOptions["ca"], accept: DownloadPolicy["accept"]): Promise<{
   status: number; location: string | null; body: Buffer;
 }> {
   return new Promise((resolve, reject) => {
@@ -136,6 +159,9 @@ function requestBuffer(url: URL, address: LookupAddress, maximumBytes: number, t
       }) as never,
     });
     const timer = setTimeout(() => req.destroy(new ImportValidationError("FETCH_TIMEOUT", "remote fetch exceeded its wall-time limit")), timeoutMs);
+    req.setTimeout(idleTimeoutMs, () => req.destroy(
+      new ImportValidationError("FETCH_IDLE_TIMEOUT", "remote fetch made no network progress within the idle limit"),
+    ));
     req.once("error", (error) => { clearTimeout(timer); fail(error); });
     req.once("response", (response) => {
       const status = response.statusCode ?? 0;
@@ -193,42 +219,83 @@ export async function downloadHttps(
   }
   if (!Number.isInteger(policy.maxRedirects) || policy.maxRedirects < 0 || policy.maxRedirects > 3
     || !Number.isInteger(policy.maxBytes) || policy.maxBytes < 1 || policy.maxBytes > 20 * 1024 * 1024
-    || !Number.isInteger(policy.timeoutMs) || policy.timeoutMs < 100 || policy.timeoutMs > 300_000) {
+    || !Number.isInteger(policy.timeoutMs) || policy.timeoutMs < 100 || policy.timeoutMs > 300_000
+    || (policy.idleTimeoutMs !== undefined && (!Number.isInteger(policy.idleTimeoutMs)
+      || policy.idleTimeoutMs < 100 || policy.idleTimeoutMs > policy.timeoutMs))
+    || (policy.sourceSlug !== undefined && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(policy.sourceSlug))) {
     throw new ImportValidationError("INVALID_FETCH_POLICY", "fetch policy limits are invalid");
   }
+  const idleTimeoutMs = policy.idleTimeoutMs ?? Math.min(10_000, policy.timeoutMs);
   let url = safeUrl(inputUrl);
   const visited = new Set<string>();
   const deadline = Date.now() + policy.timeoutMs;
+  let addressAttempts = 0;
+  const remoteError = (error: ImportValidationError, statusCode: number | null = null) => new RemoteFetchError(
+    error.code, error.message, policy.sourceSlug ?? null, `${url.origin}${url.pathname}`, addressAttempts, statusCode,
+  );
   for (let redirects = 0; redirects <= policy.maxRedirects; redirects += 1) {
-    if (!allowed.has(url.origin)) throw new ImportValidationError("REMOTE_ORIGIN_BLOCKED", "remote URL origin is not allowlisted");
-    if (visited.has(url.href)) throw new ImportValidationError("REDIRECT_LOOP", "remote redirect loop detected");
+    if (!allowed.has(url.origin)) throw remoteError(
+      new ImportValidationError("REMOTE_ORIGIN_BLOCKED", "remote URL origin is not allowlisted"),
+    );
+    if (visited.has(url.href)) throw remoteError(
+      new ImportValidationError("REDIRECT_LOOP", "remote redirect loop detected"),
+    );
     visited.add(url.href);
     const remainingForDns = deadline - Date.now();
-    if (remainingForDns < 1) throw new ImportValidationError("FETCH_TIMEOUT", "remote fetch exceeded its wall-time limit");
-    let address: LookupAddress;
+    if (remainingForDns < 1) throw remoteError(
+      new ImportValidationError("FETCH_TIMEOUT", "remote fetch exceeded its wall-time limit"),
+    );
+    let addresses: LookupAddress[];
     try {
-      address = await pinnedAddress(url, options, remainingForDns);
+      addresses = await pinnedAddresses(url, options, remainingForDns);
     } catch (error) {
-      if (error instanceof ImportValidationError) throw error;
-      throw new ImportValidationError("DNS_FAILED", "remote hostname resolution failed");
+      if (error instanceof ImportValidationError) throw remoteError(error);
+      throw remoteError(new ImportValidationError("DNS_FAILED", "remote hostname resolution failed"));
     }
-    const remainingForRequest = deadline - Date.now();
-    if (remainingForRequest < 1) throw new ImportValidationError("FETCH_TIMEOUT", "remote fetch exceeded its wall-time limit");
-    let result;
-    try {
-      result = await requestBuffer(url, address, policy.maxBytes, remainingForRequest, options.ca, policy.accept);
-    } catch (error) {
-      if (error instanceof ImportValidationError) throw error;
-      throw new ImportValidationError("FETCH_FAILED", "HTTPS fetch failed TLS or transport validation");
+    let result: Awaited<ReturnType<typeof requestBuffer>> | undefined;
+    let lastTransientError: ImportValidationError | undefined;
+    const baseAttemptCount = addressAttempts;
+    for (const address of addresses) {
+      const remainingForRequest = deadline - Date.now();
+      if (remainingForRequest < 1) break;
+      addressAttempts += 1;
+      try {
+        const candidate = await requestBuffer(
+          url, address, policy.maxBytes, remainingForRequest,
+          Math.min(idleTimeoutMs, remainingForRequest), options.ca, policy.accept,
+        );
+        if (RETRYABLE_HTTP_STATUSES.has(candidate.status)) {
+          lastTransientError = new ImportValidationError("FETCH_STATUS_REJECTED", "remote fetch returned a transient HTTP status");
+          if (addressAttempts - baseAttemptCount < addresses.length) continue;
+        }
+        result = candidate;
+        break;
+      } catch (error) {
+        const normalized = error instanceof ImportValidationError
+          ? error
+          : new ImportValidationError("FETCH_FAILED", "HTTPS fetch failed TLS or transport validation");
+        if (!["FETCH_TIMEOUT", "FETCH_IDLE_TIMEOUT", "FETCH_FAILED"].includes(normalized.code)) {
+          throw remoteError(normalized);
+        }
+        lastTransientError = normalized;
+      }
     }
+    if (!result) throw remoteError(lastTransientError
+      ?? new ImportValidationError("FETCH_TIMEOUT", "remote fetch exceeded its wall-time limit"));
     if ([301, 302, 303, 307, 308].includes(result.status)) {
-      if (redirects === policy.maxRedirects) throw new ImportValidationError("TOO_MANY_REDIRECTS", "remote fetch exceeded the redirect limit");
-      if (!result.location) throw new ImportValidationError("INVALID_REDIRECT", "redirect response has no Location header");
+      if (redirects === policy.maxRedirects) throw remoteError(
+        new ImportValidationError("TOO_MANY_REDIRECTS", "remote fetch exceeded the redirect limit"), result.status,
+      );
+      if (!result.location) throw remoteError(
+        new ImportValidationError("INVALID_REDIRECT", "redirect response has no Location header"), result.status,
+      );
       url = safeUrl(new URL(result.location, url).href);
       continue;
     }
-    if (result.status !== 200) throw new ImportValidationError("FETCH_STATUS_REJECTED", "remote fetch did not return HTTP 200");
+    if (result.status !== 200) throw remoteError(
+      new ImportValidationError("FETCH_STATUS_REJECTED", "remote fetch did not return HTTP 200"), result.status,
+    );
     return { bytes: result.body, redirectCount: redirects, finalOrigin: url.origin };
   }
-  throw new ImportValidationError("TOO_MANY_REDIRECTS", "remote fetch exceeded the redirect limit");
+  throw remoteError(new ImportValidationError("TOO_MANY_REDIRECTS", "remote fetch exceeded the redirect limit"));
 }

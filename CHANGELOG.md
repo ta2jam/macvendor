@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.7.8 — 2026-07-19
+
+- Fixed the reproduced multi-address edge failure in the daily governed source
+  update after four consecutive enrichment failures left five IEEE inputs
+  stale. The HTTPS boundary no longer pins every fetch to only the first
+  validated DNS address: an idle or explicitly retryable edge now fails over
+  sequentially within the existing wall deadline.
+- Added source slug, sanitized remote path, attempt count, and HTTP status to
+  fetch failures without weakening origin allowlists, SSRF rejection, TLS,
+  size, signature, parser, rights, or atomic activation gates.
+- Reproduced the incident against the production VPS and `pci-ids.ucw.cz`: the
+  first edge stalled near the end of the response, while the next validated
+  edge returned the complete 1,653,587-byte artifact. Added idle, transient
+  status, non-transient status, and attribution regression coverage.
+
 ## 0.7.7 — 2026-07-15
 
 - Removed patch-specific active-version wording from the binding architecture

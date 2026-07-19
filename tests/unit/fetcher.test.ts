@@ -13,6 +13,7 @@ import { loadManifest } from "../../src/importer/manifest";
 
 let directory: string;
 let server: Server;
+let stallingServer: Server;
 let origin: string;
 let certificate: Buffer;
 let artifact: string;
@@ -48,7 +49,7 @@ keyUsage=critical,digitalSignature,keyCertSign
       response.writeHead(302, { Location: "/artifact" }).end();
     } else if (request.url === "/off-origin") {
       response.writeHead(302, { Location: `https://blocked.test:${(server.address() as { port: number }).port}/artifact` }).end();
-    } else if (request.url === "/artifact") {
+    } else if (request.url === "/artifact" || request.url === "/transient" || request.url === "/rate-limited") {
       response.writeHead(200, { "Content-Type": "text/csv" }).end(artifact);
     } else if (request.url === "/signature") {
       response.writeHead(200, { "Content-Type": "text/plain" }).end(signatureText);
@@ -60,9 +61,21 @@ keyUsage=critical,digitalSignature,keyCertSign
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   origin = `https://fixture.test:${(server.address() as { port: number }).port}`;
+  stallingServer = createServer({ key, cert: certificate }, (request, response) => {
+    if (request.url === "/artifact") {
+      response.writeHead(200, { "Content-Type": "text/csv", "Content-Length": Buffer.byteLength(artifact) });
+      response.write(artifact.slice(0, -8));
+    } else if (request.url === "/transient") response.writeHead(503).end();
+    else if (request.url === "/missing") response.writeHead(404).end();
+    else if (request.url === "/rate-limited") response.writeHead(429, { "Retry-After": "60" }).end();
+  });
+  await new Promise<void>((resolve) => stallingServer.listen(
+    (server.address() as { port: number }).port, "::1", resolve,
+  ));
 });
 
 afterAll(async () => {
+  await new Promise<void>((resolve, reject) => stallingServer.close((error) => error ? reject(error) : resolve()));
   await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   await rm(directory, { recursive: true, force: true });
 });
@@ -111,6 +124,78 @@ describe("HTTPS fetch boundary", () => {
     await expect(downloadHttps(`${origin}/off-origin`, {
       allowedOrigins: [origin], maxRedirects: 1, maxBytes: 1024, timeoutMs: 5_000,
     }, testNetwork())).rejects.toMatchObject({ code: "REMOTE_ORIGIN_BLOCKED" });
+  });
+
+  it("fails over to another validated address when the first edge becomes idle", async () => {
+    const result = await downloadHttps(`${origin}/artifact`, {
+      allowedOrigins: [origin], maxRedirects: 0, maxBytes: 1024, timeoutMs: 2_000,
+      idleTimeoutMs: 100, sourceSlug: "pci-id-repository",
+    }, {
+      ...testNetwork(),
+      resolver: async () => [
+        { address: "::1", family: 6 },
+        { address: "127.0.0.1", family: 4 },
+      ],
+    });
+    expect(result).toMatchObject({ finalOrigin: origin });
+    expect(result.bytes.toString()).toBe(artifact);
+  });
+
+  it("attributes an exhausted idle failure to the source and sanitized remote", async () => {
+    await expect(downloadHttps(`${origin}/artifact`, {
+      allowedOrigins: [origin], maxRedirects: 0, maxBytes: 1024, timeoutMs: 500,
+      idleTimeoutMs: 100, sourceSlug: "pci-id-repository",
+    }, {
+      ...testNetwork(),
+      resolver: async () => [{ address: "::1", family: 6 }],
+    })).rejects.toMatchObject({
+      name: "RemoteFetchError", code: "FETCH_IDLE_TIMEOUT", sourceSlug: "pci-id-repository",
+      remoteUrl: `${origin}/artifact`, addressAttempts: 1,
+    });
+  });
+
+  it("fails over on a transient upstream status", async () => {
+    const result = await downloadHttps(`${origin}/transient`, {
+      allowedOrigins: [origin], maxRedirects: 0, maxBytes: 1024, timeoutMs: 2_000,
+      idleTimeoutMs: 100, sourceSlug: "pci-id-repository",
+    }, {
+      ...testNetwork(),
+      resolver: async () => [
+        { address: "::1", family: 6 },
+        { address: "127.0.0.1", family: 4 },
+      ],
+    });
+    expect(result.bytes.toString()).toBe(artifact);
+  });
+
+  it("does not retry a non-transient upstream status", async () => {
+    await expect(downloadHttps(`${origin}/missing`, {
+      allowedOrigins: [origin], maxRedirects: 0, maxBytes: 1024, timeoutMs: 2_000,
+      idleTimeoutMs: 100, sourceSlug: "pci-id-repository",
+    }, {
+      ...testNetwork(),
+      resolver: async () => [
+        { address: "::1", family: 6 },
+        { address: "127.0.0.1", family: 4 },
+      ],
+    })).rejects.toMatchObject({
+      name: "RemoteFetchError", code: "FETCH_STATUS_REJECTED", statusCode: 404, addressAttempts: 1,
+    });
+  });
+
+  it("does not bypass an origin rate limit through another address", async () => {
+    await expect(downloadHttps(`${origin}/rate-limited`, {
+      allowedOrigins: [origin], maxRedirects: 0, maxBytes: 1024, timeoutMs: 2_000,
+      idleTimeoutMs: 100, sourceSlug: "pci-id-repository",
+    }, {
+      ...testNetwork(),
+      resolver: async () => [
+        { address: "::1", family: 6 },
+        { address: "127.0.0.1", family: 4 },
+      ],
+    })).rejects.toMatchObject({
+      name: "RemoteFetchError", code: "FETCH_STATUS_REJECTED", statusCode: 429, addressAttempts: 1,
+    });
   });
 
   it("does not permit URL credentials, query tokens, or disabled TLS verification", async () => {

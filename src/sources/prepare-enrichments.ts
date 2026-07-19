@@ -110,9 +110,10 @@ function outputPrefix(item: { bits: bigint; length: number }): Pick<OutputRecord
   return { prefix: formatPrefix(item.bits, item.length), prefixLength: String(item.length) };
 }
 
-async function download(url: string, origins: string[], accept: "application/octet-stream" | "application/json" = "application/octet-stream"): Promise<Buffer> {
+async function download(sourceSlug: string, url: string, origins: string[],
+  accept: "application/octet-stream" | "application/json" = "application/octet-stream"): Promise<Buffer> {
   return (await downloadHttps(url, {
-    allowedOrigins: origins, maxRedirects: 0, maxBytes: MAX_BYTES, timeoutMs: 60_000, accept,
+    allowedOrigins: origins, maxRedirects: 0, maxBytes: MAX_BYTES, timeoutMs: 60_000, sourceSlug, accept,
   })).bytes;
 }
 
@@ -123,7 +124,7 @@ async function ianaRecords(): Promise<OutputRecord[]> {
   ];
   const records: OutputRecord[] = [];
   for (const input of inputs) {
-    const rows = parse(await download(input.url, [IANA_ORIGIN]), {
+    const rows = parse(await download("iana-ethernet-numbers", input.url, [IANA_ORIGIN]), {
       columns: true, bom: true, skip_empty_lines: true, relax_column_count: false,
     }) as Array<{ Addresses: string; Usage: string; Reference: string }>;
     for (const row of rows) {
@@ -142,7 +143,7 @@ async function ianaRecords(): Promise<OutputRecord[]> {
 }
 
 async function ieeeGroupRecords(): Promise<OutputRecord[]> {
-  const html = (await download(IEEE_GROUP_URL, [IEEE_SITE_ORIGIN])).toString("utf8");
+  const html = (await download("ieee-group-mac", IEEE_GROUP_URL, [IEEE_SITE_ORIGIN])).toString("utf8");
   const $ = loadHtml(html);
   const records: OutputRecord[] = [];
   $("table tr").each((_index, element) => {
@@ -230,7 +231,9 @@ async function organizationIdentityRecords(mappingPath: string): Promise<Record<
     throw new Error("organization identity mappings must contain unique organizationKey values");
   }
   const [penBytes, pciBytes, usbBytes] = await Promise.all([
-    download(IANA_PEN_URL, [IANA_ORIGIN]), download(PCI_IDS_URL, [PCI_ORIGIN]), download(USB_IDS_URL, [RUNZERO_ORIGIN]),
+    download("iana-private-enterprise-numbers", IANA_PEN_URL, [IANA_ORIGIN]),
+    download("pci-id-repository", PCI_IDS_URL, [PCI_ORIGIN]),
+    download("hwdata-usb-vendors", USB_IDS_URL, [RUNZERO_ORIGIN]),
   ]);
   const penNames = new Map<string,string>();
   for (const match of penBytes.toString("utf8").matchAll(/^(\d+)\r?\n {2}([^\r\n]+)$/gmu)) {
@@ -250,7 +253,7 @@ async function organizationIdentityRecords(mappingPath: string): Promise<Record<
   for (const mapping of mappings) {
     for (const identifier of mapping.gleif ?? []) {
       const url = `${GLEIF_ORIGIN}/api/v1/lei-records/${identifier}`;
-      const body = JSON.parse((await download(url, [GLEIF_ORIGIN], "application/json")).toString("utf8")) as {
+      const body = JSON.parse((await download("gleif-lei-identities", url, [GLEIF_ORIGIN], "application/json")).toString("utf8")) as {
         data?: { id?: string; attributes?: { entity?: { legalName?: { name?: string }; otherNames?: Array<{ name?: string }>;
           legalAddress?: { country?: string }; registeredAs?: string }; registration?: { status?: string } } };
       };
@@ -265,7 +268,7 @@ async function organizationIdentityRecords(mappingPath: string): Promise<Record<
     }
     for (const identifier of mapping.sec ?? []) {
       const url = `${SEC_ORIGIN}/submissions/CIK${identifier}.json`;
-      const body = JSON.parse((await download(url, [SEC_ORIGIN], "application/json")).toString("utf8")) as {
+      const body = JSON.parse((await download("sec-edgar-identities", url, [SEC_ORIGIN], "application/json")).toString("utf8")) as {
         cik?: number; name?: string; formerNames?: Array<{ name?: string; from?: string; to?: string }>;
         tickers?: string[]; exchanges?: string[]; stateOfIncorporation?: string;
       };
@@ -276,7 +279,7 @@ async function organizationIdentityRecords(mappingPath: string): Promise<Record<
     }
     for (const identifier of mapping.companiesHouse ?? []) {
       const url = `${COMPANIES_HOUSE_ORIGIN}/doc/company/${identifier}.json`;
-      const body = JSON.parse((await download(url, [COMPANIES_HOUSE_ORIGIN], "application/json")).toString("utf8")) as {
+      const body = JSON.parse((await download("companies-house-identities", url, [COMPANIES_HOUSE_ORIGIN], "application/json")).toString("utf8")) as {
         primaryTopic?: { CompanyName?: string; CompanyNumber?: string; CompanyStatus?: string; PreviousCompanyName?: string[] };
       };
       const company = body.primaryTopic;
@@ -293,9 +296,11 @@ async function officialVirtualPlatformRecords(): Promise<{
   wireshark: OutputRecord[]; hyperv: OutputRecord[]; vmware: OutputRecord[]; openstack: OutputRecord[];
 }> {
   const [wka, hypervPage, vmwarePage, openstackSource, openstackDvrSource] = await Promise.all([
-    download(WIRESHARK_WKA_URL, [WIRESHARK_ORIGIN]), download(HYPERV_URL, [MICROSOFT_ORIGIN]),
-    download(VMWARE_URL, [BROADCOM_ORIGIN]), download(OPENSTACK_MAC_URL, [OPENSTACK_ORIGIN]),
-    download(OPENSTACK_DVR_URL, [OPENSTACK_ORIGIN]),
+    download("wireshark-well-known-addresses", WIRESHARK_WKA_URL, [WIRESHARK_ORIGIN]),
+    download("microsoft-hyperv-mac-hints", HYPERV_URL, [MICROSOFT_ORIGIN]),
+    download("vmware-mac-hints", VMWARE_URL, [BROADCOM_ORIGIN]),
+    download("openstack-neutron-mac-hints", OPENSTACK_MAC_URL, [OPENSTACK_ORIGIN]),
+    download("openstack-neutron-mac-hints", OPENSTACK_DVR_URL, [OPENSTACK_ORIGIN]),
   ]);
   const hypervText = hypervPage.toString("utf8").toLowerCase();
   const vmwareText = vmwarePage.toString("utf8").toLowerCase();
@@ -361,7 +366,8 @@ export function runZeroVirtualRecords(source: string): OutputRecord[] {
 
 async function runZeroRecords(): Promise<OutputRecord[]> {
   const [history, virtual] = await Promise.all([
-    download(RUNZERO_HISTORY_URL, [RUNZERO_ORIGIN]), download(RUNZERO_VIRTUAL_URL, [RUNZERO_ORIGIN]),
+    download("runzero-mac-tracker", RUNZERO_HISTORY_URL, [RUNZERO_ORIGIN]),
+    download("runzero-mac-tracker", RUNZERO_VIRTUAL_URL, [RUNZERO_ORIGIN]),
   ]);
   const virtualRecords = runZeroVirtualRecords(virtual.toString("utf8"));
   if (virtualRecords.length < 10) throw new Error("runZero virtual prefix parser produced too few records");
@@ -383,7 +389,7 @@ async function wikidataRecords(ieeeDirectory: string, mappingPath: string): Prom
   const entities = new Map<string, { label: string; aliases: string[] }>();
   for (const mapping of mappings) {
     const url = `${WIKIDATA_ENTITY}/${mapping.qid}.json`;
-    const body = JSON.parse((await download(url, [WIKIDATA_ORIGIN])).toString("utf8")) as {
+    const body = JSON.parse((await download("wikidata-vendor-aliases", url, [WIKIDATA_ORIGIN])).toString("utf8")) as {
       entities: Record<string, { labels?: Record<string, { value: string }>; aliases?: Record<string, Array<{ value: string }>> }>;
     };
     const entity = body.entities[mapping.qid];
