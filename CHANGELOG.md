@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.7.9 — 2026-07-19
+
+- Fixed the scheduled Docker image-retention unit after its filesystem
+  hardening blocked the Docker CLI from creating the default `/root/.docker`
+  configuration directory. The unit now gets a private, writable
+  `DOCKER_CONFIG` below `/run` while retaining `ProtectHome=true` and
+  `ProtectSystem=full`.
+- Added a regression assertion for the isolated runtime directory and Docker
+  configuration boundary.
+
 ## 0.7.8 — 2026-07-19
 
 - Fixed the reproduced multi-address edge failure in the daily governed source

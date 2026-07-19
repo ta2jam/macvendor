@@ -6,6 +6,9 @@ After=docker.service
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/flock -n /run/macvendor-image-retention.lock /usr/local/sbin/macvendor-image-retention
+Environment=DOCKER_CONFIG=/run/macvendor-image-retention/docker
+RuntimeDirectory=macvendor-image-retention
+RuntimeDirectoryMode=0700
 Nice=15
 IOSchedulingClass=idle
 PrivateTmp=true
